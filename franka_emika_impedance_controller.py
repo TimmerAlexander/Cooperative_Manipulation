@@ -12,7 +12,7 @@
 
 # /***************************************************************************
 # Copyright (c) 2019-2021, Saif Sidhik
- 
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -80,7 +80,10 @@ def _on_robot_state(msg):
         Callback function for updating jacobian and EE velocity from robot state
     """
     global JACOBIAN, CARTESIAN_VEL
+    # Get Jacobian matrix 0_dJac_EE: zero jacobian of end-effector frame. Vectorized 6x7 Jacobian, column-major
     JACOBIAN = np.asarray(msg.O_Jac_EE).reshape(6,7,order = 'F')
+    print(JACOBIAN)
+    # Get EE velocities from msg.0_dP_EE: EE vel computed as J*dq
     CARTESIAN_VEL = {
                 'linear': np.asarray([msg.O_dP_EE[0], msg.O_dP_EE[1], msg.O_dP_EE[2]]),
                 'angular': np.asarray([msg.O_dP_EE[3], msg.O_dP_EE[4], msg.O_dP_EE[5]]) }
@@ -91,8 +94,9 @@ def _on_endpoint_state(msg):
     """
     # pose message received is a vectorised column major transformation matrix
     global CARTESIAN_POSE
+    # O_T_EE: Measured end effector pose in base frame
     cart_pose_trans_mat = np.asarray(msg.O_T_EE).reshape(4,4,order='F')
-
+    # Transform cart_pose_trans_mat into the dictionary CARTESIAN_POSE
     CARTESIAN_POSE = {
         'position': cart_pose_trans_mat[:3,3],
         'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
@@ -102,9 +106,13 @@ def quatdiff_in_euler(quat_curr, quat_des):
         Compute difference between quaternions and return 
         Euler angles as difference
     """
+    # Transform current orientation to a rotation matrix 
     curr_mat = quaternion.as_rotation_matrix(quat_curr)
+    # Transform goal orientation to a rotation matrix
     des_mat = quaternion.as_rotation_matrix(quat_des)
+    
     rel_mat = des_mat.T.dot(curr_mat)
+    
     rel_quat = quaternion.from_rotation_matrix(rel_mat)
     vec = quaternion.as_float_array(rel_quat)[1:]
     if rel_quat.w < 0.0:
@@ -121,26 +129,37 @@ def control_thread(rate):
     while not rospy.is_shutdown():
         error = 100.
         while error > 0.005:
+            # Create a deepcopy of CARTESIAN_POSE
             curr_pose = copy.deepcopy(CARTESIAN_POSE)
+            
+            # Assgin curr_pose['position'],curr_pose['orientation'] to curr_pos, curr_ori
             curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
-
+            
+            # Assgin (CARTESIAN_VEL['linear']).reshape([3,1]) to curr_vel
             curr_vel = (CARTESIAN_VEL['linear']).reshape([3,1])
+            
+            # Assgin CARTESIAN_VEL['angular'].reshape([3,1]) to curr_omg
             curr_omg = CARTESIAN_VEL['angular'].reshape([3,1])
-
+            
+            # Calculate position difference
             delta_pos = (goal_pos - curr_pos).reshape([3,1])
+            
+            # Calculate orientation difference
             delta_ori = quatdiff_in_euler(curr_ori, goal_ori).reshape([3,1])
-
-            # Desired task-space force using PD law
+            
+            # Desired task-space force using PD law (Stiffness and Damping)
             F = np.vstack([P_pos*(delta_pos), P_ori*(delta_ori)]) - \
                 np.vstack([D_pos*(curr_vel), D_ori*(curr_omg)])
-
+                
+            # Calculate the vector norm of delta_pos and delta_ori and sum the results
             error = np.linalg.norm(delta_pos) + np.linalg.norm(delta_ori)
             
+            # Create a deepcopy of J
             J = copy.deepcopy(JACOBIAN)
-
-            # joint torques to be commanded
+            
+            # Calculate the joint torques to be commanded
             tau = np.dot(J.T,F)
-
+            
             # publish joint commands
             command_msg.effort = tau.flatten()
             joint_command_publisher.publish(command_msg)
@@ -217,7 +236,6 @@ if __name__ == "__main__":
     pose = copy.deepcopy(CARTESIAN_POSE)
     start_pos, start_ori = pose['position'],pose['orientation']
     goal_pos, goal_ori = start_pos, start_ori # set goal pose a starting pose in the beginning
-    
 
     # start controller thread
     rospy.on_shutdown(_on_shutdown)
