@@ -1,0 +1,11 @@
+
+
+Universal_Robot_Directory:
+
+universal_robot:
+	Installation:
+		- https://github.com/ros-industrial/universal_robot
+
+cartesian_controllers:
+	Installation:
+		- https://github.com/fzi-forschungszentrum-informatik/cartesian_controllers

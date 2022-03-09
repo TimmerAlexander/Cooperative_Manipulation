@@ -1,0 +1,28 @@
+
+Franka_Emika_Directory:
+
+panda_simulator:
+	Installation:
+		- https://github.com/justagist/panda_simulator/tree/noetic-devel
+
+		- pip install numpy
+		- pip install numpy-quaternion
+		- sudo pip install numpy-quaternion
+
+	Launch:
+		Simulator:
+			-  roslaunch panda_gazebo panda_world.launch start_moveit:=false # (use argument load_gripper:=false for starting without gripper; see other available arguments in launch file)
+
+			-  roslaunch panda_sim_moveit sim_move_group.launch # (use argument load_gripper:=false for starting without gripper
+		
+		Demos:
+		To run these demos, launch the simulator first: roslaunch panda_gazebo panda_world.launch. The following demos can then be tested:
+
+		Moveit Demo: The moveit server must be running (see usage). Run roslaunch panda_simulator_examples demo_moveit.launch to run a demo for testing the moveit planner interface with the simulated robot. This script starts a moveit RViz GUI for motion planning and terminal interface for modifying planning scene.
+
+		Task-space control using Franka ROS Interface (or PandaRobot) API: Run roslaunch panda_simulator_examples demo_task_space_control.launch to run a demo showing the task-space control. By default, the demo uses the (Franka ROS Interface) API to retrieve state information, and to control it using torque control (see script).
+
+		Task-space control using ROS topics directly: Another script demonstrating the same functionality without using the Franka ROS Interface API, and only the ROS topics from the simulation is also provided. This can be run interactively by running roslaunch panda_simulator_examples demo_task_space_control.launch use_fri:=False.
+
+		API usage demo: Another (much simpler) demo 'move_robot.py' is provided demonstrating (i) controlling the robot in the joint space, (ii) retrieving state information of the robot.
+	
