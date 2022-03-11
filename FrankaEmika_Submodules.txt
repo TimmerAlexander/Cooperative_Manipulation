@@ -5,9 +5,11 @@ panda_simulator:
 	Installation:
 		- https://github.com/justagist/panda_simulator/tree/noetic-devel
 
-		- pip install numpy
-		- pip install numpy-quaternion
-		- sudo pip install numpy-quaternion
+		python3 -m pip install numpy-quaternion
+		pip install -U numpy
+		pip install scipy
+		pip install numba
+		
 
 	Launch:
 		Simulator:
