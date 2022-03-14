@@ -4,6 +4,10 @@
   <arg name="paused" default="false" doc="Starts gazebo in paused mode" />
   <arg name="gui" default="true" doc="Starts gazebo gui" />
   
+  <arg name="robot1_name"  default="franka"/>
+  <arg name="robot2_name"  default="ur"/>
+
+
   <!-- startup simulated world -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" default="worlds/empty.world"/>
@@ -11,10 +15,33 @@
     <arg name="gui" value="$(arg gui)"/>
   </include>
 
+  <!-- launch the franka emika-->
 
-  <include file="$(find cooperative_manipulation)/simulation_launch/universal_robot.launch">
+  
+  <rosparam command="load" file="$(find panda_gazebo)/config/robot_details.yaml"/>
+  
+  <group ns="$(arg robot1_name)">
+    <include file="$(find cooperative_manipulation)/simulation_launch/franka_emika.launch">
+        <arg name="load_gazebo" value="true"/>
+    </include>
+  </group> 
+  
+  
 
+
+
+  <!-- launch the ur -->
+
+  
+  <!--
+
+  <group ns="$(arg robot2_name)">
+    <include file="$(find cooperative_manipulation)/simulation_launch/universal_robot.launch">
   </include>
+  </group> 
+
+  -->
+  
  <!-- launch rviz-->
 
 </launch>
