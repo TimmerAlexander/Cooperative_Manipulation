@@ -2,12 +2,11 @@
 <launch>
 
   <arg name="paused" default="false" doc="Starts gazebo in paused mode" />
-  <arg name="gui" default="true" doc="Starts gazebo gui" />
+  <arg name="use_sim_time" default="true"/>
+  <arg name="gui" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="debug" default="false"/>
   
-  <arg name="robot1_name"  default="franka"/>
-  <arg name="robot2_name"  default="ur"/>
-
-
   <!-- startup simulated world -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" default="worlds/empty.world"/>
@@ -15,31 +14,44 @@
     <arg name="gui" value="$(arg gui)"/>
   </include>
 
-  <!-- launch the franka emika-->
+  <!-- pass robot names -->
+  <arg name="robot1_name"  default="franka"/>
+  <arg name="robot2_name"  default="ur"/>
 
-  
+
+  <!-- franka emika -->
+
+  <!--initial_pose(translation and rotation) of base-->
+  <!--arg with suffix tf for static_transform_publisher node, args without suffix "tf" fit for urdf files-->
+  <arg name="panda_base_trans" default="'0 0 0'"/>
+  <arg name="panda_base_trans_tf" default="0 0 0"/>
+  <arg name="panda_base_rot" default="'0 0 0'"/>
+  <arg name="panda_base_rot_tf" default="0 0 0 1"/>
+  <arg name="panda_initial_pose" default="[0.00,-0.785,0.0,-2.356,0.0,1.57,-0.785]"/>
+
+  <!-- load panda robot details into parameterserver -->
   <rosparam command="load" file="$(find panda_gazebo)/config/robot_details.yaml"/>
   
+  <!-- launch franka emika -->
   <group ns="$(arg robot1_name)">
     <include file="$(find cooperative_manipulation)/simulation_launch/franka_emika.launch">
         <arg name="load_gazebo" value="true"/>
+        <arg name="panda_name" value="$(arg robot1_name)"/>
+        <arg name="gui" value="$(arg gui)"/>
+        <arg name="initial_pose" value="$(arg panda_initial_pose)"/>
+        <arg name="panda_xyz" value="$(arg panda_base_trans)"/>
+        <arg name="panda_xyz_tf" value="$(arg panda_base_trans_tf)"/>
     </include>
   </group> 
   
   
-
-
-
   <!-- launch the ur -->
 
-  
   <!--
-
   <group ns="$(arg robot2_name)">
     <include file="$(find cooperative_manipulation)/simulation_launch/universal_robot.launch">
   </include>
   </group> 
-
   -->
   
  <!-- launch rviz-->
