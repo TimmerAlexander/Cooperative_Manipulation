@@ -7,10 +7,8 @@
   <arg name="start_moveit" default="false"/>
   <arg name="load_demo_planning_scene" default="false"/>
   <arg name="force_neutral_pose" default="true"/> <!-- Use a separate script to send robot to the neutral pose in the beginning of simulation -->
-
-  <!-- passed arguments from cooperative_manipulation.launch-->
-  <arg name="load_gazebo" default="true"/>
-  <arg name="panda_name" default="panda"/>
+  <arg name="panda_name" default="panda1"/>
+  <arg name="ns" default="/$(arg panda_name)/panda_simulator"/>
   <arg name="gui" default="true"/>
   <arg name="panda_xyz" default="'0 0 0'"/>
   <arg name="panda_rpy" default="'0 0 0'"/>
@@ -18,26 +16,24 @@
   <arg name="panda_rpy_tf" default="0 0 0 1"/>
   <arg name="initial_pose" default="[0.000,-0.785,0.0,-2.356,0.0,1.57,0.785]"/>
 
-  <!-- panda namespace -->
-  <arg name="ns" default="/$(arg panda_name)/panda_simulator"/>
-
   <!-- This argument fixes the robot statically to the world -->
   <arg name="static" default="true"/>
 
+  <!-- This argument dictates whether gazebo should be launched in this file -->
+  <arg name="load_gazebo" default="true"/>
+
   <!-- This argument sets the initial joint states -->
   <arg name="initial_joint_states"
-    default=" -J panda::panda_joint1 0.000
-              -J panda::panda_joint2 -0.785
-              -J panda::panda_joint3 0.0
-              -J panda::panda_joint4 -2.356
-              -J panda::panda_joint5 0.0
-              -J panda::panda_joint6 1.57
-              -J panda::panda_joint7 0.785"/>
+    default=" -J $(arg panda_name)::panda_joint1 0.000
+              -J $(arg panda_name)::panda_joint2 -0.785
+              -J $(arg panda_name)::panda_joint3 0.0
+              -J $(arg panda_name)::panda_joint4 -2.356
+              -J $(arg panda_name)::panda_joint5 0.0
+              -J $(arg panda_name)::panda_joint6 1.57
+              -J $(arg panda_name)::panda_joint7 -0.785"/>
 
-  <!-- launch robot description -->
+
   <param name="robot_description" command="$(find xacro)/xacro --inorder $(find cooperative_manipulation)/franka_urdf/cooperative_manipulator_panda_arm_hand.urdf.xacro load_gripper:=$(arg load_gripper) load_gazebo:=$(arg load_gazebo) panda_namespace:=$(arg panda_name) xyz:=$(arg panda_xyz) rpy:=$(arg panda_rpy)"/>
-
-
 
   <param name="/arm/root_name" value="panda_link0" />
   <param if="$(arg load_gripper)" name="/arm/tip_name" value="panda_hand" /> 
@@ -54,8 +50,7 @@
   <!-- create a tf with base frame as 'base' (to match aml_robot) -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_link0" args="0 0 0 0 0 0 1 $(arg panda_name)/base $(arg panda_name)/panda_link0 100" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_base" args="$(arg panda_xyz_tf) $(arg panda_rpy_tf) $(arg panda_name)/world $(arg panda_name)/base 100" />
-
-
+  <node pkg="tf" type="static_transform_publisher" name="world_to_panda_world" args="0 0 0 0 0 0 1 world $(arg panda_name)/world 100" />
 
   <!-- ros_control panda launch file -->
   <include file="$(find cooperative_manipulation)/cooperative_manipulation_controller/launch/franka_emika_controller.launch">
@@ -65,36 +60,28 @@
       <arg name="panda_name" default="$(arg panda_name)"/>
   </include>
 
-
   <group if="$(eval arg('use_custom_action_servers') == true)">
-    <!-- node force_neutral_pose -->
     <node pkg="panda_sim_custom_action_server" type="start_joint_trajectory_server.py" name="joint_trajectory_server_emulator">
       <param name="ns" value="$(arg ns)"/> 
     </node>
 
       <group if="$(eval arg('load_gripper') == true)">
-        <!-- node load_gripper -->
-        <node pkg="panda_sim_custom_action_server" type="start_gripper_action_server.py" name="gripper_action_server_emulator"/>
+        <node pkg="panda_sim_custom_action_server" type="start_gripper_action_server.py" name="gripper_action_server_emulator">
+          <param name="panda_name" value="$(arg panda_name)"/>
+        </node>
       </group>
-
-    <group if="$(eval arg('start_moveit') == true)">
-    <!-- launch sim_move_group.launch -->
-      <include file="$(find panda_sim_moveit)/launch/sim_move_group.launch">
-        <arg name="load_gripper" value="$(arg load_gripper)" />
-        <arg name="info" value="true" />
-      </include>
-    </group>
   </group>
 
-  
   <group if="$(eval arg('load_demo_planning_scene') == true)">
-    <!-- node demo_scene_loader -->
     <node name="demo_scene_loader" pkg="franka_moveit" type="create_demo_planning_scene.py" respawn="false" output="screen" />
   </group>
 
+
   <group if="$(eval arg('force_neutral_pose') == true)">
-    <!-- node force_neutral_pose -->
-    <node pkg="panda_gazebo" type="force_neutral_pose.py" name="startup_script"/>
+      <node pkg="simu" type="sim_force_neutral_pose.py" name="startup_script">
+        <rosparam command="load" file="$(find simu)/config/force_neutral_pose.yaml"/>
+        <rosparam param="initial_pose" subst_value="True">$(arg initial_pose)</rosparam>
+      </node>
   </group>   
 
 </launch>

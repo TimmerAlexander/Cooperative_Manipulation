@@ -77,7 +77,7 @@
       <remap from="/joint_states" to="/$(arg panda_name)/joint_states" /> -->
   </node>
 
-  <node name="topic_remap" pkg="topic_tools" type="relay" args="/$(arg panda_name)/joint_states /panda_simulator/custom_franka_state_controller/joint_states"/>
+  <node name="topic_remap" pkg="topic_tools" type="relay" args="/$(arg panda_name)/joint_states /$(arg ns)/custom_franka_state_controller/joint_states"/>
 
 
 </launch>
