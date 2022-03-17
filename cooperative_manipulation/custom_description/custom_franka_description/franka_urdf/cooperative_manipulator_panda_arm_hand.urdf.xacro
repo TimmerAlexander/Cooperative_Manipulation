@@ -20,7 +20,7 @@
 
   <xacro:if value="$(arg load_gazebo)">  
     <xacro:include filename="$(find franka_panda_description)/robots/panda.gazebo.xacro"/>
-    <xacro:include filename="$(find cooperative_manipulation)/franka_urdf/cooperative_manipulator.transmission.xacro"/>
+    <xacro:include filename="$(find cooperative_manipulation)/custom_description/custom_franka_description/franka_urdf/cooperative_manipulator.transmission.xacro"/>
     
     <xacro:panda_arm in_gazebo="true"  connected_to="$(arg connected_to)" xyz="$(arg xyz)" rpy="$(arg rpy)"/>
     <xacro:panda_gazebo robot_name="$(arg robot_name)" load_gripper="$(arg load_gripper)"/>
