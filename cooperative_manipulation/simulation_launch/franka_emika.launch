@@ -7,7 +7,7 @@
   <arg name="start_moveit" default="false"/>
   <arg name="load_demo_planning_scene" default="false"/>
   <arg name="force_neutral_pose" default="true"/> <!-- Use a separate script to send robot to the neutral pose in the beginning of simulation -->
-  <arg name="panda_name" default="panda1"/>
+  <arg name="panda_name" default="panda"/>
   <arg name="ns" default="/$(arg panda_name)/panda_simulator"/>
   <arg name="gui" default="true"/>
   <arg name="panda_xyz" default="'0 0 0'"/>

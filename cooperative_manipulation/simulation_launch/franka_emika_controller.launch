@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="panda_name" default="panda"/>
+
+    <!--transformation from object to end effector of manipulators-->
+    <arg name="obj_end" default="[0.707,0.707,0,0.4897,0.707,-0.707,0,-0.4424,0,0,-1,0.0788,0,0,0,1]"/>
+ 
+    
+    <group ns="$(arg panda_name)">
+        <node pkg="cooperaive_manipulatioin" type="franka_emika_control.py" name="ts_control_sim_only" output="screen">
+            <param name="base" value="$(arg panda_name)/base"/>
+        </node>
+
+        <node pkg="simu" type="equilibrium.py" name="equilibrium">
+            <rosparam file="$(find simu)/scripts/config/equilibrium.yaml" command="load"/>
+            <rosparam param="base_name" subst_value="True">$(arg panda_name)</rosparam>
+            <rosparam param="obj_end" subst_value="True">$(arg obj_end)</rosparam>
+        </node>
+    </group>   
+
+</launch>
