@@ -2,8 +2,8 @@
 <robot xmlns:xacro="http://wiki.ros.org/xacro"
        name="ur5" >
 
-  <xacro:arg name="xyz" default="'0.0 0.0 0.0'"/>
-  <xacro:arg name="rpy" default="'0.0 0.0 0.0'"/>
+  <xacro:arg name="xyz" default="'0 0 0'"/>
+  <xacro:arg name="rpy" default="'0 0 0'"/>
 
   <xacro:arg name="transmission_hw_interface" default="hardware_interface/PositionJointInterface"/>
 

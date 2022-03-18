@@ -4,9 +4,15 @@
   <arg name="paused" default="false" doc="Starts gazebo in paused mode" />
   <arg name="gui" default="true" doc="Starts gazebo gui" />
 
+  <!--initial_pose(translation and rotation) of base-->
+  <arg name="ur_xyz" default="0 0 0"/>
+  <arg name="ur_rpy" default="0 0 0"/>
+
   <!-- send robot urdf to param server -->
   <include file="$(find cooperative_manipulation)/custom_description/custom_ur_description/launch/custom_ur5_upload.launch">
     <arg name="limited" value="$(arg limited)"/>
+    <arg name="ur_xyz" default="$(arg ur_xyz)"/>
+    <arg name="ur_rpy" default="$(arg ur_rpy)"/>
   </include>
 
   <!-- push robot_description to factory and spawn robot in gazebo -->
@@ -21,6 +27,7 @@
   <!-- load other controllers -->
   <node name="ros_control_controller_manager" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="load joint_group_position_controller" />
 
+  <!-- load pid controller parameters -->
   <!-- <rosparam file="$(find cooperative_manipualtion)/cooperative_manipulation_controller/config/pid_controller_params.yaml" command="load"/> -->
 
 </launch>
