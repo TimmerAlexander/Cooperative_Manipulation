@@ -9,7 +9,7 @@
   <arg name="ur_rpy" default="0 0 0"/>
 
   <!-- send robot urdf to param server -->
-  <include file="$(find cooperative_manipulation)/custom_description/custom_ur_description/launch/custom_ur5_upload.launch">
+  <include file="$(find cooperative_manipulation)/custom_description/custom_ur_description/launch/custom_ur16_upload.launch">
     <arg name="limited" value="$(arg limited)"/>
     <arg name="ur_xyz" default="$(arg ur_xyz)"/>
     <arg name="ur_rpy" default="$(arg ur_rpy)"/>
@@ -18,10 +18,10 @@
   <!-- push robot_description to factory and spawn robot in gazebo -->
   <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model robot -z 0.1" respawn="false" output="screen" />
 
-  <include file="$(find ur_gazebo)/launch/controller_utils.launch"/>
+  <include file="$(find ur_e_gazebo)/launch/controller_utils.launch"/>
 
   <!-- start this controller -->
-  <rosparam file="$(find ur_gazebo)/controller/arm_controller_ur5.yaml" command="load"/>
+  <rosparam file="$(find ur_e_gazebo)/controller/arm_controller_ur10e.yaml" command="load"/>
   <node name="arm_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn arm_controller" respawn="false" output="screen"/>
 
   <!-- load other controllers -->
