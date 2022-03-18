@@ -6,8 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /Grid1
-        - /panda11
+        - /InteractiveMarkers1
+        - /InteractiveMarkers1/Status1
       Splitter Ratio: 0.27494457364082336
     Tree Height: 719
   - Class: rviz/Selection
@@ -133,6 +133,85 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Alpha: 1
+      Class: rviz/Axes
+      Enabled: true
+      Length: 1
+      Name: Axes
+      Radius: 0.009999999776482582
+      Reference Frame: <Fixed Frame>
+      Show Trail: false
+      Value: true
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        panda/base:
+          Value: true
+        panda/panda_hand:
+          Value: true
+        panda/panda_leftfinger:
+          Value: true
+        panda/panda_link0:
+          Value: true
+        panda/panda_link1:
+          Value: true
+        panda/panda_link2:
+          Value: true
+        panda/panda_link3:
+          Value: true
+        panda/panda_link4:
+          Value: true
+        panda/panda_link5:
+          Value: true
+        panda/panda_link6:
+          Value: true
+        panda/panda_link7:
+          Value: true
+        panda/panda_link8:
+          Value: true
+        panda/panda_rightfinger:
+          Value: true
+        panda/world:
+          Value: true
+        world:
+          Value: true
+      Marker Alpha: 1
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: false
+      Show Axes: false
+      Show Names: false
+      Tree:
+        world:
+          panda/world:
+            panda/base:
+              panda/panda_link0:
+                panda/panda_link1:
+                  panda/panda_link2:
+                    panda/panda_link3:
+                      panda/panda_link4:
+                        panda/panda_link5:
+                          panda/panda_link6:
+                            panda/panda_link7:
+                              panda/panda_link8:
+                                panda/panda_hand:
+                                  panda/panda_leftfinger:
+                                    {}
+                                  panda/panda_rightfinger:
+                                    {}
+      Update Interval: 0
+      Value: true
+    - Class: rviz/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Name: InteractiveMarkers
+      Show Axes: false
+      Show Descriptions: true
+      Show Visual Aids: false
+      Update Topic: ""
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
