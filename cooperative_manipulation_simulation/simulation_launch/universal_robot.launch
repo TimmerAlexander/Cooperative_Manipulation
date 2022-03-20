@@ -9,7 +9,7 @@
   <arg name="ur_rpy" default="0 0 0"/>
 
   <!-- send robot urdf to param server -->
-  <include file="$(find cooperative_manipulation)/custom_description/custom_ur_description/launch/custom_ur16_upload.launch">
+  <include file="$(find cooperative_manipulation_robot_description)/custom_ur_description/launch/custom_ur16e_upload.launch">
     <arg name="limited" value="$(arg limited)"/>
     <arg name="ur_xyz" default="$(arg ur_xyz)"/>
     <arg name="ur_rpy" default="$(arg ur_rpy)"/>
