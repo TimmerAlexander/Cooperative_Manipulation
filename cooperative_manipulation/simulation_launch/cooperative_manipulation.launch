@@ -23,7 +23,7 @@
     
     <!-- In Franka Emika namespace -->
     <!-- Launch Franka Emika -->
-    <!--
+    
     <group ns="$(arg franka_emika_name)">
 
       
@@ -37,19 +37,17 @@
         <arg name="panda_rpy_tf" value="$(arg panda_base_rot_tf)"/>
       </include>
     </group> 
-  -->
+  
     <!-- Launch Franka Emika controller -->
-    <!--
-    <include file="$(find $(find cooperative_manipulation)/cooperative_manipulation_controller/launch/franka_emika_control.launch">
+    
+    <include file="$(find cooperative_manipulation_controller)/launch/franka_emika_control.launch">
       <arg name="panda_name" value="$(arg franka_emika_name)"/>
       <arg name="base_name" value="$(arg franka_emika_name)/base"/>
     </include>
-    -->
+    
 
     <!-- Franka Emika launch rviz -->
-    <!--
     <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation)/world/rviz/franka_single.rviz"/>
-    -->
     
     
     
@@ -62,19 +60,19 @@
     <arg name="ur_base_rot" default="'0 0 0'"/>
 
     <!-- Launch Universal Robot -->
-    
+    <!--
     <group ns="$(arg universal_robot_name)">
       <include file="$(find cooperative_manipulation)/simulation_launch/universal_robot.launch">
       <arg name="ur_xyz" value="$(arg ur_base_trans)"/>
       <arg name="ur_rpy" value="$(arg ur_base_rot)"/>
     </include>
     </group> 
-    
+    -->
     
     <!-- Universal Robot launch rviz -->
-    
+    <!--
     <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation)/world/rviz/ur_single.rviz"/>
-  
+    -->
     
   <!-- Launch Cooperative Manipulation controller:___________________________________________________________________-->
   <!--
