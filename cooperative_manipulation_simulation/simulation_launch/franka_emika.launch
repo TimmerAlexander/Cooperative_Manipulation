@@ -33,7 +33,7 @@
               -J $(arg panda_name)::panda_joint7 -0.785"/>
 
 
-  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find cooperative_manipulation)custom_description/custom_franka_description/franka_urdf/cooperative_manipulator_panda_arm_hand.urdf.xacro load_gripper:=$(arg load_gripper) load_gazebo:=$(arg load_gazebo) panda_namespace:=$(arg panda_name) xyz:=$(arg panda_xyz) rpy:=$(arg panda_rpy)"/>
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find cooperative_manipulation_simulation)custom_description/custom_franka_description/franka_urdf/cooperative_manipulator_panda_arm_hand.urdf.xacro load_gripper:=$(arg load_gripper) load_gazebo:=$(arg load_gazebo) panda_namespace:=$(arg panda_name) xyz:=$(arg panda_xyz) rpy:=$(arg panda_rpy)"/>
 
   <param name="/arm/root_name" value="panda_link0" />
   <param if="$(arg load_gripper)" name="/arm/tip_name" value="panda_hand" /> 

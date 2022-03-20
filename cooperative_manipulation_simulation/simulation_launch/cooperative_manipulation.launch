@@ -5,7 +5,7 @@
 
   <!-- Gazebo launch:________________________________________________________________________________________________-->
   <arg name="load_gazebo" default="true"/>
-  <include if="$(arg load_gazebo)" file="$(find cooperative_manipulation)/world/launch/gazebo_world.launch"/>
+  <include if="$(arg load_gazebo)" file="$(find cooperative_manipulation_simulation)/world/launch/gazebo_world.launch"/>
 
   <!-- Franka Emika:_________________________________________________________________________________________________-->
 
@@ -28,7 +28,7 @@
 
       
      
-      <include file="$(find cooperative_manipulation)/simulation_launch/franka_emika.launch">
+      <include file="$(find cooperative_manipulation_simulation)/simulation_launch/franka_emika.launch">
         <arg name="panda_name" value="$(arg franka_emika_name)"/>
         <arg name="initial_pose" value="$(arg panda_initial_pose)"/>
         <arg name="panda_xyz" value="$(arg panda_base_trans)"/>
@@ -47,7 +47,7 @@
     
 
     <!-- Franka Emika launch rviz -->
-    <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation)/world/rviz/franka_single.rviz"/>
+    <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/world/rviz/franka_single.rviz"/>
     
     
     
@@ -62,7 +62,7 @@
     <!-- Launch Universal Robot -->
     <!--
     <group ns="$(arg universal_robot_name)">
-      <include file="$(find cooperative_manipulation)/simulation_launch/universal_robot.launch">
+      <include file="$(find cooperative_manipulation_simulation)/simulation_launch/universal_robot.launch">
       <arg name="ur_xyz" value="$(arg ur_base_trans)"/>
       <arg name="ur_rpy" value="$(arg ur_base_rot)"/>
     </include>
@@ -71,17 +71,17 @@
     
     <!-- Universal Robot launch rviz -->
     <!--
-    <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation)/world/rviz/ur_single.rviz"/>
+    <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/world/rviz/ur_single.rviz"/>
     -->
     
   <!-- Launch Cooperative Manipulation controller:___________________________________________________________________-->
   <!--
-  <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation)/world/rviz/cooperative_manipulation.rviz"/>
+
   -->
   
   <!-- Launch Cooperative Manipulation Rviz:_________________________________________________________________________-->
   <!--
-  <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation)/world/rviz/cooperative_manipulation.rviz"/>
+  <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/world/rviz/cooperative_manipulation.rviz"/>
   -->
 
 </launch>
