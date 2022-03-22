@@ -28,7 +28,7 @@
   <node name="ros_control_controller_manager" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="load joint_group_position_controller" />
 
   <!-- load pid controller parameters -->
-  <!-- <rosparam file="$(find cooperative_manipualtion)/cooperative_manipulation_controller/config/pid_controller_params.yaml" command="load"/> -->
+  <!-- <rosparam file="$(find cooperative_manipualtion)/cooperative_manipulation_controllers/config/pid_controller_params.yaml" command="load"/> -->
 
 </launch>
 

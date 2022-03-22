@@ -1,0 +1,9 @@
+#relative pose between the base of each manipulator
+rel_pose_base: [0.0,-1.0,0.0,0,0,0,1]
+base_name: panda/base
+leader_name: panda/base
+end_name: panda/panda_link8
+#transformation from leader base to object frame
+leader_obj: [0,1,0,0.7464,-1,0,0,0.4897,0,0,1,0.4971,0,0,0,1]
+#transformation from object to end effector
+obj_end: [0.707,0.707,0,0.4897,0.707,-0.707,0,-0.4424,0,0,-1,0.0788,0,0,0,1]

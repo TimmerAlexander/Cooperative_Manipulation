@@ -53,7 +53,7 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_panda_world" args="0 0 0 0 0 0 1 world $(arg panda_name)/world 100" />
 
   <!-- ros_control panda launch file -->
-  <include file="$(find cooperative_manipulation_controller)/launch/franka_emika_controller.launch">
+  <include file="$(find cooperative_manipulation_controllers)/launch/franka_emika_controller.launch">
       <arg name="gui" value="$(arg gui)" />
       <arg name="ns" value="$(arg ns)" />
       <arg name="load_gripper" value="$(arg load_gripper)" />

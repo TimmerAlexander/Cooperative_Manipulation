@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   #pluglib
   roscpp
+  rospy
 )
 
 ## System dependencies are found with CMake's conventions

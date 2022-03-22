@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # /***************************************************************************
 
@@ -12,7 +12,7 @@
 
 # /***************************************************************************
 # Copyright (c) 2019-2021, Saif Sidhik
-
+ 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -31,12 +31,10 @@
     simulator robot using the ROS topics and messages directly 
     from panda_simulator. The task-space force for the desired
     pose is computed using a simple PD law, and the corresponding
-    joint torques are computed and sent to the robot.
+    joint torques are computed and sent to the robot. 
     
-    After launching the simulator (panda_world.launch),
-    run this demo using the command:
-        
-        roslaunch panda_simulator_examples demo_task_space_control.launch --use_fri:=false
+    By using this file you can set a equilibrium pose by using interactive marker. You can also set the target 
+    By publishing the topic "panda_simulator/equili_pose" .
 
 """
 
@@ -45,7 +43,7 @@ import rospy
 import threading
 import quaternion
 import numpy as np
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, TransformStamped,PoseStamped
 from visualization_msgs.msg import *
 from interactive_markers.interactive_marker_server import *
 from franka_core_msgs.msg import EndPointState, JointCommand, RobotState
@@ -55,18 +53,18 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # -------------------------------------------------
 
-from rviz_markers import RvizMarkers
+from cooperative_manipulation_controllers.franka_rviz_markers import RvizMarkers
 
 # --------- Modify as required ------------
 # Task-space controller parameters
 # stiffness gains
-P_pos = 50.
-P_ori = 25.
+P_pos = 50
+P_ori = 0
 # damping gains
-D_pos = 10.
-D_ori = 1.
+D_pos = 1
+D_ori = 0
 # -----------------------------------------
-publish_rate = 100 # 100 Hz == 10 ms
+publish_rate = 100
 
 JACOBIAN = None
 CARTESIAN_POSE = None
@@ -80,10 +78,7 @@ def _on_robot_state(msg):
         Callback function for updating jacobian and EE velocity from robot state
     """
     global JACOBIAN, CARTESIAN_VEL
-    # Get Jacobian matrix 0_dJac_EE: zero jacobian of end-effector frame. Vectorized 6x7 Jacobian, column-major
     JACOBIAN = np.asarray(msg.O_Jac_EE).reshape(6,7,order = 'F')
-    print(JACOBIAN)
-    # Get EE velocities from msg.0_dP_EE: EE vel computed as J*dq
     CARTESIAN_VEL = {
                 'linear': np.asarray([msg.O_dP_EE[0], msg.O_dP_EE[1], msg.O_dP_EE[2]]),
                 'angular': np.asarray([msg.O_dP_EE[3], msg.O_dP_EE[4], msg.O_dP_EE[5]]) }
@@ -94,9 +89,8 @@ def _on_endpoint_state(msg):
     """
     # pose message received is a vectorised column major transformation matrix
     global CARTESIAN_POSE
-    # O_T_EE: Measured end effector pose in base frame
     cart_pose_trans_mat = np.asarray(msg.O_T_EE).reshape(4,4,order='F')
-    # Transform cart_pose_trans_mat into the dictionary CARTESIAN_POSE
+
     CARTESIAN_POSE = {
         'position': cart_pose_trans_mat[:3,3],
         'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
@@ -106,13 +100,9 @@ def quatdiff_in_euler(quat_curr, quat_des):
         Compute difference between quaternions and return 
         Euler angles as difference
     """
-    # Transform current orientation to a rotation matrix 
     curr_mat = quaternion.as_rotation_matrix(quat_curr)
-    # Transform goal orientation to a rotation matrix
     des_mat = quaternion.as_rotation_matrix(quat_des)
-    
     rel_mat = des_mat.T.dot(curr_mat)
-    
     rel_quat = quaternion.from_rotation_matrix(rel_mat)
     vec = quaternion.as_float_array(rel_quat)[1:]
     if rel_quat.w < 0.0:
@@ -129,45 +119,25 @@ def control_thread(rate):
     while not rospy.is_shutdown():
         error = 100.
         while error > 0.005:
-            # Create a deepcopy of CARTESIAN_POSE
             curr_pose = copy.deepcopy(CARTESIAN_POSE)
-            
-            # Assgin curr_pose['position'],curr_pose['orientation'] to curr_pos, curr_ori
             curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
-            
-            # Assgin (CARTESIAN_VEL['linear']).reshape([3,1]) to curr_vel
+
             curr_vel = (CARTESIAN_VEL['linear']).reshape([3,1])
-            
-            # Assgin CARTESIAN_VEL['angular'].reshape([3,1]) to curr_omg
             curr_omg = CARTESIAN_VEL['angular'].reshape([3,1])
-            
-            # Calculate position difference
             delta_pos = (goal_pos - curr_pos).reshape([3,1])
-            
-            # Calculate orientation difference
             delta_ori = quatdiff_in_euler(curr_ori, goal_ori).reshape([3,1])
-            
-            # Desired task-space force using PD law (Stiffness and Damping)
-            F = np.vstack([P_pos*(delta_pos), P_ori*(delta_ori)]) - \
+            # Desired task-space force using PD law
+            F = np.vstack([P_pos*(delta_pos), P_ori*(delta_ori)]) + \
                 np.vstack([D_pos*(curr_vel), D_ori*(curr_omg)])
-                
-            # Calculate the vector norm of delta_pos and delta_ori and sum the results
             error = np.linalg.norm(delta_pos) + np.linalg.norm(delta_ori)
             
-            # Create a deepcopy of J
             J = copy.deepcopy(JACOBIAN)
-            
-            # Calculate the joint torques to be commanded
-            # .T Transpose
+
+            # joint torques to be commanded
             tau = np.dot(J.T,F)
-            
-            # Flattern the tau vector
+            # publish joint commands
             command_msg.effort = tau.flatten()
-            
-            # Pdublish joint commands
             joint_command_publisher.publish(command_msg)
-            
-            # Sleep for rate
             rate.sleep()
 
 def process_feedback(feedback):
@@ -175,40 +145,35 @@ def process_feedback(feedback):
     InteractiveMarker callback function. Update target pose.
     """
     global goal_pos, goal_ori
-
+    '''
     if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-        p = feedback.pose.position
-        q = feedback.pose.orientation
-        goal_pos = np.array([p.x,p.y,p.z])
-        goal_ori = np.quaternion(q.w, q.x,q.y,q.z)
+    '''
+    p = feedback.pose.position
+    q = feedback.pose.orientation
+    goal_pos = np.array([p.x,p.y,p.z])
+    goal_ori = np.quaternion(q.w, q.x,q.y,q.z)
 
 def _on_shutdown():
     """
         Clean shutdown controller thread when rosnode dies.
     """
-    
     global ctrl_thread, cartesian_state_sub, \
         robot_state_sub, joint_command_publisher
-    
-    # Check if the Thread 'ctrl_thread' is active
     if ctrl_thread.is_alive():
-        # Block 'ctrl_thread' ????????????????????????????????????????????????????????????????????????
         ctrl_thread.join()
 
-    # unpublish/unsubscribe from topic. Topic instance is no longer valid after this call. Additional calls to  unregister() have no effect.
     robot_state_sub.unregister()
     cartesian_state_sub.unregister()
     joint_command_publisher.unregister()
     
 if __name__ == "__main__":
-    # Initialize node
+    # global goal_pos, goal_ori, ctrl_thread
+
     rospy.init_node("ts_control_sim_only")
 
     # if not using franka_ros_interface, you have to subscribe to the right topics
     # to obtain the current end-effector state and robot jacobian for computing 
     # commands
-    
-    # Initialize Subscriber for 'robot_state' (JACOBIAN, CARTESIAN_VEL) and 'tip_state' (CARTESIAN_POSE)
     cartesian_state_sub = rospy.Subscriber(
         'panda_simulator/custom_franka_state_controller/tip_state',
         EndPointState,
@@ -223,11 +188,10 @@ if __name__ == "__main__":
         queue_size=1,
         tcp_nodelay=True)
     
-    # Create joint command message and fix its type to joint torque mode
+    # create joint command message and fix its type to joint torque mode
     command_msg = JointCommand()
     command_msg.names = ['panda_joint1','panda_joint2','panda_joint3',\
         'panda_joint4','panda_joint5','panda_joint6','panda_joint7']
-    # Mode in which to command arm here TORQUE_MODE (Why not Impedance mode (4))
     command_msg.mode = JointCommand.TORQUE_MODE
     
     # Also create a publisher to publish joint commands
@@ -244,28 +208,20 @@ if __name__ == "__main__":
             break
     rospy.loginfo("Recieved messages; Starting Demo.")
 
-    # deepcopy CARTESIAN_POSE
-    # When placing the Manipulator in rviz
-    pose = copy.deepcopy(CARTESIAN_POSE)
-    # Get start_pos and start_ori from Pose
-    start_pos, start_ori = pose['position'],pose['orientation']
-    # Set goal pose a starting pose in the beginning
-    goal_pos, goal_ori = start_pos, start_ori 
 
+    pose = copy.deepcopy(CARTESIAN_POSE)
+    start_pos, start_ori = pose['position'],pose['orientation']
+    goal_pos, goal_ori = start_pos, start_ori # set goal pose a starting pose in the beginning
     
-    # Specify a function that should be called when ROS has initiated a shutdown
+
+    # start controller thread
     rospy.on_shutdown(_on_shutdown)
-    
-    # Initialize the rate 
     rate = rospy.Rate(publish_rate)
-    
-    # Create 'ctrl_thread' and pass function 'control_thread' and 'rate'
     ctrl_thread = threading.Thread(target=control_thread, args = [rate])
-    
-    # Start controller thread
     ctrl_thread.start()
 
     # ------------------------------------------------------------------------------------
+    end_target_sub = rospy.Subscriber("panda_simulator/equili_pose",PoseStamped,process_feedback,queue_size=1)
     server = InteractiveMarkerServer("basic_control")
 
     position = Point( start_pos[0], start_pos[1], start_pos[2])

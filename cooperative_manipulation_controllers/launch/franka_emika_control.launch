@@ -8,8 +8,8 @@
  
     
     <group ns="$(arg panda_name)">
-        <node pkg="cooperative_manipulation_controller" type="franka_impedance_control.py" name="ts_control_sim_only" output="screen">
-            <param name="base" value="$(arg panda_name)/base"/>
+        <node pkg="simu" type="task_space_control.py" name="ts_control_sim_only" output="screen">
+            <param name="base" value="$(arg base_name)"/>
         </node>
 
         <node pkg="simu" type="equilibrium.py" name="equilibrium">
@@ -17,6 +17,8 @@
             <rosparam param="base_name" subst_value="True">$(arg base_name)</rosparam>
             <rosparam param="obj_end" subst_value="True">$(arg obj_end)</rosparam>
         </node>
-    </group>   
+
+    </group>  
 
 </launch>
+

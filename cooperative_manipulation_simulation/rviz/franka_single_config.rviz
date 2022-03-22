@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /InteractiveMarkers1
-        - /InteractiveMarkers1/Status1
       Splitter Ratio: 0.27494457364082336
     Tree Height: 719
   - Class: rviz/Selection
@@ -210,7 +209,7 @@ Visualization Manager:
       Show Axes: false
       Show Descriptions: true
       Show Visual Aids: false
-      Update Topic: ""
+      Update Topic: /panda/basic_control/update
       Value: true
   Enabled: true
   Global Options:
