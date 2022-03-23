@@ -2,6 +2,9 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro"
        name="ur16e" >
 
+  <xacro:arg name="xyz" default="'0 0 0'"/>
+  <xacro:arg name="rpy" default="'0 0 0'"/>
+
   <!-- common stuff -->
   <xacro:include filename="$(find ur_e_description)/urdf/common.gazebo.xacro" />
 
@@ -19,7 +22,7 @@
   <joint name="world_joint" type="fixed">
     <parent link="world" />
     <child link = "base_link" />
-    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+    <origin xyz="$(arg xyz)" rpy="$(arg rpy)" />
   </joint>
 
 </robot>
