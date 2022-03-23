@@ -148,6 +148,8 @@ def process_feedback(feedback):
     '''
     if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
     '''
+    #print("Update InteractiveMarker target pose.")
+        
     p = feedback.pose.position
     q = feedback.pose.orientation
     goal_pos = np.array([p.x,p.y,p.z])
@@ -157,6 +159,8 @@ def _on_shutdown():
     """
         Clean shutdown controller thread when rosnode dies.
     """
+    
+    print("Shutdown impedance controller:")
     global ctrl_thread, cartesian_state_sub, \
         robot_state_sub, joint_command_publisher
     if ctrl_thread.is_alive():
@@ -205,11 +209,15 @@ if __name__ == "__main__":
     rospy.loginfo("Subscribing to robot state topics...")
     while (True):
         if not (JACOBIAN is None or CARTESIAN_POSE is None):
+            print(JACOBIAN,CARTESIAN_POSE)
             break
-    rospy.loginfo("Recieved messages; Starting Demo.")
+    rospy.loginfo("Recieved messages; Launch Franka Impedance Control.")
 
 
     pose = copy.deepcopy(CARTESIAN_POSE)
+    
+    print(pose['position'],pose['orientation'])
+    
     start_pos, start_ori = pose['position'],pose['orientation']
     goal_pos, goal_ori = start_pos, start_ori # set goal pose a starting pose in the beginning
     
@@ -221,7 +229,6 @@ if __name__ == "__main__":
     ctrl_thread.start()
 
     # ------------------------------------------------------------------------------------
-    end_target_sub = rospy.Subscriber("panda_simulator/equili_pose",PoseStamped,process_feedback,queue_size=1)
     server = InteractiveMarkerServer("basic_control")
 
     position = Point( start_pos[0], start_pos[1], start_pos[2])

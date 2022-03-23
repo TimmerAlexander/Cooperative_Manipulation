@@ -29,7 +29,7 @@ class RvizMarkers():
     def makeMarker( self, fixed, interaction_mode, position, orientation, show_6dof = False):
         int_marker = InteractiveMarker()
         base = rospy.get_param("~base")
-        ##rospy.logwarn("base's value is~~~~~~~~~~~~~~`:"+base)
+        rospy.logwarn("base's value is~~~~~~~~~~~~~~`:"+base)
         int_marker.header.frame_id = base
         int_marker.pose.position = position
 
