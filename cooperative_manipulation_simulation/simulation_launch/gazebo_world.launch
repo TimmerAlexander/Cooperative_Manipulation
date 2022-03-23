@@ -12,6 +12,7 @@
     <arg name="verbose" default="false"/>
 
     <include if="$(arg load_gazebo)" file="$(find gazebo_ros)/launch/empty_world.launch">
+      <arg name="world_name" value="$(find cooperative_manipulation_simulation)/world/gazebo_sim.world"/>
       <arg name="debug" value="$(arg debug)" />
       <arg name="verbose" value="$(arg verbose)"/>
       <arg name="gui" value="$(arg gui)" />
