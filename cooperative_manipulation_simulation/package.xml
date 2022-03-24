@@ -53,14 +53,20 @@
   <build_depend>hardware_interface</build_depend>
   <build_depend>pluglib</build_depend>
   <build_depend>roscpp</build_depend>
+  <build_depend>cooperative_manipulation_controllers</build_depend>
+  <build_depend>cooperative_manipulation_robot_description</build_depend>
   <build_export_depend>controller_interface</build_export_depend>
   <build_export_depend>hardware_interface</build_export_depend>
   <build_export_depend>pluglib</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>cooperative_manipulation_controllers</build_export_depend>
+  <build_export_depend>cooperative_manipulation_robot_description</build_export_depend>
   <exec_depend>controller_interface</exec_depend>
   <exec_depend>hardware_interface</exec_depend>
   <exec_depend>pluglib</exec_depend>
   <exec_depend>roscpp</exec_depend>
+  <exec_depend>cooperative_manipulation_controllers</exec_depend>
+  <exec_depend>cooperative_manipulation_robot_description</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

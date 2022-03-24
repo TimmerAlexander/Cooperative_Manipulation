@@ -42,7 +42,6 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add "message_runtime" and every package in MSG_DEP_SET to
 catkin_package(
   CATKIN_DEPENDS
-  cooperative_manipulation_simulation
     rospy)
 ##   * uncomment the add_*_files sections below as needed
 ##     and list every .msg/.srv/.action file to be processed
