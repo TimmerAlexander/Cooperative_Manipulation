@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="panda_name" default="ur"/>
+
+    <group ns="$(arg panda_name)">
+
+        <node pkg="cooperative_manipulation_controllers" type="universal_robot_admittance_control.py" name="admittance_controller_node" output="screen">
+            <param name="ur_ns" value="$(arg panda_name)"/>
+        </node>
+
+    </group>  
+
+</launch>
+

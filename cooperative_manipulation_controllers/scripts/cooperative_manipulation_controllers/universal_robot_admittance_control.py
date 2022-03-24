@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 from geometry_msgs.msg import WrenchStamped, Twist
 import tf
@@ -12,17 +12,19 @@ class admittance_controller():
         rospy.init_node('admittance_controller_node', anonymous=True)
         rospy.loginfo("controller running")
         
-        self.pub = rospy.Publisher("/twist_controller/command", Twist, queue_size = 1)
+        self.namespace = rospy.get_param("~ur_ns")
+        
+        self.pub = rospy.Publisher("/" + self.namespace + "/twist_controller/command", Twist, queue_size = 1)
         self.listener = tf.TransformListener()
         now = rospy.Time()
         self.listener.waitForTransform("base_link", "tool0", rospy.Time(), rospy.Duration(4.0))
         (self.initial_position,self.initial_orientation) = self.listener.lookupTransform('base_link', 'tool0', now)
         print(self.initial_position)
-        rospy.Subscriber("/wrench", WrenchStamped, self.wrench_cb)
+        rospy.Subscriber("/" + self.namespace + "/wrench", WrenchStamped, self.wrench_cb)
         rospy.spin()
 
     def wrench_cb(self,wrench):
-        #print(wrench)
+        print(wrench)
 
         now = rospy.Time()
         (curr_position,curr_orientation) = self.listener.lookupTransform('base_link', 'tool0', now)
@@ -55,7 +57,7 @@ class admittance_controller():
         if abs(self.cmd_vel_filtered.linear.z)> self.velocity_threshhold:
             self.cmd_vel_filtered.linear.z = self.cmd_vel_filtered.linear.z/abs(self.cmd_vel_filtered.linear.z) * self.velocity_threshhold
 
-        #print(self.cmd_vel.linear.x,self.cmd_vel.linear.y)
+        print("Publish Twist:",self.cmd_vel.linear.x,self.cmd_vel.linear.y)
         print(position_diff_z)
 
         self.pub.publish(self.cmd_vel)
