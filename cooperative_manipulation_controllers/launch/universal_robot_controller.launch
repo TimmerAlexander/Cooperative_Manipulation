@@ -1,9 +1,6 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg name="ur_name" default="ur"/>
-
-  <group ns="$(arg ur_name)">
     <!-- Robot state publisher -->
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="ur_state_publisher">
       <param name="publish_frequency" type="double" value="50.0" />
@@ -18,6 +15,5 @@
     <rosparam file="$(find ur_e_gazebo)/controller/joint_state_controller.yaml" command="load"/>
     <node name="ur_joint_state_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn joint_state_controller" respawn="false" output="screen"/>
   
-  </group>  
 
 </launch>
