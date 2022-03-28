@@ -2,9 +2,14 @@
 import rospy
 from geometry_msgs.msg import WrenchStamped, Twist
 import tf
+import moveit_commander
+import moveit_msgs.msg
+from sensor_msgs.msg import JointState
+import numpy
 
+#J_ur=self.group.get_jacobian_matrix(joint_states_array)
 
-class admittance_controller():
+class ur_admittance_controller():
     
     
     def __init__(self):
@@ -14,6 +19,16 @@ class admittance_controller():
         
         self.namespace = rospy.get_param("~ur_ns")
         
+        #-------------------------------------------
+        
+        group_name = 'manipulator'
+        print("Initialize movit_commander: ",group_name)
+        self.group = moveit_commander.MoveGroupCommander(group_name)
+        
+        #rospy.Subscriber("/" + self.namespace + "/joint_states",JointState, self.joint_state_cb)
+        
+        #-------------------------------------------
+        
         self.pub = rospy.Publisher("/" + self.namespace + "/twist_controller/command", Twist, queue_size = 1)
         self.listener = tf.TransformListener()
         now = rospy.Time()
@@ -22,6 +37,18 @@ class admittance_controller():
         print(self.initial_position)
         rospy.Subscriber("/" + self.namespace + "/wrench", WrenchStamped, self.wrench_cb)
         rospy.spin()
+
+#-------------------------------------------
+#    def joint_state_cb(self,joint_states):
+        
+#        joint_states_array=[joint_states.position[0],joint_states.position[1],joint_states.position[2],joint_states.position[3],joint_states.position[4],joint_states.position[5]]
+        
+#        J_ur=self.group.get_jacobian_matrix(joint_states_array)
+#        inverse = numpy.linalg.inv(J_ur)
+#        print(J_ur)
+#        print(inverse)
+#-------------------------------------------  
+        
 
     def wrench_cb(self,wrench):
         print(wrench)
@@ -57,8 +84,15 @@ class admittance_controller():
         if abs(self.cmd_vel_filtered.linear.z)> self.velocity_threshhold:
             self.cmd_vel_filtered.linear.z = self.cmd_vel_filtered.linear.z/abs(self.cmd_vel_filtered.linear.z) * self.velocity_threshhold
 
-        print("Publish Twist:",self.cmd_vel.linear.x,self.cmd_vel.linear.y)
-        print(position_diff_z)
+        #print("Publish Twist:",self.cmd_vel.linear.x,self.cmd_vel.linear.y)
+        #print(position_diff_z)
+
+        joint_states_array = self.group.get_current_joint_values()
+
+        J_ur=self.group.get_jacobian_matrix(joint_states_array)
+        print(J_ur)
+        
+
 
         self.pub.publish(self.cmd_vel)
     
@@ -81,4 +115,4 @@ class admittance_controller():
 
     
 if __name__ == '__main__':
-    admittance_controller()
+    ur_admittance_controller()

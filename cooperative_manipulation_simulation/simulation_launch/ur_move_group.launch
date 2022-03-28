@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="ur_name" default="ur"/>
+
+  <group ns="$(arg ur_name)">
+
+    <arg name="sim" default="false" />
+    <arg name="debug" default="false" />
+
+    <!-- Remap follow_joint_trajectory -->
+    <remap if="$(arg sim)" from="/scaled_pos_joint_traj_controller/follow_joint_trajectory" to="/arm_controller/follow_joint_trajectory"/>
+
+    <!-- Launch moveit -->
+    <include file="$(find ur16e_moveit_config)/launch/move_group.launch">
+      <arg name="debug" default="$(arg debug)" />
+      <remap from="/joint_states" to="/ur/joint_states" />
+    </include>
+    
+  </group> 
+    
+
+</launch>
