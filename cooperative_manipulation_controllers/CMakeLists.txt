@@ -8,6 +8,9 @@ project(cooperative_manipulation_controllers)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  controller_interface
+  hardware_interface
+  pluginlib
   roscpp
   rospy
   std_msgs
@@ -105,9 +108,10 @@ catkin_package(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES cooperative_manipulation_controllers
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+  INCLUDE_DIRS include
+  LIBRARIES cooperative_manipulation_controllers
+  CATKIN_DEPENDS roscpp rospy std_msgs
+  pluginlib
 #  DEPENDS system_lib
 )
 
@@ -123,9 +127,9 @@ include_directories(
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/cooperative_manipulation_controllers.cpp
-# )
+ add_library(${PROJECT_NAME}
+   src/my_controller.cpp
+ )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -148,9 +152,9 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
+ target_link_libraries(${PROJECT_NAME}
+   ${catkin_LIBRARIES}
+ )
 
 #############
 ## Install ##
