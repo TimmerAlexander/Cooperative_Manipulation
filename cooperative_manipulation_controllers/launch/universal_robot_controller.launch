@@ -35,8 +35,7 @@
   -->
  
   <!-- load pid controller parameters -->
-  <!-- 
-  <rosparam file="$(find cooperative_manipualtion)/cooperative_manipulation_controllers/config/ur_pid_controller_params.yaml" command="load"/> 
+  <!--
+  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur_pid_controller.yaml" command="load"/> 
   -->
-  
 </launch>
