@@ -79,15 +79,13 @@ class ur_admittance_controller():
         #print("Publish Twist:",self.cmd_vel.linear.x,self.cmd_vel.linear.y)
         #print(position_diff_z)
 #---------------------------------------------------------------------
-        #print("Publish Twist: ")
-        #print(self.cmd_vel)
-        print("cmd_vel: ")
-        print(self.cmd_vel.linear.x)
-        print(self.cmd_vel.linear.y)
-        print(self.cmd_vel.linear.z)
-        print(self.cmd_vel.angular.x)
-        print(self.cmd_vel.angular.y)
-        print(self.cmd_vel.angular.z)
+        #print("cmd_vel: ")
+        #print(self.cmd_vel.linear.x)
+        #print(self.cmd_vel.linear.y)
+        #print(self.cmd_vel.linear.z)
+        #print(self.cmd_vel.angular.x)
+        #print(self.cmd_vel.angular.y)
+        #print(self.cmd_vel.angular.z)
         
         
         self.target_vel = numpy.array([self.cmd_vel.linear.x,self.cmd_vel.linear.y,self.cmd_vel.linear.z,self.cmd_vel.angular.x,self.cmd_vel.angular.y,self.cmd_vel.angular.z])
@@ -108,7 +106,7 @@ class ur_admittance_controller():
         self.joint_vel.data = self.target_dq
         
         
-        #print("self.joint_vel.data: ",self.joint_vel.data)
+        print("self.joint_vel.data: ",self.joint_vel.data)
         self.pub.publish(self.joint_vel)
 #--------------------------------------------------------------------
         #print("Publish Twist: ")

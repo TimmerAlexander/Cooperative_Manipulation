@@ -1,4 +1,4 @@
-rostopic pub  /ur/wrench geometry_msgs/WrenchStamped '{header: {stamp: now, frame_id: base_link}, wrench:{force: {x: 50.0, y: 50.0, z: 50.0}, torque: {x: 50.0, y: 50.0, z: 50.0}}}'
+rostopic pub  /ur/wrench geometry_msgs/WrenchStamped '{header: {stamp: now, frame_id: base_link}, wrench:{force: {x: 50.0, y: 0.0, z: 0.0}, torque: {x: 0.0, y: 0.0, z: 0.0}}}'
 
 rostopic pub  /ur/ur_admittance_controller/command std_msgs/Float64MultiArray '{data:[20.0,20.0,10.0,1.0,90.0,1.0]}'
 
