@@ -10,14 +10,14 @@
   <arg name="ur_xyz" default="0 0 0"/>
   <arg name="ur_rpy" default="0 0 0"/>
 
-  <arg name="ur_transmission_hw_interface" default="hardware_interface/PositionJointInterface"/>
+  <arg name="ur_transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
 
   <!-- send robot urdf to param server -->
   <include file="$(find cooperative_manipulation_robot_description)/custom_ur_description/launch/custom_ur16e_upload.launch">
     <arg name="ur_xyz" default="$(arg ur_xyz)"/>
     <arg name="ur_rpy" default="$(arg ur_rpy)"/>
     <arg name="limited" value="$(arg limited)"/>
-    <arg name="transmission_hw_interface" default="hardware_interface/PositionJointInterface"/>
+    <arg name="transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
   </include>
 
 
