@@ -2,9 +2,11 @@
 import rospy
 from geometry_msgs.msg import WrenchStamped, Twist
 import tf
+
 import moveit_commander
 import moveit_msgs.msg
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
 import numpy
 
 #J_ur=self.group.get_jacobian_matrix(joint_states_array)
@@ -20,34 +22,24 @@ class ur_admittance_controller():
         self.namespace = rospy.get_param("~ur_ns")
         
         #-------------------------------------------
-        
+        # Initialize move_it
+        self.joint_vel = Float64MultiArray()
         group_name = 'manipulator'
-        print("Initialize movit_commander: ",group_name)
+        print("Initialize movit_commander. Group name: ",group_name)
         self.group = moveit_commander.MoveGroupCommander(group_name)
-        
-        #rospy.Subscriber("/" + self.namespace + "/joint_states",JointState, self.joint_state_cb)
-        
+        self.pub = rospy.Publisher("/" + self.namespace + "/ur_admittance_controller/command", Float64MultiArray, queue_size=1)
         #-------------------------------------------
         
-        self.pub = rospy.Publisher("/" + self.namespace + "/twist_controller/command", Twist, queue_size = 1)
+        #self.pub = rospy.Publisher("/" + self.namespace + "/ur_admittance_controller/command", Twist, queue_size = 1)
         self.listener = tf.TransformListener()
         now = rospy.Time()
         self.listener.waitForTransform("base_link", "tool0", rospy.Time(), rospy.Duration(4.0))
         (self.initial_position,self.initial_orientation) = self.listener.lookupTransform('base_link', 'tool0', now)
         print(self.initial_position)
         rospy.Subscriber("/" + self.namespace + "/wrench", WrenchStamped, self.wrench_cb)
+        
+    
         rospy.spin()
-
-#-------------------------------------------
-#    def joint_state_cb(self,joint_states):
-        
-#        joint_states_array=[joint_states.position[0],joint_states.position[1],joint_states.position[2],joint_states.position[3],joint_states.position[4],joint_states.position[5]]
-        
-#        J_ur=self.group.get_jacobian_matrix(joint_states_array)
-#        inverse = numpy.linalg.inv(J_ur)
-#        print(J_ur)
-#        print(inverse)
-#-------------------------------------------  
         
 
     def wrench_cb(self,wrench):
@@ -86,15 +78,42 @@ class ur_admittance_controller():
 
         #print("Publish Twist:",self.cmd_vel.linear.x,self.cmd_vel.linear.y)
         #print(position_diff_z)
-
-        joint_states_array = self.group.get_current_joint_values()
-
-        J_ur=self.group.get_jacobian_matrix(joint_states_array)
-        print(J_ur)
+#---------------------------------------------------------------------
+        #print("Publish Twist: ")
+        #print(self.cmd_vel)
+        print("cmd_vel: ")
+        print(self.cmd_vel.linear.x)
+        print(self.cmd_vel.linear.y)
+        print(self.cmd_vel.linear.z)
+        print(self.cmd_vel.angular.x)
+        print(self.cmd_vel.angular.y)
+        print(self.cmd_vel.angular.z)
+        
+        
+        self.target_vel = numpy.array([self.cmd_vel.linear.x,self.cmd_vel.linear.y,self.cmd_vel.linear.z,self.cmd_vel.angular.x,self.cmd_vel.angular.y,self.cmd_vel.angular.z])
+        
+        #print("Publish self.target_vel: ")
+        #print(self.target_vel)
+        
         
 
-
-        self.pub.publish(self.cmd_vel)
+        joint_states_array = self.group.get_current_joint_values()
+        self.Jacobian_ur=self.group.get_jacobian_matrix(joint_states_array)
+        
+        #print("Publish Jacobian_ur: ",self.Jacobian_ur)
+        #print(self.Jacobian_ur)
+        
+        inverse = numpy.linalg.inv(self.Jacobian_ur)
+        self.target_dq = inverse.dot(self.target_vel)
+        self.joint_vel.data = self.target_dq
+        
+        
+        #print("self.joint_vel.data: ",self.joint_vel.data)
+        self.pub.publish(self.joint_vel)
+#--------------------------------------------------------------------
+        #print("Publish Twist: ")
+        #print(self.cmd_vel)
+        #self.pub.publish(self.cmd_vel)
     
 
     def config(self):
