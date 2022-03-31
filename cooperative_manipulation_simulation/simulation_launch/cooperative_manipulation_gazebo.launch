@@ -1,0 +1,5 @@
+<launch>
+<!-- Gazebo launch:________________________________________________________________________________________________-->
+    <arg name="load_gazebo" default="true"/>
+    <include if="$(arg load_gazebo)" file="$(find cooperative_manipulation_simulation)/simulation_launch/gazebo_world.launch"/>
+</launch>
