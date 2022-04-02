@@ -1,7 +1,11 @@
 panda_simulator:
   panda_gripper_controller:
     type: panda_sim_controllers/PandaGripperController
-    pub_topic:  /franka_gripper/joint_states
+    joint_state_topic:  /franka_gripper/joint_states
+    homing_topic: /franka_gripper/homing
+    stop_topic: /franka_gripper/stop
+    grasp_topic: /franka_gripper/grasp
+    move_topic: /franka_gripper/move
     joints:
           # main joint
           panda_finger_joint1_controller:

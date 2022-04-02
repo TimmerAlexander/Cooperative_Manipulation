@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+
+    <group ns="panda">
+        <node pkg="cooperative_manipulation_controllers" type="franka_gripper_goal.py" name="franka_gripper_goal"/>
+    </group>   
+
+</launch>
