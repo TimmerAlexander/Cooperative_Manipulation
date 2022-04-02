@@ -11,7 +11,7 @@ kinematics:
     y: 0
     z: 0
     roll: 1.570796327
-    pitch: 1.570796327
+    pitch: 2.355
     yaw: -0
   forearm:
     x: -0.4784
@@ -19,7 +19,7 @@ kinematics:
     z: 0
     roll: -0
     pitch: 0
-    yaw: -0
+    yaw: 1.570796327
   wrist_1:
     x: -0.36
     y: 0
@@ -32,7 +32,7 @@ kinematics:
     y: -0.11985
     z: -2.458164590756244e-11
     roll: 1.570796327
-    pitch: 1.570796327
+    pitch: 0
     yaw: -0
   wrist_3:
     x: 0

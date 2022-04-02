@@ -12,7 +12,7 @@
   <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e.urdf.xacro" />
 
   <!-- arm -->
-  <xacro:arg name="kinematics_config" default="$(find ur_e_description)/config/ur16e_default.yaml"/>
+  <xacro:arg name="kinematics_config" default="$(find cooperative_manipulation_robot_description)/custom_ur_description/config/custom_ur16e_default.yaml"/>
   <xacro:ur16e_robot prefix="" joint_limited="false"
     kinematics_file="${load_yaml('$(arg kinematics_config)')}"
   />

@@ -8,8 +8,8 @@
     <!-- Set Universal Robot arguments -->
     <!--initial_pose(translation and rotation) of base-->
     
-    <arg name="ur_base_trans" default="'+2 0 0'"/>
-    <arg name="ur_base_rot" default="'0 0 1.57'"/>
+    <arg name="ur_base_trans" default="'-1.0 0 0'"/>
+    <arg name="ur_base_rot" default="'0 0 -1.57'"/>
     <arg name="ur_transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
 
     <group ns="$(arg universal_robot_name)">
