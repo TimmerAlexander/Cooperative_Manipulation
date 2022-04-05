@@ -6,7 +6,13 @@ Franka Emika:
 Universal_Robot:
 	Installation:
 		- https://github.com/ros-industrial/universal_robot
-
+        
+robotiq(Gripper):
+    Installation:
+		- https://github.com/utecrobotics/robotiq.git
+    
+    Building error:
+        - https://github.com/crigroup/robotiq/issues/4
 
 ________________________________________________________________________________________________________________________
 Usage:
