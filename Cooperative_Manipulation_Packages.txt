@@ -13,6 +13,8 @@ robotiq(Gripper):
     
     Building error:
         - https://github.com/crigroup/robotiq/issues/4
+        - Change in /robotiq/robotiq_description/urdf/robotiq_85_gripper.transmission.xacro
+         <hardwareInterface>PositionJointInterface</hardwareInterface> to <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
 
 ________________________________________________________________________________________________________________________
 Usage:

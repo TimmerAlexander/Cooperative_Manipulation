@@ -17,14 +17,14 @@ class ur_admittance_controller():
     def __init__(self):
         self.config()
         rospy.init_node('admittance_controller_node', anonymous=True)
-        rospy.loginfo("controller running")
+        rospy.loginfo("admittance controller running")
         
         self.namespace = rospy.get_param("~ur_ns")
         
         #-------------------------------------------
         # Initialize move_it
         self.joint_vel = Float64MultiArray()
-        group_name = 'manipulator'
+        group_name = 'endeffector'
         print("Initialize movit_commander. Group name: ",group_name)
         self.group = moveit_commander.MoveGroupCommander(group_name)
         self.pub = rospy.Publisher("/" + self.namespace + "/ur_admittance_controller/command", Float64MultiArray, queue_size=1)
