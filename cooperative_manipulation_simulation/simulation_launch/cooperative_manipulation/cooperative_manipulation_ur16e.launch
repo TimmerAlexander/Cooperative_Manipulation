@@ -13,7 +13,7 @@
     <arg name="ur_transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
 
     <group ns="$(arg universal_robot_name)">
-      <include file="$(find cooperative_manipulation_simulation)/simulation_launch/universal_robot.launch">
+      <include file="$(find cooperative_manipulation_simulation)/simulation_launch/ur16e.launch">
       <arg name="ur_name" value="$(arg universal_robot_name)"/>
       <arg name="ur_transmission_hw_interface" value="$(arg ur_transmission_hw_interface)" />
       <arg name="ur_xyz" value="$(arg ur_base_trans)"/>
@@ -23,9 +23,9 @@
     </group> 
 
     <!-- Universal Robot launch rviz -->
-    <!--
-    <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/rviz/ur_single_config.rviz"/>
-    -->
+   
+    <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/rviz/ur16e_single_config.rviz"/>
+   
   <!--_______________________________________________________________________________________________________________-->
 
   
