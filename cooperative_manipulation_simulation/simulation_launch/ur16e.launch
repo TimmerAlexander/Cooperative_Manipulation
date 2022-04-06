@@ -4,6 +4,7 @@
   <arg name="paused" default="false" doc="Starts gazebo in paused mode" />
   <arg name="gui" default="true" doc="Starts gazebo gui" />
   <arg name="debug" default="false" />
+  <arg name="load_gripper" default="true"/>
 
   <arg name="ur_name" default="ur"/>
   <!--initial_pose(translation and rotation) of base-->
@@ -25,8 +26,9 @@
   <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model robot -z 0.1" respawn="false" output="screen" />
 
   <!-- launch ur controller -->
-  <include file="$(find cooperative_manipulation_controllers)/launch/universal_robot_controller.launch"/>
-
+  <include file="$(find cooperative_manipulation_controllers)/launch/universal_robot_controller.launch">
+    <arg name="load_gripper" value="$(arg load_gripper)"/>
+  </include>
 
 </launch>
 

@@ -1,8 +1,22 @@
 <?xml version="1.0"?>
 <launch>
 
-    <group ns="panda">
-        <node pkg="cooperative_manipulation_controllers" type="franka_gripper_goal.py" name="franka_gripper_goal"/>
-    </group>   
+    <arg name="panda_name" default="panda"/>
+    <arg name="panda_goal_width" default="0.8" />
+    <arg name="panda_goal_epsilon_inner" default="0.05" />
+    <arg name="panda_goal_epsilon_outer" default="0.05" />
+    <arg name="panda_goal_speed" default="0.1" />
+    <arg name="panda_goal_force" default="60" />
+
+    <group ns="$(arg panda_name)">
+        <node pkg="cooperative_manipulation_controllers" type="franka_gripper_goal.py" name="franka_gripper_goal">
+            <param  name="panda_ns" value="$(arg panda_name)" />
+            <param  name="panda_goal_width" value="$(arg panda_goal_width)" />
+            <param  name="panda_goal_epsilon_inner" value="$(arg panda_goal_epsilon_inner)" />
+            <param  name="panda_goal_epsilon_outer" value="$(arg panda_goal_epsilon_outer)" />
+            <param  name="panda_goal_speed" value="$(arg panda_goal_speed)" />
+            <param  name="panda_goal_force" value="$(arg panda_goal_force)" />
+        </node>
+    </group>
 
 </launch>

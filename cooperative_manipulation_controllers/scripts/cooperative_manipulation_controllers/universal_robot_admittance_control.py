@@ -24,7 +24,7 @@ class ur_admittance_controller():
         #-------------------------------------------
         # Initialize move_it
         self.joint_vel = Float64MultiArray()
-        group_name = 'endeffector'
+        group_name = 'manipulator'
         print("Initialize movit_commander. Group name: ",group_name)
         self.group = moveit_commander.MoveGroupCommander(group_name)
         self.pub = rospy.Publisher("/" + self.namespace + "/ur_admittance_controller/command", Float64MultiArray, queue_size=1)

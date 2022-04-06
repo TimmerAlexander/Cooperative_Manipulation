@@ -9,17 +9,27 @@ if __name__ == "__main__":
     publishing the following topic in terminal.
     '''
     rospy.init_node("grippe_state")
-    pub = rospy.Publisher('franka_gripper/grasp/goal',
+    
+    namespace = rospy.get_param("~panda_ns")
+    
+    panda_goal_width = rospy.get_param("~panda_goal_width")
+    panda_goal_epsilon_inner = rospy.get_param("~panda_goal_epsilon_inner")
+    panda_goal_epsilon_outer = rospy.get_param("~panda_goal_epsilon_outer")
+    panda_goal_speed = rospy.get_param("~panda_goal_speed")
+    panda_goal_force = rospy.get_param("~panda_goal_force")
+
+    
+    pub = rospy.Publisher('/' + namespace + '/franka_gripper/grasp/goal',
         GraspActionGoal,
         tcp_nodelay=True,
         queue_size=10)
-
+    
     command_msg = GraspActionGoal()
-    command_msg.goal.width = 0.01
-    command_msg.goal.epsilon.inner = 0.005
-    command_msg.goal.epsilon.outer = 0.005
-    command_msg.goal.speed = 0.1
-    command_msg.goal.force = 60
+    command_msg.goal.width = panda_goal_width
+    command_msg.goal.epsilon.inner = panda_goal_epsilon_inner
+    command_msg.goal.epsilon.outer = panda_goal_epsilon_outer
+    command_msg.goal.speed = panda_goal_speed
+    command_msg.goal.force = panda_goal_force
     
     rospy.sleep(0.5)
     start = rospy.Time.now().to_sec()

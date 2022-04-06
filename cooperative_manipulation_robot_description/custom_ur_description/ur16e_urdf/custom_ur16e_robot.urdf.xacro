@@ -12,6 +12,7 @@
   <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e.urdf.xacro" />
 
   <!-- robotiq 85 gripper -->
+  
   <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/ur16e_robotiq_85_gripper.urdf.xacro" />
 
 

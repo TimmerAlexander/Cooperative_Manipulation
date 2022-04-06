@@ -14,9 +14,7 @@
   <rosparam if="$(arg load_gripper)" command="load"
       file="$(find cooperative_manipulation_controllers)/config/franka_gripper_controller.yaml" ns="/$(arg panda_name)"/>
 
-  <node if="$(arg load_gripper)" name="panda_gripper_controller_spawner_stopped"
-        pkg="controller_manager" type="controller_manager" respawn="false" output="screen" ns="/$(arg panda_name)"
-        args="spawn panda_simulator/panda_gripper_controller"/>
+
 
 
   
@@ -46,12 +44,21 @@
   <!--topic in effort_joint_gravity controller-->
   <param name="/$(arg panda_name)/panda_simulator/effort_joint_gravity_controller/topic_robot_state" 
                                     value="/$(arg panda_name)/panda_simulator/custom_franka_state_controller/robot_state"/>
-
   <!--topic in gripper_controller-->
   <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/joint_state_topic" 
-                                    value="/$(arg panda_name)/franka_gripper/joint_states"/> 
+                                    value="/$(arg panda_name)/franka_gripper/joint_states"/>
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/homing_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/homing"/>
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/stop_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/stop"/>                                   
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/move_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/move"/>
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/grasp_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/grasp"/>
  
-
+    <node if="$(arg load_gripper)" name="panda_gripper_controller_spawner_stopped"
+        pkg="controller_manager" type="controller_manager" respawn="false" output="screen" ns="/$(arg panda_name)"
+        args="spawn panda_simulator/panda_gripper_controller"/>
 
   <!-- load the default "ON" controllers -->
   <node name="controller_spawner_panda" pkg="controller_manager" type="controller_manager" respawn="false" ns="/$(arg panda_name)"

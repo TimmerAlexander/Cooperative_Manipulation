@@ -57,7 +57,7 @@
       <arg name="gui" value="$(arg gui)" />
       <arg name="ns" value="$(arg ns)" />
       <arg name="load_gripper" value="$(arg load_gripper)" />
-      <arg name="panda_name" default="$(arg panda_name)"/>
+      <arg name="panda_name" value="$(arg panda_name)"/>
   </include>
 
   <group if="$(eval arg('use_custom_action_servers') == true)">
