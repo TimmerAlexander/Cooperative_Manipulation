@@ -3,7 +3,7 @@
 
     <arg name="ur_name" default="ur"/>
     <group ns="$(arg ur_name)">
-        <node pkg="cooperative_manipulation_controllers" type="universal_robot_admittance_control.py" name="admittance_controller_node" output="screen">
+        <node pkg="cooperative_manipulation_controllers" type="ur16e_admittance_control.py" name="admittance_controller_node" output="screen">
             <param name="ur_ns" value="$(arg ur_name)"/>
         </node>
     </group> 
