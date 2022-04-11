@@ -45,40 +45,45 @@ class ur_admittance_controller():
         # Wrench filter parameter
         self.wrench_filter = 0.03
         
-        # ? Brauche ich das? --------------------------------------------
+        # ? Brauche ich das? --------------------------------------------------------
         self.velocity_threshhold = 0.1
         self.cmd_vel_filter = 0.05
         # ? --------------------------------------------------------------------------
         
     def __init__(self):
-        # Load config
+        # * Load config parameters
         self.config()
         
-        # *Initialize the msgs:
-        # Initialize target cartesian velocity array
-        self.target_cartesian_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        # Initialize shutdown joint velocity
-        self.shutdown_joint_velocity = Float64MultiArray()
-        self.shutdown_joint_velocity.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        # Declare target joint velocity msgs
-        self.target_joint_velocity = Float64MultiArray()
-        
-        self.tool0_cartesian_velocity = Vector3Stamped()
-        
-        self.velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        
-        
-        # Initialize desired velocity
+        # * Initialize the needed velocity data types:
+        #  Todo: Delete in ready code--------------------------------
+        # Initialize desired velocity (xdot_desired_tool0)
         self.desired_velocity = numpy.array([0.0,0.01,0.0,0.0,0.0,0.0])
+        # Todo: --------------------------------
+        # Initialize desired velocity transformed form 'tool0' frame to 'base_link' frame (xdot_desired_baselink)
+        self.desired_velocity_transformed = numpy.array([0.01,0.0,0.0,0.0,0.0,0.0])
+        # Initialize velocity from admittance (xdot_a_tool0)
+        self.velocity_admittance = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        # Initialize velocity from admittance 'tool0' frame to 'base_link' frame  (xdot_a_baselink)
+        self.velocity_admittance_transformed  = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        # Initialize target cartesian velocity array (xdot_target_baselink)
+        self.target_cartesian_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        # Declare target joint velocity msgs (qdot_target_baselink)
+        self.target_joint_velocity = Float64MultiArray()
+        # Initialize velocity (xdot_desired_tool0)
+        self.velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.tool0_cartesian_velocity = Vector3Stamped()
+        # Initialize shutdown joint velocity, called on shutdown 
+        self.shutdown_joint_velocity = Float64MultiArray()
+        self.shutdown_joint_velocity.data = [0.0,0.0,0.0,0.0,0.0,0.0]
         
         # * Initialize node
         rospy.init_node('admittance_controller_node', anonymous=True)
         rospy.loginfo("admittance controller running")
         
-        # Initialize on_shutdown methode
+        # * Initialize on_shutdown clean up
         rospy.on_shutdown(self.shutdown)
 
-        # * Get namespace from launch file
+        # * Get namespace for topics from launch file
         self.namespace = rospy.get_param("~ur_ns")
         
         # * Initialize move_it
@@ -98,7 +103,7 @@ class ur_admittance_controller():
         self.listener = tf.TransformListener()
         self.listener.waitForTransform("tool0","base_link", rospy.Time(), rospy.Duration(4.0))
 
-        # Run publish_joint_velocity_thread
+        # * Run publish_joint_velocity_thread
         self.publish_joint_velocity_thread()
         
         rospy.spin()
@@ -106,6 +111,9 @@ class ur_admittance_controller():
     
     def wrench_cb(self,wrench_ext):
         """ Get external wrench.
+        
+        Send example wrenc:
+        rostopic pub  /ur/wrench geometry_msgs/WrenchStamped '{header: {stamp: now, frame_id: base_link}, wrench:{force: {x: 0.0, y: 0.0, z: 0.0}, torque: {x: 0.0, y: 0.0, z: 0.0}}}'
         """
         print("wrench_ext:")
         print(wrench_ext)
@@ -116,25 +124,31 @@ class ur_admittance_controller():
         #self.wrench_filtered_z = self.wrench_filtered_z*(1-self.wrench_filter) + wrench_ext.wrench.force.z * self.wrench_filter 
         #? -------------------------------------------------------------------------------------------------------
         
+        self.wrench_filtered_x = wrench_ext.wrench.force.x
+        self.wrench_filtered_y = wrench_ext.wrench.force.y
+        self.wrench_filtered_z = wrench_ext.wrench.force.z
+        
     
-    # ? In welchen Koordiantensystem wird die Bahn berechnet?
+    # ? In welchem Koordiantensystem wird die Bahn berechnet?
     def transform_velocity(self,cartesian_velocity: numpy.array):
         """ Transform the cartesian velocity from the 'tool0' frame to the 'base_link' frame
         """
+        # Get current time stamp
         now = rospy.Time()
         
+        # Converse cartesian_velocity from numpy.array to vector3
         self.tool0_cartesian_velocity.header.frame_id = 'tool0'
         self.tool0_cartesian_velocity.header.stamp = now
         self.tool0_cartesian_velocity.vector.x = cartesian_velocity[0]
         self.tool0_cartesian_velocity.vector.y = cartesian_velocity[1]
         self.tool0_cartesian_velocity.vector.z = cartesian_velocity[2]
         
+        # Transform cartesian_velocity from 'tool0' frame to 'base_link' frame
         self.base_link_cartesian_velocity = self.listener.transformVector3('base_link',self.tool0_cartesian_velocity)
         
+        # Converse cartesian_velocity from vector3 to numpy.array
         self.velocity_transformed = numpy.array([self.base_link_cartesian_velocity.vector.x,self.base_link_cartesian_velocity.vector.y,self.base_link_cartesian_velocity.vector.z,0.0,0.0,0.0])
         
-        print("self.velocity_transformed")
-        print(self.velocity_transformed)
         return self.velocity_transformed
         
     def publish_joint_velocity_thread(self):
@@ -146,52 +160,51 @@ class ur_admittance_controller():
             print("desired_velocity: ")
             print(self.desired_velocity)
             
-            self.desired_velocity_transformed = self.transform_velocity(self.desired_velocity)
+            # Calculate velocity from external wrench and admittance in 'tool0' frame
+            self.velocity_admittance[0] = self.wrench_filtered_x * pow(self.D_x,-1)
+            self.velocity_admittance[1] = self.wrench_filtered_y * pow(self.D_y,-1)
+            self.velocity_admittance[2] = self.wrench_filtered_z * pow(self.D_z,-1)
+            
+            # Transform velocity admittance from 'tool0' frame to 'base_link' frame
+            self.velocity_admittance_transformed = self.transform_velocity(self.velocity_admittance)
+            
+            #print("self.velocity_admittance_transformed")
+            #print(self.velocity_admittance_transformed)
 
-            #  Todo: Uncomment in ready code
+            #  Todo: Uncomment in ready code--------------------------------
             # Calculate the target cartesian velocity using the admittance
-            #self.target_cartesian_velocity[0] = self.desired_velocity[0] + self.wrench_filtered_x * pow(self.D_x,-1)
-            #self.target_cartesian_velocity[1] = self.desired_velocity[1] + self.wrench_filtered_y * pow(self.D_y,-1)
-            #self.target_cartesian_velocity[2] = self.desired_velocity[2] + self.wrench_filtered_z * pow(self.D_z,-1)
+            # for i in self.target_cartesian_velocity:
+            #    self.target_cartesian_velocity[i] = self.desired_velocity[i] + self.velocity_admittance_transformed[i]
+            #  Todo: ------------------------------------------------------
 
             # * Placeholder--------------------------------------------------------
-            #  Todo: Delete in ready code
-            self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.wrench_filtered_x * pow(self.D_x,-1)
-            self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] + self.wrench_filtered_y * pow(self.D_y,-1)
-            self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] + self.wrench_filtered_z * pow(self.D_z,-1)
+            #  Todo: Uncomment in ready code--------------------------------
+            # Transform desired velocity from 'tool0' frame to 'base_link' frame
+            self.desired_velocity_transformed = self.transform_velocity(self.desired_velocity)
+            
+            print("self.desired_velocity_transformed")
+            print(self.desired_velocity_transformed)
+            
+            for i in range(0, 6):
+                self.target_cartesian_velocity[i] = self.desired_velocity_transformed[i] + self.velocity_admittance_transformed[i]
+            #  Todo: -----------------------------------------------------
             # * Placeholder--------------------------------------------------------
 
+                # Check for cartesian velocity min limit
+                if abs(self.target_cartesian_velocity[i]) < self.cartesian_velocity_min_limit:
+                    self.target_cartesian_velocity[i] = 0.0
 
-            # Check for cartesian velocity min limit
-            if abs(self.target_cartesian_velocity[0]) < self.cartesian_velocity_min_limit:
-                self.target_cartesian_velocity[0] = 0.0
-            if abs(self.target_cartesian_velocity[1]) < self.cartesian_velocity_min_limit:
-                self.target_cartesian_velocity[1] = 0.0
-            if abs(self.target_cartesian_velocity[2]) < self.cartesian_velocity_min_limit:
-                self.target_cartesian_velocity[2] = 0.0
+                # Check for cartesian velocity max limit
+                if abs(self.target_cartesian_velocity[i]) > self.cartesian_velocity_max_limit:
+                    # Check for sign
+                    if numpy.sign(self.target_cartesian_velocity[0]) == 1:
+                        self.target_cartesian_velocity[i] = self.cartesian_velocity_max_limit
+                    else:
+                        self.target_cartesian_velocity[i] = -self.cartesian_velocity_max_limit
+              
             
-            # Check for cartesian velocity max limit
-            if abs(self.target_cartesian_velocity[0]) > self.cartesian_velocity_max_limit:
-                # Check for sign
-                if numpy.sign(self.target_cartesian_velocity[0]) == 1:
-                    self.target_cartesian_velocity[0] = self.cartesian_velocity_max_limit
-                else:
-                    self.target_cartesian_velocity[0] = -self.cartesian_velocity_max_limit
-            if abs(self.target_cartesian_velocity[1]) > self.cartesian_velocity_max_limit:
-                # Check for sign
-                if numpy.sign(self.target_cartesian_velocity[1]) == 1:
-                    self.target_cartesian_velocity[1] = self.cartesian_velocity_max_limit
-                else:
-                    self.target_cartesian_velocity[1] = -self.cartesian_velocity_max_limit
-            if abs(self.target_cartesian_velocity[2]) > self.cartesian_velocity_max_limit:
-                # Check for sign
-                if numpy.sign(self.target_cartesian_velocity[2]) == 1:
-                    self.target_cartesian_velocity[2] = self.cartesian_velocity_max_limit
-                else:
-                    self.target_cartesian_velocity[2] = -self.cartesian_velocity_max_limit
-            
-            #print("target_cartesian_velocity")
-            #print(self.target_cartesian_velocity)
+            print("target_cartesian_velocity")
+            print(self.target_cartesian_velocity)
             
             # Get current joint states and calculate the jaobian-matrix
             self.current_joint_states_array = self.group.get_current_joint_values()       
@@ -200,6 +213,7 @@ class ur_admittance_controller():
 
             # Calculate the target joint velocity 
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
+            
             #print("target_joint_velocity: ")
             #print(self.target_joint_velocity)
             
@@ -209,13 +223,13 @@ class ur_admittance_controller():
             # Sleep for publish_rate
             rate.sleep()
 
+#  Todo: shutdown_joint_velocity wird nicht gebpublished
     def shutdown(self):
         """ This function is called rospy.on_shutdown!
         """
-        
         print("Shutdown amittcance controller!")
         
-        print("Send stop joint velocity!")
+        print("Publish shutdown joint velocity!")
         self.joint_velocity_pub.publish(self.shutdown_joint_velocity)
         
         print("Unregister from joint_velocity_pub!")
@@ -226,14 +240,6 @@ class ur_admittance_controller():
     
 if __name__ == '__main__':
     ur_admittance_controller()
-    
-    
-   # def joint_state_cb(self,joint_states):
-    #    """ Get current joint velocity.
-     #   """
-      #  current_joint_velocity_array =[joint_states.velocity[0],joint_states.velocity[1],joint_states.velocity[2],joint_states.velocity[3],joint_states.velocity[4],joint_states.velocity[5]]
-        #print("current_joint_velocity_array: ")
-        #print(current_joint_velocity_array)
         
         # ? Brauche ich das? -------------------------------------
      #   joint_states_array=[joint_states.position[0],joint_states.position[1],joint_states.position[2],joint_states.position[3],joint_states.position[4],joint_states.position[5]]
