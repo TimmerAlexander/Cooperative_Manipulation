@@ -11,6 +11,7 @@
 # * target joint velocity: self.target_joint_velocity (In 'base_link' frame)
 # **************************************************************************/
 
+import sys
 import rospy
 import tf
 import moveit_commander
@@ -57,7 +58,7 @@ class ur_admittance_controller():
         # * Initialize the needed velocity data types:
         #  Todo: Delete in ready code--------------------------------
         # Initialize desired velocity (xdot_desired_tool0)
-        self.desired_velocity = numpy.array([0.0,0.01,0.0,0.0,0.0,0.0])
+        self.desired_velocity = numpy.array([0.01,0.0,0.0,0.0,0.0,0.0])
         # Todo: --------------------------------
         # Initialize desired velocity transformed form 'tool0' frame to 'base_link' frame (xdot_desired_baselink)
         self.desired_velocity_transformed = numpy.array([0.01,0.0,0.0,0.0,0.0,0.0])
@@ -185,37 +186,44 @@ class ur_admittance_controller():
             print("self.desired_velocity_transformed")
             print(self.desired_velocity_transformed)
             
-            for i in range(0, 6):
+            for i in range(0,6):
                 self.target_cartesian_velocity[i] = self.desired_velocity_transformed[i] + self.velocity_admittance_transformed[i]
             #  Todo: -----------------------------------------------------
             # * Placeholder--------------------------------------------------------
 
                 # Check for cartesian velocity min limit
                 if abs(self.target_cartesian_velocity[i]) < self.cartesian_velocity_min_limit:
+                    # Set cartesian velocity min limit
                     self.target_cartesian_velocity[i] = 0.0
 
                 # Check for cartesian velocity max limit
                 if abs(self.target_cartesian_velocity[i]) > self.cartesian_velocity_max_limit:
                     # Check for sign
                     if numpy.sign(self.target_cartesian_velocity[0]) == 1:
+                        # Set cartesian velocity max limit
                         self.target_cartesian_velocity[i] = self.cartesian_velocity_max_limit
-                    else:
+                    elif numpy.sign(self.target_cartesian_velocity[0]) == -1:
+                        # Set cartesian velocity max limit
                         self.target_cartesian_velocity[i] = -self.cartesian_velocity_max_limit
-              
+                    else:
+                        sys.exit('Sign could not be detected!')
+                        
             
             print("target_cartesian_velocity")
             print(self.target_cartesian_velocity)
             
-            # Get current joint states and calculate the jaobian-matrix
-            self.current_joint_states_array = self.group.get_current_joint_values()       
+            # Get the current joint states 
+            self.current_joint_states_array = self.group.get_current_joint_values() 
+            # Calculate the jacobian-matrix
             self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array) 
+            # Calculate the inverse of the jacobian-matrix
             self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
 
-            # Calculate the target joint velocity 
+            # Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
             
-            #print("target_joint_velocity: ")
-            #print(self.target_joint_velocity)
+            print("target_joint_velocity: ")
+            print(self.target_joint_velocity)
             
             # Publish the target_joint_velocity
             self.joint_velocity_pub.publish(self.target_joint_velocity)
@@ -223,7 +231,7 @@ class ur_admittance_controller():
             # Sleep for publish_rate
             rate.sleep()
 
-#  Todo: shutdown_joint_velocity wird nicht gebpublished
+#  Todo: shutdown_joint_velocity wird nicht gepublished
     def shutdown(self):
         """ This function is called rospy.on_shutdown!
         """
@@ -231,6 +239,7 @@ class ur_admittance_controller():
         
         print("Publish shutdown joint velocity!")
         self.joint_velocity_pub.publish(self.shutdown_joint_velocity)
+        print(self.shutdown_joint_velocity)
         
         print("Unregister from joint_velocity_pub!")
         self.joint_velocity_pub.unregister()
