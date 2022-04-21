@@ -61,7 +61,7 @@ class ur_admittance_controller():
         # * Initialize the needed velocity data types:
         #  Todo: Delete in ready code--------------------------------
         # Initialize desired velocity (xdot_desired_wrist_3_link)
-        self.desired_velocity = numpy.array([0.0,0.0,-0.01,0.0,0.0,0.0])
+        self.desired_velocity = numpy.array([0.01,0.0,0.01,0.0,0.0,0.0])
         # Todo: -----------------------------------------------------
         # Initialize desired velocity transformed form 'wrist_3_link' frame to 'base_link' frame (xdot_desired_baselink)
         self.desired_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -104,12 +104,15 @@ class ur_admittance_controller():
         
         # * Initialize subscriber:
         # Subscriber to "/ur/wrench"
-        self.wrench_ext_sub = rospy.Subscriber("/" + self.namespace + "/wrench", WrenchStamped, self.wrench_callback)
+        self.wrench_ext_sub = rospy.Subscriber("/" + self.namespace + "/ur_admittance_controller/wrench", WrenchStamped, self.wrench_callback)
         
         # * Initialize tf TransformListener
         self.listener = tf.TransformListener()
         self.listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(4.0))
 
+        
+        
+        
         # * Run publish_joint_velocity_thread
         self.publish_joint_velocity_thread()
         
@@ -123,6 +126,8 @@ class ur_admittance_controller():
         Send example wrench:
         rostopic pub  /ur/wrench geometry_msgs/WrenchStamped '{header: {stamp: now, frame_id: base_link}, wrench:{force: {x: 0.0, y: 0.0, z: 0.0}, torque: {x: 0.0, y: 0.0, z: 0.0}}}'
         """
+        
+        
         #print("wrench_ext:")
         #print(wrench_ext)
         
@@ -138,8 +143,15 @@ class ur_admittance_controller():
         """ 
         Transform the cartesian velocity from the 'wrist_3_link' frame to the 'base_link' frame.
         """
+        
+        
+        
         # Get current time stamp
         now = rospy.Time()
+        # Get position of wrist_3_link
+        (curr_position,curr_orientation) = self.listener.lookupTransform('world', 'wrist_3_link', now)
+        print("curr_position:")
+        print(curr_position)
         
         # Converse cartesian_velocity translation from numpy.array to vector3
         self.wrist_3_link_cartesian_velocity_trans.header.frame_id = 'wrist_3_link'
@@ -181,8 +193,8 @@ class ur_admittance_controller():
         rate = rospy.Rate(self.publish_rate)
         while not rospy.is_shutdown():
             
-            print("desired_velocity: ")
-            print(self.desired_velocity)
+            #print("desired_velocity: ")
+            #print(self.desired_velocity)
             
             # * Calculate velocity from external wrench and admittance in 'wrist_3_link' frame
             self.admittance_velocity[0] = self.wrench_ext_filtered.wrench.force.x * pow(self.D_trans_x,-1)
@@ -202,8 +214,8 @@ class ur_admittance_controller():
             # * Transform desired velocity from 'wrist_3_link' frame to 'base_link' frame
             self.desired_velocity_transformed = self.transform_velocity(self.desired_velocity)
             
-            print("self.desired_velocity_transformed")
-            print(self.desired_velocity_transformed)
+            #print("self.desired_velocity_transformed")
+            #print(self.desired_velocity_transformed)
             
             # * Add the desired_velocity in 'base_link' frame and velocity admittance in 'base_link' frame
             self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.admittance_velocity_transformed[0]
@@ -307,6 +319,9 @@ class ur_admittance_controller():
             
             # * Get the current joint states 
             self.current_joint_states_array = self.group.get_current_joint_values() 
+            
+            print("self.current_joint_states_array: ")
+            print(self.current_joint_states_array)
             # * Calculate the jacobian-matrix
             self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array) 
             # * Calculate the inverse of the jacobian-matrix

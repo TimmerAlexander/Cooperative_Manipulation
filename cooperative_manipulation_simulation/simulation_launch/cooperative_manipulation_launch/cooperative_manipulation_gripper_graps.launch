@@ -4,17 +4,17 @@
     <arg name="panda_name" default="panda"/>
     <arg name="ur_name" default="ur"/>
 
-    <!-- Value betwewen 0.0 (open) and 0.8 (closed) -->
-    <arg name="ur_goal_width" default="0.4" />
-    <!-- panda_close_gripper: [command_msg.goal.width,command_msg.epsilon.inner,command_msg.epsilon.outer,command_msg.goal.speed,command_msg.goal.force] -->
-    <arg name="panda_goal_width" default="0.0" />
-    <arg name="panda_goal_epsilon_inner" default="0.05" />
-    <arg name="panda_goal_epsilon_outer" default="0.05" />
+    <!-- ur_goal_width value betwewen 0.0 (open) and 0.8 (closed) -->
+    <arg name="ur_goal_width" default="0.6" />
+    <!-- panda_goal_width value betwewen 0.8 (open) and 0.0 (closed) -->
+    <arg name="panda_goal_width" default="0.02" />
+    <arg name="panda_goal_epsilon_inner" default="0.005" />
+    <arg name="panda_goal_epsilon_outer" default="0.005" />
     <arg name="panda_goal_speed" default="0.1" />
     <arg name="panda_goal_force" default="60" />
 
 
-    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/gripper_grasp/franka_gripper_graps.launch">
+    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/gripper_grasp/franka_gripper_graps.launch">
         <arg name="panda_name" value="$(arg panda_name)" />
         <arg name="panda_goal_width" value="$(arg panda_goal_width)" />
         <arg name="panda_goal_epsilon_inner" value="$(arg panda_goal_epsilon_inner)" />
@@ -24,9 +24,7 @@
     </include>
 
 
-
-
-    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/gripper_grasp/ur16e_gripper_graps.launch">
+    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/gripper_grasp/ur16e_gripper_graps.launch">
         <arg name="ur_name" value="$(arg ur_name)" />
         <arg name="ur_goal_width" value="$(arg ur_goal_width)" />
     </include>

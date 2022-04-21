@@ -3,10 +3,11 @@
 
   <arg name="ur_xyz" default="'0 0 0'"/>
   <arg name="ur_rpy" default="'0 0 0'"/>
+  <arg name="load_gripper" default="true"/>
   <arg name="limited" default="false" doc="If true, limits joint range [-PI, PI] on all joints." />
   <arg name="transmission_hw_interface" default="hardware_interface/VelocityJointInterface" />
 
-  <param unless="$(arg limited)" name="robot_description" command="$(find xacro)/xacro --inorder '$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e_robot.urdf.xacro' xyz:=$(arg ur_xyz) rpy:=$(arg ur_rpy)" />
+  <param unless="$(arg limited)" name="robot_description" command="$(find xacro)/xacro --inorder '$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e_robot.urdf.xacro' transmission_hw_interface:=$(arg transmission_hw_interface) xyz:=$(arg ur_xyz) rpy:=$(arg ur_rpy) load_gripper:=$(arg load_gripper)" />
 
   <param if="$(arg limited)" name="robot_description" command="$(find xacro)/xacro --inorder '$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e_joint_limited_robot.urdf.xacro' transmission_hw_interface:=$(arg transmission_hw_interface) xyz:=$(arg ur_xyz) rpy:=$(arg ur_rpy)" />
 </launch>

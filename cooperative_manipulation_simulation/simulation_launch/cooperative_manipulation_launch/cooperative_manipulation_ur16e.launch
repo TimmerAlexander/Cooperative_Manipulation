@@ -1,0 +1,32 @@
+<launch>
+  <!-- Set namespace of the manipulators -->
+  <arg name="universal_robot_name"  default="ur"/>
+
+  <!-- Set Universal Robot arguments -->
+  <!--initial_pose(translation and rotation) of base-->
+  <arg name="ur_base_trans" default="'-1 0 0'"/>
+  <arg name="ur_base_rot" default="'0 0 -1.57'"/>
+  <arg name="load_gripper" default="true"/>
+  <arg name="debug" default="false" />
+
+  <!-- default: hardware_interface/PositionJointInterface    hardware_interface/PositionJointInterface -->
+  <arg name="ur_transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
+  
+
+  <group ns="$(arg universal_robot_name)">
+    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/ur16e.launch">
+      <arg name="ur_name" value="$(arg universal_robot_name)"/>
+      <arg name="ur_transmission_hw_interface" value="$(arg ur_transmission_hw_interface)" />
+      <arg name="ur_xyz" value="$(arg ur_base_trans)"/>
+      <arg name="ur_rpy" value="$(arg ur_base_rot)"/>
+      <arg name="load_gripper" value="$(arg load_gripper)"/>
+      <arg name="debug" value="$(arg debug)" />
+    </include>
+  </group> 
+
+  <!-- Universal Robot launch rviz --> 
+  <!--
+  <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/rviz/ur16e_single_config.rviz"/>
+  -->
+
+</launch>

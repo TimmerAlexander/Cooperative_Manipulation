@@ -7,7 +7,7 @@
 
   <!-- Gazebo launch:________________________________________________________________________________________________-->
   <arg name="load_gazebo" default="true"/>
-  <include if="$(arg load_gazebo)" file="$(find cooperative_manipulation_simulation)/simulation_launch/gazebo_world.launch"/>
+  <include if="$(arg load_gazebo)" file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/gazebo_world.launch"/>
   <!--_______________________________________________________________________________________________________________-->
 
 
@@ -28,7 +28,7 @@
     
     <!-- In Franka Emika namespace: Launch Franka Emika -->
     <group ns="$(arg franka_emika_name)">
-        <include file="$(find cooperative_manipulation_simulation)/simulation_launch/franka.launch">
+        <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/franka.launch">
             <arg name="panda_name" value="$(arg franka_emika_name)"/>
             <arg name="initial_pose" value="$(arg panda_initial_pose)"/>
             <arg name="panda_xyz" value="$(arg panda_base_trans)"/>
@@ -65,7 +65,7 @@
 
   
     <group ns="$(arg universal_robot_name)">
-      <include file="$(find cooperative_manipulation_simulation)/simulation_launch/ur16e.launch">
+      <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/ur16e.launch">
       <arg name="ur_name" value="$(arg universal_robot_name)"/>
       <arg name="ur_transmission_hw_interface" value="$(arg ur_transmission_hw_interface)" />
       <arg name="ur_xyz" value="$(arg ur_base_trans)"/>

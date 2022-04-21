@@ -4,6 +4,8 @@
 
   <xacro:arg name="xyz" default="'0 0 0'"/>
   <xacro:arg name="rpy" default="'0 0 0'"/>
+  <xacro:arg name="load_gripper" default="true"/>
+  <xacro:arg name="transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
 
   <!-- common stuff -->
   <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_common.gazebo.xacro" />
@@ -12,17 +14,15 @@
   <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e.urdf.xacro" />
 
   <!-- robotiq 85 gripper -->
-  
-  <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/ur16e_robotiq_85_gripper.urdf.xacro" />
-
+  <xacro:if value="$(arg load_gripper)">
+    <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/ur16e_robotiq_85_gripper.urdf.xacro" />
+  </xacro:if>
 
   <!-- arm -->
   <xacro:arg name="kinematics_config" default="$(find cooperative_manipulation_robot_description)/custom_ur_description/config/custom_ur16e_default.yaml"/>
   <xacro:ur16e_robot prefix="" joint_limited="false"
     kinematics_file="${load_yaml('$(arg kinematics_config)')}"
   />
-
-
 
   <link name="world" />
 
