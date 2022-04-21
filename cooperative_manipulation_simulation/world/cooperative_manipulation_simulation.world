@@ -11,13 +11,6 @@
       <uri>model://sun</uri>
     </include>
 
-    <!-- Custom Model -->
-    <include>
-      <uri>model://model2</uri>
-      <pose frame=''>0.0 0.0 1.0 0.0 0.0 0.0</pose>
-    </include>
-
-
     <physics type="ode">
       <real_time_update_rate>1000.0</real_time_update_rate>
     </physics>

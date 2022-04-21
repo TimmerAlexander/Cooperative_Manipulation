@@ -1,25 +1,29 @@
 <?xml version='1.0'?>
 <sdf version='1.7'>
   <model name='cooperative_manipulation_object'>
-    <link name='link_0'>
+    <link name='link_2'>
       <inertial>
-        <mass>0.0309731</mass>
+        <mass>1</mass>
         <inertia>
-          <ixx>0.000119661</ixx>
+          <ixx>0.166667</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
-          <iyy>0.00525871</iyy>
+          <iyy>0.166667</iyy>
           <iyz>0</iyz>
-          <izz>0.00529944</izz>
+          <izz>0.166667</izz>
         </inertia>
         <pose>0 0 0 0 -0 0</pose>
       </inertial>
-      <pose>-0 0 0 0 -0 0</pose>
+      <pose>0 0 0 0 -0 0</pose>
+      <gravity>1</gravity>
+      <self_collide>0</self_collide>
+      <kinematic>0</kinematic>
+      <enable_wind>0</enable_wind>
       <visual name='visual'>
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <box>
-            <size>1.42201 0.176269 0.123653</size>
+            <size>0.75 0.02 0.1</size>
           </box>
         </geometry>
         <material>
@@ -28,7 +32,13 @@
             <uri>file://media/materials/scripts/gazebo.material</uri>
             <name>Gazebo/Grey</name>
           </script>
-          <shader type='pixel'/>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+          <specular>0.01 0.01 0.01 1</specular>
+          <emissive>0 0 0 1</emissive>
         </material>
         <transparency>0</transparency>
         <cast_shadows>1</cast_shadows>
@@ -39,7 +49,7 @@
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <box>
-            <size>1.42201 0.176269 0.123653</size>
+            <size>0.75 0.02 0.1</size>
           </box>
         </geometry>
         <surface>
