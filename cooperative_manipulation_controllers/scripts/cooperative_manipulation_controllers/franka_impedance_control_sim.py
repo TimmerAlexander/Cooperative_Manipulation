@@ -61,7 +61,7 @@ from cooperative_manipulation_controllers.franka_rviz_markers import RvizMarkers
 P_pos = 50
 P_ori = 0
 # damping gains
-D_pos = 1
+D_pos = 10
 D_ori = 0
 # -----------------------------------------
 publish_rate = 100
@@ -127,7 +127,7 @@ def control_thread(rate):
             delta_pos = (goal_pos - curr_pos).reshape([3,1])
             delta_ori = quatdiff_in_euler(curr_ori, goal_ori).reshape([3,1])
             # Desired task-space force using PD law
-            F = np.vstack([P_pos*(delta_pos), P_ori*(delta_ori)]) + \
+            F = np.vstack([P_pos*(delta_pos), P_ori*(delta_ori)]) - \
                 np.vstack([D_pos*(curr_vel), D_ori*(curr_omg)])
             error = np.linalg.norm(delta_pos) + np.linalg.norm(delta_ori)
             
