@@ -1,16 +1,16 @@
 <?xml version='1.0'?>
 <sdf version='1.7'>
-  <model name='cooperative_manipulation_object'>
-    <link name='link_2'>
+  <model name='cooperative_simualtion_object'>
+    <link name='link_1'>
       <inertial>
         <mass>1</mass>
         <inertia>
-          <ixx>0.166667</ixx>
+          <ixx>0.0834667</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
-          <iyy>0.166667</iyy>
+          <iyy>0.0834667</iyy>
           <iyz>0</iyz>
-          <izz>0.166667</izz>
+          <izz>0.00026667</izz>
         </inertia>
         <pose>0 0 0 0 -0 0</pose>
       </inertial>
@@ -22,9 +22,10 @@
       <visual name='visual'>
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
-          <box>
-            <size>0.75 0.02 0.1</size>
-          </box>
+          <mesh>
+            <uri>/home/alexander/Studium/Masterarbeit/Masterarbeit_ws/src/Cooperative_Manipulation_Directroy/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
         </geometry>
         <material>
           <lighting>1</lighting>
@@ -49,20 +50,20 @@
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <box>
-            <size>0.75 0.02 0.1</size>
+            <size>0.04 0.04 1</size>
           </box>
         </geometry>
         <surface>
           <friction>
             <ode>
-              <mu>1</mu>
-              <mu2>1</mu2>
+              <mu>1e+06</mu>
+              <mu2>1e+06</mu2>
               <fdir1>0 0 0</fdir1>
               <slip1>0</slip1>
               <slip2>0</slip2>
             </ode>
             <torsional>
-              <coefficient>1</coefficient>
+              <coefficient>1e+06</coefficient>
               <patch_radius>0</patch_radius>
               <surface_radius>0</surface_radius>
               <use_patch_radius>1</use_patch_radius>
