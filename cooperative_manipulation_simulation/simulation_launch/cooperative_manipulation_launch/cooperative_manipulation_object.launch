@@ -2,9 +2,11 @@
 <launch>
   <arg name="x" default="0.0" />
   <arg name="y" default="0.0" />
-  <arg name="z" default="1.03" />
+  <arg name="z" default="0.485" />
+  <arg name="roll" default="0.0" />
+  <arg name="pitch" default="1.57079" />
   <arg name="yaw" default="0.0" />
-  <arg name="sdf_object_file" default="$(find cooperative_manipulation_simulation)/model/cooperative_manipulation_object/model.sdf"/>
+  <arg name="sdf_object_file" default="$(find cooperative_manipulation_simulation)/model/cooperative_simualtion_object/model.sdf"/>
   <arg name="object_name" default="object"/>
 
   <!-- startup simulated world -->
@@ -15,6 +17,8 @@
             <arg name="x" value="$(arg x)" />
             <arg name="y" value="$(arg y)" />
             <arg name="z" value="$(arg z)" />
+            <arg name="roll" value="$(arg roll)" />
+            <arg name="pitch" value="$(arg pitch)" />
             <arg name="yaw" value="$(arg yaw)" />
         </include>
     </group> 
