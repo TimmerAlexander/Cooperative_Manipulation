@@ -14,7 +14,7 @@
   <arg name="panda_rpy" default="'0 0 0'"/>
   <arg name="panda_xyz_tf" default="0 0 0"/>
   <arg name="panda_rpy_tf" default="0 0 0 1"/>
-  <arg name="initial_pose" default="[0.0,-0.785,0.0,-1.57,0.0,2.356,0.785]"/>
+  <arg name="initial_pose" default="[0.00,-0.785,0.0,-2.356,0.0,1.57,0.785]"/>
 
   <!-- This argument fixes the robot statically to the world -->
   <arg name="static" default="true"/>
@@ -27,9 +27,9 @@
     default=" -J $(arg panda_name)::panda_joint1 0.000
               -J $(arg panda_name)::panda_joint2 -0.785
               -J $(arg panda_name)::panda_joint3 0.0
-              -J $(arg panda_name)::panda_joint4 -1.57
+              -J $(arg panda_name)::panda_joint4 -2.356
               -J $(arg panda_name)::panda_joint5 0.0
-              -J $(arg panda_name)::panda_joint6 2.356
+              -J $(arg panda_name)::panda_joint6 1.57
               -J $(arg panda_name)::panda_joint7 0.785"/>
 
 

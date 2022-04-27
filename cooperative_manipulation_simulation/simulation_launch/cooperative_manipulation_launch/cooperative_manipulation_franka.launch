@@ -4,10 +4,10 @@
 
   <!--initial_pose-->
   <!-- default "[0.00,-0.785,0.0,-2.356,0.0,1.57,-0.785]" -->
-  <arg name="panda_initial_pose" default="[0.0,-0.785,0.0,-1.57,0.0,2.356,0.785]"/>
+  <arg name="panda_initial_pose" default="[0.00,-0.785,0.0,-2.356,0.0,1.57,0.785]"/>
 
   <!--initial_pose, translation and rotation of base-->
-  <arg name="panda_base_trans" default="'0.625 0 0'"/>
+  <arg name="panda_base_trans" default="'0.75 0 0'"/>
   <arg name="panda_base_rot" default="'0 0 3.14'"/>
     
   <!--arg with suffix tf for static_transform_publisher node, args without suffix "tf" fit for urdf files, also important for the correct pose in rviz-->
