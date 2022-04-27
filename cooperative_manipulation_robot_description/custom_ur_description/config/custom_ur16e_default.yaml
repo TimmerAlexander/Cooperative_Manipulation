@@ -5,7 +5,7 @@ kinematics:
     z: 0.1807
     roll: -0
     pitch: 0
-    yaw: -1.27435
+    yaw: -1.25685
   upper_arm:
     x: 0
     y: 0
@@ -39,6 +39,6 @@ kinematics:
     y: 0.11655
     z: -2.390480459346185e-11
     roll: 1.570796326589793
-    pitch: -0.1915
+    pitch: -0.31361
     yaw: 3.141592653589793
   hash: calib_1935737212149401527

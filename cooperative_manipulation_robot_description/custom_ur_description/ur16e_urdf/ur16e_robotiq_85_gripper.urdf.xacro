@@ -66,17 +66,48 @@
     </plugin>
   </gazebo>
   
-  <!-- Gazebo grasping plugin -->
+
+  <!-- Gazebo graspi fix plugin -->
   <gazebo>
+    <!-- https://github.com/JenniferBuehler/gazebo-pkgs/wiki/The-Gazebo-grasp-fix-plugin -->
+    <plugin name="gazebo_grasp_fix" filename="libgazebo_grasp_fix.so">
+          <arm>
+            <arm_name>ur16e</arm_name>
+            <!--  has to be the link to which the finger joints are attached. -->
+            <palm_link>robotiq_85_left_inner_knuckle_link</palm_link>
+            <palm_link>robotiq_85_right_inner_knuckle_link</palm_link>
+           <!-- tags have to include all link names of the gripper/hand which are used to actively grasp objects -->           
+              <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
+              <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
+          </arm>
+        <forces_angle_tolerance>100</forces_angle_tolerance>
+        <update_rate>4</update_rate>
+        <grip_count_threshold>4</grip_count_threshold>
+        <max_grip_count>8</max_grip_count>
+        <release_tolerance>0.005</release_tolerance>
+        <disable_collisions_on_attach>false</disable_collisions_on_attach>
+        <contact_topic>__default_topic__</contact_topic>
+      </plugin>
+  </gazebo>
+
+    <!-- Gazebo grasping plugin -->
+  <!-- <gazebo>
     <gripper name="gazebo_gripper">
       <grasp_check>
-        <attach_steps>2</attach_steps>    <!-- default: 20 -->
-        <detach_steps>2</detach_steps>    <!-- default: 40 -->
+        <attach_steps>2</attach_steps>    
+        <detach_steps>2</detach_steps>    
         <min_contact_count>3</min_contact_count>
       </grasp_check>
       <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
       <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
       <palm_link>robotiq_85_base_link</palm_link>
     </gripper>
-  </gazebo>
+  </gazebo> 
+  -->
 </robot>
+
+
+
+
+
+

@@ -3,14 +3,14 @@
   <model name='cooperative_simualtion_object'>
     <link name='link_1'>
       <inertial>
-        <mass>1</mass>
+        <mass>0.001</mass>
         <inertia>
-          <ixx>0.0834667</ixx>
+          <ixx>0.000834667</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
-          <iyy>0.0834667</iyy>
+          <iyy>0.000834667</iyy>
           <iyz>0</iyz>
-          <izz>0.00026667</izz>
+          <izz>0.00000026667</izz>
         </inertia>
         <pose>0 0 0 0 -0 0</pose>
       </inertial>

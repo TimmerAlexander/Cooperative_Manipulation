@@ -64,7 +64,7 @@ class ur_admittance_controller():
         # * Initialize the needed velocity data types:
         #  Todo: Delete in ready code--------------------------------
         # Initialize desired velocity (xdot_desired_wrist_3_link)
-        self.desired_velocity = numpy.array([0.0,0.0,0.01,0.0,0.0,0.0])
+        self.desired_velocity = numpy.array([0.01,0.0,-0.01,0.0,0.0,0.0])
         # Todo: -----------------------------------------------------
         # Initialize desired velocity transformed form 'wrist_3_link' frame to 'base_link' frame (xdot_desired_baselink)
         self.desired_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -399,15 +399,15 @@ class ur_admittance_controller():
                     sys.exit('Sign could not be detected!')
                     
                     
-            #print("target_cartesian_velocity: after check for limits")
-            #print(self.target_cartesian_velocity)
+            print("target_cartesian_velocity: after check for limits")
+            print(self.target_cartesian_velocity)
             
             
             # * Get the current joint states 
             self.current_joint_states_array = self.group.get_current_joint_values() 
             
-            print("self.current_joint_states_array: ")
-            print(self.current_joint_states_array)
+            #print("self.current_joint_states_array: ")
+            #print(self.current_joint_states_array)
             # * Calculate the jacobian-matrix
             self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array) 
             # * Calculate the inverse of the jacobian-matrix

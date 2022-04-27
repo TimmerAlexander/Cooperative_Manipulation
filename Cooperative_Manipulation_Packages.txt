@@ -16,6 +16,10 @@ robotiq(Gripper):
         - Change in /robotiq/robotiq_description/urdf/robotiq_85_gripper.transmission.xacro
          <hardwareInterface>PositionJointInterface</hardwareInterface> to <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
 
+
+Item Profile 
+  - https://3dwarehouse.sketchup.com/model/4c1d967f-b581-48be-8712-bb6cb6ff648d/Alu-Profil-8-ITEM-40-x-40-mm
+  - Alu-Profil 8, ITEM, 40 x 40 mm
 ________________________________________________________________________________________________________________________
 Usage:
 
