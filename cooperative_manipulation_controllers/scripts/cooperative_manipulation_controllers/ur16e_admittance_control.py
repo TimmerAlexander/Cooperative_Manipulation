@@ -64,7 +64,7 @@ class ur_admittance_controller():
         # * Initialize the needed velocity data types:
         #  Todo: Delete in ready code--------------------------------
         # Initialize desired velocity (xdot_desired_wrist_3_link)
-        self.desired_velocity = numpy.array([0.01,0.0,-0.01,0.0,0.0,0.0])
+        self.desired_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         # Todo: -----------------------------------------------------
         # Initialize desired velocity transformed form 'wrist_3_link' frame to 'base_link' frame (xdot_desired_baselink)
         self.desired_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])

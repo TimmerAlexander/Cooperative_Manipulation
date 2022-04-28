@@ -14,7 +14,7 @@
   <xacro:include filename="$(find franka_panda_description)/robots/panda_arm.xacro"/>
 
   <xacro:if value="$(arg load_gripper)">
-    <xacro:include filename="$(find franka_panda_description)/robots/hand.xacro"/>
+    <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_franka_description/franka_urdf/custom_hand.xacro"/>
     <xacro:hand ns="panda" rpy="0 0 ${-pi/4}" connected_to="panda_link8"/>
   </xacro:if>
 
