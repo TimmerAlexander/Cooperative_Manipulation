@@ -4,7 +4,7 @@
 # *Admittance controller
 
 # * Input: 
-# * desired cartesian velocity from path planning: self.desired_velocity (In 'base_link' frame)
+# * desired cartesian velocity from path planning: self.desired_velocity (In 'world' frame)
 # * external wrench from the f/t sensor: self.wrench_ext (In 'wrist_3_link' frame)
 
 # * Output: 
@@ -17,8 +17,7 @@ import tf
 import moveit_commander
 from geometry_msgs.msg import WrenchStamped, Vector3Stamped
 from std_msgs.msg import Float64MultiArray
-from sensor_msgs.msg import JointState
-
+from geometry_msgs.msg import Twist
 import numpy
 
 #J_ur=self.group.get_jacobian_matrix(self.current_joint_states_array)
@@ -62,12 +61,10 @@ class ur_admittance_controller():
         self.config()
         
         # * Initialize the needed velocity data types:
-        #  Todo: Delete in ready code--------------------------------
-        # Initialize desired velocity (xdot_desired_wrist_3_link)
-        self.desired_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        # Todo: -----------------------------------------------------
-        # Initialize desired velocity transformed form 'wrist_3_link' frame to 'base_link' frame (xdot_desired_baselink)
+        # Initialize desired velocity transformed form 'wrorld' frame to 'base_link' frame (xdot_desired_baselink)
         self.desired_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.world_cartesian_velocity_trans = Vector3Stamped()
+        self.world_cartesian_velocity_rot = Vector3Stamped()
         # Initialize velocity from admittance (xdot_a_wrist_3_link)
         self.admittance_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         # Initialize velocity from admittance 'wrist_3_link' frame to 'base_link' frame  (xdot_a_baselink)
@@ -107,20 +104,70 @@ class ur_admittance_controller():
         
         # * Initialize subscriber:
         # Subscriber to "/ur/wrench"
-        self.wrench_ext_sub = rospy.Subscriber("/" + self.namespace + "/ft_sensor/raw", WrenchStamped, self.wrench_callback)
+        self.wrench_ext_sub = rospy.Subscriber("/" + self.namespace + "/ft_sensor/raw", WrenchStamped, self.wrench_callback,queue_size=1)
+        
+        # ----------------------------------
+        # Subscriber to "/ur/cooperative_manipulation/cartesian_velocity_command"
+        self.cartesian_velocity_command_sub = rospy.Subscriber("/cooperative_manipulation/cartesian_velocity_command", Twist, self.cartesian_velocity_command_callback,queue_size=1)
+        # ----------------------------------
         
         # * Initialize tf TransformListener
         self.listener = tf.TransformListener()
         self.listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(4.0))
 
         
-        
-        
         # * Run publish_joint_velocity_thread
         self.publish_joint_velocity_thread()
         
         rospy.spin()
     
+    def cartesian_velocity_command_callback(self,desired_velocity):
+        """
+        Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' frame.
+        
+        Send example velocity:
+        rostopic pub -r 10 cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        angular:
+        x: 0.0
+        y: 0.0
+        z: 0.0" 
+        """
+        # Get current time stamp
+        now = rospy.Time()
+
+        # Converse cartesian_velocity translation to vector3
+        self.world_cartesian_velocity_trans.header.frame_id = 'world'
+        self.world_cartesian_velocity_trans.header.stamp = now
+        self.world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x
+        self.world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y
+        self.world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z
+        
+        # Transform cartesian_velocity translation from 'world' frame to 'base_link' frame
+        self.base_link_cartesian_desired_velocity_trans = self.listener.transformVector3('base_link',self.world_cartesian_velocity_trans)
+        
+        # Converse cartesian_velocity rotation to vector3
+        self.world_cartesian_velocity_rot.header.frame_id = 'world'
+        self.world_cartesian_velocity_rot.header.stamp = now
+        self.world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
+        self.world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
+        self.world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
+        
+        # Transform cartesian_velocity rotation from 'world' frame to 'base_link' frame
+        self.base_link_cartesian_desired_velocity_rot = self.listener.transformVector3('base_link',self.    world_cartesian_velocity_rot)
+        
+        # Converse cartesian_velocity from vector3 to numpy.array
+        self.desired_velocity_transformed = [
+            self.base_link_cartesian_desired_velocity_trans.vector.x,
+            self.base_link_cartesian_desired_velocity_trans.vector.y,
+            self.base_link_cartesian_desired_velocity_trans.vector.z,
+            self.base_link_cartesian_desired_velocity_rot.vector.x,
+            self.base_link_cartesian_desired_velocity_rot.vector.y,
+            self.base_link_cartesian_desired_velocity_rot.vector.z
+            ]
+
     
     def wrench_callback(self,wrench_ext):
         """ 
@@ -223,21 +270,13 @@ class ur_admittance_controller():
         
         self.wrench_ext_filtered = wrench_ext
     
-    # ? In welchem Koordiantensystem wird die Bahn berechnet?
     def transform_velocity(self,cartesian_velocity: numpy.array):
         """ 
         Transform the cartesian velocity from the 'wrist_3_link' frame to the 'base_link' frame.
         """
-        
-        
-        # -----------------------------
         # Get current time stamp
         now = rospy.Time()
-        # Get position of wrist_3_link
-        (curr_position,curr_orientation) = self.listener.lookupTransform('world', 'wrist_3_link', now)
-        print("curr_position:")
-        print(curr_position)
-        # -----------------------------
+
         
         # Converse cartesian_velocity translation from numpy.array to vector3
         self.wrist_3_link_cartesian_velocity_trans.header.frame_id = 'wrist_3_link'
@@ -296,12 +335,8 @@ class ur_admittance_controller():
             #print("self.admittance_velocity_transformed")
             #print(self.admittance_velocity_transformed)
 
-
-            # * Transform desired velocity from 'wrist_3_link' frame to 'base_link' frame
-            self.desired_velocity_transformed = self.transform_velocity(self.desired_velocity)
-            
-            #print("self.desired_velocity_transformed")
-            #print(self.desired_velocity_transformed)
+            print("self.desired_velocity_transformed")
+            print(self.desired_velocity_transformed)
             
             # * Add the desired_velocity in 'base_link' frame and velocity admittance in 'base_link' frame
             self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.admittance_velocity_transformed[0]
@@ -399,8 +434,8 @@ class ur_admittance_controller():
                     sys.exit('Sign could not be detected!')
                     
                     
-            print("target_cartesian_velocity: after check for limits")
-            print(self.target_cartesian_velocity)
+            #print("target_cartesian_velocity: after check for limits")
+            #print(self.target_cartesian_velocity)
             
             
             # * Get the current joint states 
