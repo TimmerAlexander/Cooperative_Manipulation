@@ -43,10 +43,12 @@ import rospy
 import threading
 import quaternion
 import numpy as np
-from geometry_msgs.msg import Point, TransformStamped,PoseStamped
+import tf
+from geometry_msgs.msg import Point, Twist, Vector3Stamped, TransformStamped,PoseStamped
 from visualization_msgs.msg import *
 from interactive_markers.interactive_marker_server import *
 from franka_core_msgs.msg import EndPointState, JointCommand, RobotState
+import numpy
 
 # -- add to pythonpath for finding rviz_markers.py 
 import sys, os
@@ -58,11 +60,11 @@ from cooperative_manipulation_controllers.franka_rviz_markers import RvizMarkers
 # --------- Modify as required ------------
 # Task-space controller parameters
 # stiffness gains
-P_pos = 50
-P_ori = 0
+P_pos = 50.
+P_ori = 25.
 # damping gains
-D_pos = 10
-D_ori = 0
+D_pos = 10.
+D_ori = 1.
 # -----------------------------------------
 publish_rate = 100
 
@@ -72,7 +74,55 @@ CARTESIAN_VEL = None
 
 destination_marker = RvizMarkers()
 
+def cartesian_msg_callback(desired_velocity):
+        """
+        Get the cartesian velocity command
+        
+        rostopic pub -r 10 cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        angular:
+        x: 0.0
+        y: 0.0
+        z: 0.0" 
+        """
+         # Get current time stamp
+        now = rospy.Time()
 
+        # Converse cartesian_velocity translation to vector3
+        world_cartesian_velocity_trans.header.frame_id = 'world'
+        world_cartesian_velocity_trans.header.stamp = now
+        world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x
+        world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y
+        world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z
+        
+        # Transform cartesian_velocity translation from 'world' frame to 'panda/base' frame
+        base_link_cartesian_desired_velocity_trans = listener.transformVector3('panda/base',world_cartesian_velocity_trans)
+        
+        # Converse cartesian_velocity rotation to vector3
+        world_cartesian_velocity_rot.header.frame_id = 'world'
+        world_cartesian_velocity_rot.header.stamp = now
+        world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
+        world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
+        world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
+        
+        # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame
+        base_link_cartesian_desired_velocity_rot = listener.transformVector3('panda/base',world_cartesian_velocity_rot)
+        
+        # Converse cartesian_velocity from vector3 to numpy.array
+        desired_velocity_transformed = [
+            base_link_cartesian_desired_velocity_trans.vector.x,
+            base_link_cartesian_desired_velocity_trans.vector.y,
+            base_link_cartesian_desired_velocity_trans.vector.z,
+            base_link_cartesian_desired_velocity_rot.vector.x,
+            base_link_cartesian_desired_velocity_rot.vector.y,
+            base_link_cartesian_desired_velocity_rot.vector.z
+            ]
+        
+        print("desired_velocity_transformed: ")
+        print(desired_velocity_transformed)
+        
 def _on_robot_state(msg):
     """
         Callback function for updating jacobian and EE velocity from robot state
@@ -175,6 +225,13 @@ if __name__ == "__main__":
 
     rospy.init_node("ts_control_sim_only")
 
+    # * Initialize tf TransformListener
+    listener = tf.TransformListener()
+        
+    desired_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+    world_cartesian_velocity_trans = Vector3Stamped()
+    world_cartesian_velocity_rot = Vector3Stamped()
+
     # if not using franka_ros_interface, you have to subscribe to the right topics
     # to obtain the current end-effector state and robot jacobian for computing 
     # commands
@@ -191,6 +248,9 @@ if __name__ == "__main__":
         _on_robot_state,
         queue_size=1,
         tcp_nodelay=True)
+    
+    cartesian_msg_sub = rospy.Subscriber(
+        '/cooperative_manipulation/cartesian_velocity_command', Twist, cartesian_msg_callback,queue_size=1)
     
     # create joint command message and fix its type to joint torque mode
     command_msg = JointCommand()
