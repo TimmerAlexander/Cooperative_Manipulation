@@ -2,7 +2,7 @@
 <launch>
 
     <arg name="panda_name" default="panda"/>
-    <arg name="base_name" default="panda/base"/>
+    <arg name="base_name" default="$(arg panda_name)/base"/>
  
     <group ns="$(arg panda_name)">
 

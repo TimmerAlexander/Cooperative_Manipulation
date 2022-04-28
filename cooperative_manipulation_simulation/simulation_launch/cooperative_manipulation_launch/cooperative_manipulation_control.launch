@@ -1,0 +1,14 @@
+<launch>
+
+    <arg name="panda_name" value="panda"/>
+    <arg name="ur_name" value="ur"/>
+
+    <include file="$(find cooperative_manipulation_controllers)/launch/franka_emika_control.launch">
+        <arg name="panda_name" value="$(arg panda_name)" />
+    </include>
+
+    <include file="$(find cooperative_manipulation_controllers)/launch/universal_robot_control.launch">
+        <arg name="ur_name" value="$(arg ur_name)" />
+    </include>
+
+</launch>
