@@ -46,7 +46,7 @@ from geometry_msgs.msg import Twist, Vector3Stamped
 from franka_core_msgs.msg import EndPointState, JointCommand, RobotState
 
 
-import quaternion
+
 
 class franka_impedance_controller():
     
@@ -60,8 +60,6 @@ class franka_impedance_controller():
         self.P_rot_x = 10.
         self.P_rot_y = 10.
         self.P_rot_z = 10.
-        self.P_pos = 10.
-        self.P_ori = 10.
         # Damping gains
         self.D_trans_x = 10.
         self.D_trans_y = 10.
@@ -99,8 +97,7 @@ class franka_impedance_controller():
         self.delta_euler = numpy.array([0.0,0.0,0.0])
         self.curr_euler  = numpy.array([0.0,0.0,0.0])
         
-        self.desired_velocity_trans_transformed  = numpy.array([0.0,0.0,0.0])
-        self.desired_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
+        self.desired_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         
         self.base_cartesian_velocity_trans = Vector3Stamped()
         self.base_cartesian_cartesian_velocity_rot = Vector3Stamped()
@@ -141,11 +138,7 @@ class franka_impedance_controller():
             tcp_nodelay=True)
         
         self.cartesian_msg_sub = rospy.Subscriber(
-            '/cooperative_manipulation/cartesian_velocity_command', 
-            Twist, 
-            self.cartesian_msg_callback,
-            queue_size=1,
-            tcp_nodelay=True)
+            '/cooperative_manipulation/cartesian_velocity_command', Twist, self.cartesian_msg_callback,queue_size=1)
         
         
         
@@ -225,19 +218,20 @@ class franka_impedance_controller():
 
             
             # Converse cartesian_velocity from vector3 to numpy.array
-            self.desired_velocity_trans_transformed = [
+            self.desired_velocity_transformed = [
                 base_cartesian_velocity_trans.vector.x,
                 base_cartesian_velocity_trans.vector.y,
                 base_cartesian_velocity_trans.vector.z,
-                ]
-            
-            self.desired_velocity_rot_transformed = [
                 base_cartesian_velocity_rot.vector.x,
                 base_cartesian_velocity_rot.vector.y,
                 base_cartesian_velocity_rot.vector.z,
                 ]
             
             
+            #print("panda_link8_cartesian_velocity_trans")
+            #print(panda_link8_cartesian_velocity_trans)
+            #print("base_cartesian_velocity_trans")
+            #print(base_cartesian_velocity_trans)
         
     def _on_robot_state(self,msg):
         """
@@ -259,21 +253,7 @@ class franka_impedance_controller():
             'position': cart_pose_trans_mat[:3,3],
             'euler': numpy.asarray(tf.transformations.euler_from_matrix(cart_pose_trans_mat[:3,:3])) }
     
-    def quatdiff_in_euler(self,quat_curr, quat_des):
-        """
-        Compute difference between quaternions and return 
-        Euler angles as difference
-    """
-        curr_mat = quaternion.as_rotation_matrix(quat_curr)
-        des_mat = quaternion.as_rotation_matrix(quat_des)
-        rel_mat = des_mat.T.dot(curr_mat)
-        rel_quat = quaternion.from_rotation_matrix(rel_mat)
-        vec = quaternion.as_float_array(rel_quat)[1:]
-        if rel_quat.w < 0.0:
-            vec = -vec
-        
-        return -des_mat.dot(vec)
-
+    
     def control_thread(self,rate):
         """
             Actual control loop. Uses goal pose from the feedback thread
@@ -284,73 +264,84 @@ class franka_impedance_controller():
         # print("start pos and euler: ")
         # print(self.goal_pos)
         # print(self.goal_euler)
-        velocity_trans = numpy.array([None])
-        velocity_rot = numpy.array([None])
         
-        self.goal_pos_new = self.goal_pos
         while not rospy.is_shutdown():
             
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
-            curr_pos, curr_ori = curr_pose['position'],curr_pose['euler']
+            curr_pos, curr_euler  = curr_pose['position'], curr_pose['euler']
+            print("curr_pos, curr_euler")
+            print(curr_pos, curr_euler)
+                
+            # * Check self.target_cartesian_velocity for the min/max velocity limits
+            # Calculate the norm of target_cartesian_velocity (trans and rot)
+            target_cartesian_trans_velocity_norm = numpy.linalg.norm(self.desired_velocity_transformed[0:3])
+            target_cartesian_rot_velocity_norm = numpy.linalg.norm(self.desired_velocity_transformed[3:6])
+                
+            #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
+            if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
+                for i in range(3):
+                    self.desired_velocity_transformed[i] = (self.desired_velocity_transformed[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
+                        
+            if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
+                for i in range(3,6):
+                    self.desired_velocity_transformed[i] = (self.desired_velocity_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
+                
+            # Check for cartesian velocity min limit and set to null, if min limit is understeps
+            if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
+                for i in range(3):
+                    self.desired_velocity_transformed[i] = 0.0
+                self.goal_pos = curr_pos
+                    
+            if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
+                for i in range(3,6):
+                    self.desired_velocity_transformed[i] = 0.0
+                self.goal_euler = curr_euler
+                    
+            print("self.goal_pos,self.goal_euler")
+            print(self.goal_pos,self.goal_euler)
+            print("curr_pos, curr_euler")
+            print(curr_pos, curr_euler)
+                
+            for i in range(3):
+                self.goal_pos[i] = self.goal_pos[i] + (self.desired_velocity_transformed[i]/self.publish_rate)
+                self.delta_pos[i] = (self.goal_pos[i] - curr_pos[i])
+                        
+            for i in range(3):
+                self.goal_euler[i] = self.goal_euler[i] + (self.desired_velocity_transformed[i+3]/self.publish_rate)
+                self.delta_euler[i] = (self.goal_euler[i] - curr_euler[i])
 
-            # curr_vel = (self.CARTESIAN_VEL['linear']).reshape([3,1])
-            # curr_omg = self.CARTESIAN_VEL['angular'].reshape([3,1])
-
-            velocity_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-            velocity_rot = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]).reshape([1,3])
-            
-            pose = copy.deepcopy(self.CARTESIAN_POSE)
-            self.goal_pos, self.goal_euler = pose['position'],pose['euler']
-            
-            print("velocity_trans")
-            print(velocity_trans)
-            self.goal_pos = (self.goal_pos + velocity_trans)
-            print("self.goal_pos")
-            print(self.goal_pos)
-            
-            delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
-            delta_ori = (self.goal_euler - curr_ori).reshape([3,1])
-
-            #print(self.goal_pos + velocity_trans)
-            # Desired task-space force using PD law
-            F = numpy.vstack([self.P_pos*(delta_pos), self.P_ori*(delta_ori)])
+            print("self.delta_pos")
+            print(self.delta_pos)
 
             
-          
+            print("self.delta_euler")
+            print(self.delta_euler)
+                        
+            print("self.desired_velocity_transformed: ")
+            print(self.desired_velocity_transformed)
+                    
+            # Todo: 2. Calculate pos and ori differences from velocity (goal - curr) 3. Try world -> panda/panda_link8 -> panda/panda_base, should be equal as 0_dP_EE and tf homogeniuos transformation(0=base and EE=panda_link8)4. Calculate velocity differences (new_vel - old vel) (old_vel from CARTESIAN_VEL or last cmd_vel?)    
+                    
+            self.F_target[0] = self.D_trans_x * self.desired_velocity_transformed[0] + self.P_trans_x * self.delta_pos[0]
+            self.F_target[1] = self.D_trans_y * self.desired_velocity_transformed[1] + self.P_trans_y * self.delta_pos[2]
+            self.F_target[2] = self.D_trans_z * self.desired_velocity_transformed[2] + self.P_trans_z * self.delta_pos[2]
+            self.F_target[3] = self.D_rot_x * self.desired_velocity_transformed[3] + self.P_rot_x * self.delta_euler[0]
+            self.F_target[4] = self.D_rot_y * self.desired_velocity_transformed[4] + self.P_rot_y * self.delta_euler[1]                
+            self.F_target[5] = self.D_rot_z * self.desired_velocity_transformed[5] + self.P_rot_z * self.delta_euler[2]
+
+                
+            print("self.F_target")
+            print(self.F_target)
+                    
             J = copy.deepcopy(self.JACOBIAN)
 
             # joint torques to be commanded
-            tau = numpy.dot(J.T,F)
-
+            tau = numpy.dot(J.T,self.F_target.reshape([6,1]))
             # publish joint commands
             self.command_msg.effort = tau.flatten()
-            self.joint_command_publisher.publish(self.command_msg)
-            rate.sleep()
- 
-                        
-                    
-            # # Todo: 4. Calculate velocity differences (new_vel - old vel) (old_vel from CARTESIAN_VEL or last cmd_vel?)    
-                    
-            # self.F_target[0] = self.D_trans_x * self.desired_velocity_transformed[0] + self.P_trans_x * delta_pos[0]
-            # self.F_target[1] = self.D_trans_y * self.desired_velocity_transformed[1] + self.P_trans_y * delta_pos[2]
-            # self.F_target[2] = self.D_trans_z * self.desired_velocity_transformed[2] + self.P_trans_z * delta_pos[2]
-            # self.F_target[3] = self.D_rot_x * self.desired_velocity_transformed[3] + self.P_rot_x * delta_euler[0]
-            # self.F_target[4] = self.D_rot_y * self.desired_velocity_transformed[4] + self.P_rot_y * delta_euler[1]                
-            # self.F_target[5] = self.D_rot_z * self.desired_velocity_transformed[5] + self.P_rot_z * delta_euler[2]
-            
-
-            # print("self.F_target")
-            # print(self.F_target)
-                    
-            # J = copy.deepcopy(self.JACOBIAN)
-
-            # # joint torques to be commanded
-            # tau = numpy.dot(J.T,self.F_target.reshape([6,1]))
-            # # publish joint commands
-            # self.command_msg.effort = tau.flatten()
-            # #print(self.command_msg)
+            print(self.command_msg)
             # self.joint_command_publisher.publish(self.command_msg)
-            # rate.sleep()
+            rate.sleep()
 
     def _on_shutdown(self):
         """
@@ -370,3 +361,28 @@ class franka_impedance_controller():
     
 if __name__ == "__main__":
     franka_impedance_controller()
+    
+#--------------------------------------------------------------------------------------------
+# * Check self.target_cartesian_velocity for the min/max velocity limits
+            # Calculate the norm of target_cartesian_velocity (trans and rot)
+            target_cartesian_trans_velocity_norm = numpy.linalg.norm(self.desired_velocity_transformed[0:3])
+            target_cartesian_rot_velocity_norm = numpy.linalg.norm(self.desired_velocity_transformed[3:6])
+                
+            #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
+            if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
+                for i in range(3):
+                    self.desired_velocity_transformed[i] = (self.desired_velocity_transformed[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
+                        
+            if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
+                for i in range(3,6):
+                    self.desired_velocity_transformed[i] = (self.desired_velocity_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
+                
+            # Check for cartesian velocity min limit and set to null, if min limit is understeps
+            if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
+                for i in range(3):
+                    self.desired_velocity_transformed[i] = 0.0
+ 
+                    
+            if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
+                for i in range(3,6):
+                    self.desired_velocity_transformed[i] = 0.0
