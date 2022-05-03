@@ -263,14 +263,14 @@ class franka_impedance_controller():
                         
             if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
                 for i in range(3):
-                    self.desired_velocity_trans_transformed[i] = (self.desired_velocity_trans_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
+                    self.desired_velocity_rot_transformed[i] = (self.desired_velocity_rot_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
                     
                 
                 
             # Check for cartesian velocity min limit and set to null, if min limit is understeps
             if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
                 for i in range(3):
-                    self.desired_velocity_rot_transformed[i] = 0.0
+                    self.desired_velocity_trans_transformed[i] = 0.0
                 
             if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
                 for i in range(3):
@@ -282,21 +282,22 @@ class franka_impedance_controller():
             
             movement_ori = quaternion.from_euler_angles(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))  
             
-            print(self.goal_ori)
+            print("movement_ori %0.4f",movement_ori)
+            
             # Add 
             self.goal_pos = (self.goal_pos + movement_trans)
-            #self.goal_ori = self.quat_add(self.goal_ori,movement_ori)
+            self.goal_ori = self.quat_add(self.goal_ori,movement_ori)
             # Calculate position and ori difference
             self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
             self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
 
 
             # Calculate linear and angular velocity difference
-            # self.delta_linear = (self.desired_velocity_trans_transformed.reshape([3,1]) - vel_trans)
-            # self.delta_angular = (self.desired_velocity_rot_transformed.reshape([3,1]) - vel_rot)
+            #self.delta_linear = (self.desired_velocity_trans_transformed.reshape([3,1]) - vel_trans)
+            #self.delta_angular = (self.desired_velocity_rot_transformed.reshape([3,1]) - vel_rot)
             
-            # print("self.delta_linear,self.delta_angular")
-            # print(self.delta_linear,self.delta_angular)
+            #print("self.delta_linear,self.delta_angular")
+            #print(self.delta_linear,self.delta_angular)
             
             # Desired task-space force using PD law
             F = numpy.vstack([self.P_pos*(self.delta_pos), self.P_ori*(self.delta_ori)])
@@ -346,17 +347,34 @@ class franka_impedance_controller():
         
         return -des_mat.dot(vec)
     
-    def quat_add(self,summand_1, summand_2):
+    def quat_add(self,init_quat, add_quat):
         """
         Compute difference between quaternions and return 
         Euler angles as difference
     """
-        curr_mat = quaternion.as_rotation_matrix(summand_1)
-        des_mat = quaternion.as_rotation_matrix(summand_2)
-        rel_mat = des_mat + curr_mat
-        rel_quat = quaternion.from_rotation_matrix(rel_mat)
+        # Extract the values from Q0
+        w0 = init_quat.w
+        x0 = init_quat.x
+        y0 = init_quat.y
+        z0 = init_quat.z
+     
+        # Extract the values from Q1
+        w1 = add_quat.w
+        x1 = add_quat.x
+        y1 = add_quat.y
+        z1 = add_quat.z
+     
+        # Computer the product of the two quaternions, term by term
+        Q0Q1_w = w0 * w1 - x0 * x1 - y0 * y1 - z0 * z1
+        Q0Q1_x = w0 * x1 + x0 * w1 + y0 * z1 - z0 * y1
+        Q0Q1_y = w0 * y1 - x0 * z1 + y0 * w1 + z0 * x1
+        Q0Q1_z = w0 * z1 + x0 * y1 - y0 * x1 + z0 * w1
 
-        return rel_quat
+        sum_quat = numpy.quaternion(Q0Q1_w ,Q0Q1_x,Q0Q1_y,Q0Q1_z)
+        return sum_quat 
+
+       
+ 
     
     def _on_shutdown(self):
         """
