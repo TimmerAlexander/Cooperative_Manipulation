@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(cooperative_manipulation_controllers)
 
+
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++17)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -14,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  gazebo
 )
 
 ## System dependencies are found with CMake's conventions
@@ -43,9 +45,7 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add "message_generation" and every package in MSG_DEP_SET to
 ##     find_package(catkin REQUIRED COMPONENTS ...)
 ##   * add "message_runtime" and every package in MSG_DEP_SET to
-catkin_package(
-  CATKIN_DEPENDS
-    rospy)
+
 ##   * uncomment the add_*_files sections below as needed
 ##     and list every .msg/.srv/.action file to be processed
 ##   * uncomment the generate_messages entry below
@@ -112,8 +112,8 @@ catkin_package(
   LIBRARIES cooperative_manipulation_controllers
   CATKIN_DEPENDS roscpp rospy std_msgs
   pluginlib
-#  DEPENDS system_lib
-)
+  CATKIN_DEPENDS
+  rospy)
 
 ###########
 ## Build ##
@@ -124,6 +124,7 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  ${GAZEBO_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -138,8 +139,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/cooperative_manipulation_controllers_node.cpp)
-
+ add_executable(gazebo_ros_interface src/gazebo_ros_interface.cpp)
+ target_link_libraries(gazebo_ros_interface ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -155,6 +156,8 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
+link_directories(${GAZEBO_LIBRARY_DIRS})
+list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
 #############
 ## Install ##
 #############
