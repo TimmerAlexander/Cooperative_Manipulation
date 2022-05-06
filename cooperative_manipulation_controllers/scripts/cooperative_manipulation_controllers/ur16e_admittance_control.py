@@ -201,91 +201,26 @@ class ur_admittance_controller():
             Send example wrench:
             rostopic pub  /ur/wrench geometry_msgs/WrenchStamped '{header: {stamp: now, frame_id: base_link}, wrench:{force: {x: 0.0, y: 0.0, z: 0.0}, torque: {x: 0.0, y: 0.0, z: 0.0}}}'
         """
-        # Filter min wrench
-        # if abs(wrench_ext.wrench.force.x) < self.wrench_ext_min_filter:
-        #     # Set extern wrench min limit
-        #     wrench_ext.wrench.force.x = 0.0
-        # if abs(wrench_ext.wrench.force.y) < self.wrench_ext_min_filter:
-        #     # Set extern wrench min limit
-        #     wrench_ext.wrench.force.y = 0.0
-        # if abs(wrench_ext.wrench.force.z) < self.wrench_ext_min_filter:
-        #     # Set extern wrench min limit
-        #     wrench_ext.wrench.force.z = 0.0
-        # if abs(wrench_ext.wrench.torque.x) < self.wrench_ext_min_filter:
-        #     # Set extern wrench min limit
-        #     wrench_ext.wrench.torque.x = 0.0
-        # if abs(wrench_ext.wrench.torque.y) < self.wrench_ext_min_filter:
-        #     # Set extern wrench min limit
-        #     wrench_ext.wrench.torque.y = 0.0
-        # if abs(wrench_ext.wrench.torque.z) < self.wrench_ext_min_filter:
-        #     # Set extern wrench min limit
-        #     wrench_ext.wrench.torque.z = 0.0
-
-        # # Filter max wrench
-        # if abs(wrench_ext.wrench.force.x) > self.wrench_ext_max_filter:
-        #     # Check for sign
-        #     if numpy.sign(wrench_ext.wrench.force.x) == 1:
-        #         # Set cartesian velocity max limit
-        #         wrench_ext.wrench.force.x = self.wrench_ext_max_filter
-        #     elif numpy.sign(wrench_ext.wrench.force.x) == -1:
-        #     # Set cartesian velocity max limit
-        #         wrench_ext.wrench.force.x = -self.wrench_ext_max_filter
-        #     else:
-        #         sys.exit('Sign could not be detected!') 
-        # if abs(wrench_ext.wrench.force.y) > self.wrench_ext_max_filter:
-        #     # Check for sign
-        #     if numpy.sign(wrench_ext.wrench.force.y) == 1:
-        #         # Set cartesian velocity max limit
-        #         wrench_ext.wrench.force.y = self.wrench_ext_max_filter
-        #     elif numpy.sign(wrench_ext.wrench.force.y) == -1:
-        #     # Set cartesian velocity max limit
-        #         wrench_ext.wrench.force.y = -self.wrench_ext_max_filter
-        #     else:
-        #         sys.exit('Sign could not be detected!') 
-        # if abs(wrench_ext.wrench.force.z) > self.wrench_ext_max_filter:
-        #     # Check for sign
-        #     if numpy.sign(wrench_ext.wrench.force.z) == 1:
-        #         # Set cartesian velocity max limit
-        #         wrench_ext.wrench.force.z = self.wrench_ext_max_filter
-        #     elif numpy.sign(wrench_ext.wrench.force.z) == -1:
-        #     # Set cartesian velocity max limit
-        #         wrench_ext.wrench.force.z = -self.wrench_ext_max_filter
-        #     else:
-        #         sys.exit('Sign could not be detected!') 
-        # if abs(wrench_ext.wrench.torque.x) > self.wrench_ext_max_filter:
-        #     # Check for sign
-        #     if numpy.sign(wrench_ext.wrench.torque.x) == 1:
-        #         # Set cartesian velocity max limit
-        #         wrench_ext.wrench.torque.x = self.wrench_ext_max_filter
-        #     elif numpy.sign(wrench_ext.wrench.torque.x) == -1:
-        #     # Set cartesian velocity max limit
-        #         wrench_ext.wrench.torque.x = -self.wrench_ext_max_filter
-        #     else:
-        #         sys.exit('Sign could not be detected!')   
-        # if abs(wrench_ext.wrench.torque.y) > self.wrench_ext_max_filter:
-        #     # Check for sign
-        #     if numpy.sign(wrench_ext.wrench.torque.y) == 1:
-        #         # Set cartesian velocity max limit
-        #         wrench_ext.wrench.torque.y = self.wrench_ext_max_filter
-        #     elif numpy.sign(wrench_ext.wrench.torque.y) == -1:
-        #     # Set cartesian velocity max limit
-        #         wrench_ext.wrench.torque.y = -self.wrench_ext_max_filter
-        #     else:
-        #         sys.exit('Sign could not be detected!')  
-        # if abs(wrench_ext.wrench.torque.z) > self.wrench_ext_max_filter:
-        #     # Check for sign
-        #     if numpy.sign(wrench_ext.wrench.torque.z) == 1:
-        #         # Set cartesian velocity max limit
-        #         wrench_ext.wrench.torque.z = self.wrench_ext_max_filter
-        #     elif numpy.sign(wrench_ext.wrench.torque.z) == -1:
-        #     # Set cartesian velocity max limit
-        #         wrench_ext.wrench.torque.z = -self.wrench_ext_max_filter
-        #     else:
-        #         sys.exit('Sign could not be detected!')       
+    
+        print("wrench_ext.wrench before fileter:")
+        print(wrench_ext.wrench)
+        if(numpy.abs(wrench_ext.wrench.force.x * self.cartesian_velocity_trans_max_limit) < 2.0):
+            self.wrench_ext_filtered.wrench.force.x = 0.0
+        if(numpy.abs(wrench_ext.wrench.force.y * self.cartesian_velocity_trans_max_limit) < 2.0):
+            self.wrench_ext_filtered.wrench.force.y = 0.0
+        if(numpy.abs(wrench_ext.wrench.force.z * self.cartesian_velocity_trans_max_limit) < 2.0):
+            self.wrench_ext_filtered.wrench.force.z = 0.0
+        if(numpy.abs(wrench_ext.wrench.torque.x * self.cartesian_velocity_trans_max_limit) < 2.0):
+            self.wrench_ext_filtered.wrench.torque.x = 0.0
+        if(numpy.abs(wrench_ext.wrench.torque.y * self.cartesian_velocity_trans_max_limit) < 2.0):
+            self.wrench_ext_filtered.wrench.torque.y = 0.0
+        if(numpy.abs(wrench_ext.wrench.torque.z * self.cartesian_velocity_trans_max_limit) < 2.0):
+            self.wrench_ext_filtered.wrench.torque.z = 0.0
         
+        #self.wrench_ext_filtered = wrench_ext
         print("self.wrench_ext_filtered:")
         print(self.wrench_ext_filtered)
-        #self.wrench_ext_filtered = wrench_ext
+    
     
     def transform_velocity(self,cartesian_velocity: numpy.array):
         """ 
@@ -340,19 +275,25 @@ class ur_admittance_controller():
             self.admittance_velocity[4] = self.wrench_ext_filtered.wrench.torque.y * pow(self.D_rot_y,-1)
             self.admittance_velocity[5] = self.wrench_ext_filtered.wrench.torque.z * pow(self.D_rot_z,-1)
             
-            # * Transform velocity admittance from 'wrist_3_link' frame to 'base_link' frame
-            self.admittance_velocity_transformed = self.transform_velocity(self.admittance_velocity)
             
-            #print("self.admittance_velocity_transformed")
-            #print(self.admittance_velocity_transformed)
+            self.admittance_velocity_transformed = self.transform_velocity(self.admittance_velocity)
+            # print("self.admittance_velocity_transformed")
+            # print(self.admittance_velocity_transformed)
             
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
-            self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.admittance_velocity_transformed[0]
-            self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] + self.admittance_velocity_transformed[1]
-            self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] + self.admittance_velocity_transformed[2]
-            self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] + self.admittance_velocity_transformed[3]
-            self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] + self.admittance_velocity_transformed[4]
-            self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] + self.admittance_velocity_transformed[5]
+            # self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.admittance_velocity_transformed[0]
+            # self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] + self.admittance_velocity_transformed[1]
+            # self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] + self.admittance_velocity_transformed[2]
+            # self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] + self.admittance_velocity_transformed[3]
+            # self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] + self.admittance_velocity_transformed[4]
+            # self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] + self.admittance_velocity_transformed[5]
+            
+            self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] 
+            self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] 
+            self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] 
+            self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] 
+            self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] 
+            self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] 
 
             # print("target_cartesian_velocity: befor check for limits")
             # print(self.target_cartesian_velocity)

@@ -65,14 +65,27 @@
       <jointName>wrist_3_joint</jointName>
     </plugin>
   </gazebo>
+
+    <!-- <gazebo reference="wrist_3_joint">
+    <sensor name="wrist_3_joint_force_torque" type="force_torque">
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <updateRate>30.0</updateRate>
+      <topic>ft_sensor/raw</topic>
+      <force_torque>
+        <frame>sensor</frame>
+        <measure_direction>child_to_parent</measure_direction>
+      </force_torque>
+    </sensor>
+  </gazebo> -->
   
-    <!-- Gazebo grasping plugin -->
+  <!-- Gazebo grasping plugin -->
   <gazebo>
     <gripper name="gazebo_gripper">
       <grasp_check>
         <attach_steps>2</attach_steps>    
         <detach_steps>2</detach_steps>    
-        <min_contact_count>3</min_contact_count>
+        <min_contact_count>4</min_contact_count>
       </grasp_check>
       <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
       <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>

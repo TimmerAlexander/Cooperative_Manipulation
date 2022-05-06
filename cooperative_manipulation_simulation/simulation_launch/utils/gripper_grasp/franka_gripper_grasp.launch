@@ -6,8 +6,8 @@
     <arg name="panda_goal_width" default="0.039" />
     <arg name="panda_goal_epsilon_inner" default="0.005" />
     <arg name="panda_goal_epsilon_outer" default="0.005" />
-    <arg name="panda_goal_speed" default="0.2" />
-    <arg name="panda_goal_force" default="60.0" />
+    <arg name="panda_goal_speed" default="0.1" />
+    <arg name="panda_goal_force" default="10.0" />
 
     <group ns="$(arg panda_name)">
         <node pkg="cooperative_manipulation_controllers" type="franka_gripper_goal.py" name="franka_gripper_goal">

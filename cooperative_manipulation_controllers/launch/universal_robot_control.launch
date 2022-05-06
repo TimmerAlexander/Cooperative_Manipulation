@@ -8,5 +8,6 @@
         </node>
     </group> 
 
+    <!-- <node pkg="cooperative_manipulation_controllers" type="gazebo_ros_interface" name="wrist_3_joint_wrench" output="screen"/> -->
 </launch>
 

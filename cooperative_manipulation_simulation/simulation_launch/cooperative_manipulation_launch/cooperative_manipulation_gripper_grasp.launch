@@ -5,7 +5,7 @@
     <arg name="ur_name" default="ur"/>
 
     <!-- ur_goal_width value betwewen 0.0 open and 0.8 closed (If grapping an object add +0.05 as offset)-->
-    <arg name="ur_goal_width" default="0.451" />
+    <arg name="ur_goal_width" default="0.45" />
     <!-- panda_goal_width value betwewen 0.1 (open) and 0.0 (closed) -->
     <arg name="panda_goal_width" default="0.039" />
     <arg name="panda_goal_epsilon_inner" default="0.005" />

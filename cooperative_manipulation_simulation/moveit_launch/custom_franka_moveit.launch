@@ -1,0 +1,15 @@
+<launch>
+
+  <arg name="panda_name" default="panda"/>
+
+  <group ns="$(arg panda_name)">
+
+    <!-- Launch moveit -->
+    <include file="$(find panda_sim_moveit)launch/sim_move_group.launch">
+      <remap from="/robot_description" to="/panda/robot_description" />
+    </include>
+    
+  </group> 
+    
+
+</launch>

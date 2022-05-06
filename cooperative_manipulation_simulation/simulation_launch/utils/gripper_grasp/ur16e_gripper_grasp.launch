@@ -3,7 +3,7 @@
 
     <arg name="ur_name" default="ur"/>
     <!-- ur_goal_width value betwewen 0.0 (open) and 0.8 (closed) -->
-    <arg name="ur_goal_width" default="0.451" />
+    <arg name="ur_goal_width" default="0.45" />
 
     <group ns="$(arg ur_name)">
         <node pkg="cooperative_manipulation_controllers" type="ur16e_gripper_goal.py" name="ur16e_gripper_goal">
