@@ -204,22 +204,22 @@ class ur_admittance_controller():
     
         print("wrench_ext.wrench before fileter:")
         print(wrench_ext.wrench)
-        if(numpy.abs(wrench_ext.wrench.force.x * self.cartesian_velocity_trans_max_limit) < 2.0):
+        if(numpy.abs(wrench_ext.wrench.force.x * self.cartesian_velocity_trans_max_limit) < 1.5):
             self.wrench_ext_filtered.wrench.force.x = 0.0
-        if(numpy.abs(wrench_ext.wrench.force.y * self.cartesian_velocity_trans_max_limit) < 2.0):
+        if(numpy.abs(wrench_ext.wrench.force.y * self.cartesian_velocity_trans_max_limit) < 1.5):
             self.wrench_ext_filtered.wrench.force.y = 0.0
-        if(numpy.abs(wrench_ext.wrench.force.z * self.cartesian_velocity_trans_max_limit) < 2.0):
+        if(numpy.abs(wrench_ext.wrench.force.z * self.cartesian_velocity_trans_max_limit) < 1.5):
             self.wrench_ext_filtered.wrench.force.z = 0.0
-        if(numpy.abs(wrench_ext.wrench.torque.x * self.cartesian_velocity_trans_max_limit) < 2.0):
+        if(numpy.abs(wrench_ext.wrench.torque.x * self.cartesian_velocity_trans_max_limit) < 1.5):
             self.wrench_ext_filtered.wrench.torque.x = 0.0
-        if(numpy.abs(wrench_ext.wrench.torque.y * self.cartesian_velocity_trans_max_limit) < 2.0):
+        if(numpy.abs(wrench_ext.wrench.torque.y * self.cartesian_velocity_trans_max_limit) < 1.5):
             self.wrench_ext_filtered.wrench.torque.y = 0.0
-        if(numpy.abs(wrench_ext.wrench.torque.z * self.cartesian_velocity_trans_max_limit) < 2.0):
+        if(numpy.abs(wrench_ext.wrench.torque.z * self.cartesian_velocity_trans_max_limit) < 1.5):
             self.wrench_ext_filtered.wrench.torque.z = 0.0
+            
+        #print("self.wrench_ext_filtered:")
+        #print(self.wrench_ext_filtered)
         
-        #self.wrench_ext_filtered = wrench_ext
-        print("self.wrench_ext_filtered:")
-        print(self.wrench_ext_filtered)
     
     
     def transform_velocity(self,cartesian_velocity: numpy.array):
@@ -281,19 +281,19 @@ class ur_admittance_controller():
             # print(self.admittance_velocity_transformed)
             
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
-            # self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.admittance_velocity_transformed[0]
-            # self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] + self.admittance_velocity_transformed[1]
-            # self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] + self.admittance_velocity_transformed[2]
-            # self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] + self.admittance_velocity_transformed[3]
-            # self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] + self.admittance_velocity_transformed[4]
-            # self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] + self.admittance_velocity_transformed[5]
+            self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] + self.admittance_velocity_transformed[0]
+            self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] + self.admittance_velocity_transformed[1]
+            self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] + self.admittance_velocity_transformed[2]
+            self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] + self.admittance_velocity_transformed[3]
+            self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] + self.admittance_velocity_transformed[4]
+            self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] + self.admittance_velocity_transformed[5]
             
-            self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] 
-            self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] 
-            self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] 
-            self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] 
-            self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] 
-            self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] 
+            # self.target_cartesian_velocity[0] = self.desired_velocity_transformed[0] 
+            # self.target_cartesian_velocity[1] = self.desired_velocity_transformed[1] 
+            # self.target_cartesian_velocity[2] = self.desired_velocity_transformed[2] 
+            # self.target_cartesian_velocity[3] = self.desired_velocity_transformed[3] 
+            # self.target_cartesian_velocity[4] = self.desired_velocity_transformed[4] 
+            # self.target_cartesian_velocity[5] = self.desired_velocity_transformed[5] 
 
             # print("target_cartesian_velocity: befor check for limits")
             # print(self.target_cartesian_velocity)

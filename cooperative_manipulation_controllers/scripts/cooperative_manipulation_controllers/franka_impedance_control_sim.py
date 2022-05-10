@@ -32,7 +32,7 @@
     Impedance controller
     
     Input: 
-    * Desired cartesian velocity of the EE: desired_velocity (In 'world' frame)
+    * Desired cartesian velocity of the EE: desired_velocity (In 'panda/world' frame)
     
     Output: 
     * Joint effort: self.command_msg.effort (Franka joints)
@@ -98,7 +98,7 @@ class franka_impedance_controller():
         
         # * Initialize tf TransformListener
         self.listener = tf.TransformListener()
-        self.listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(4.0))
+        self.listener.waitForTransform("panda/panda_link8","panda/world", rospy.Time(), rospy.Duration(4.0))
         self.listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(4.0))
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
@@ -264,7 +264,7 @@ class franka_impedance_controller():
         
     def cartesian_msg_callback(self,desired_velocity):
         """
-            Get the cartesian velocity command and transform it from the 'world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
+            Get the cartesian velocity command and transform it from the 'panda/world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
             
             rostopic pub -r 10 cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
             x: 0.0
@@ -284,25 +284,25 @@ class franka_impedance_controller():
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
         # Converse cartesian_velocity translation to vector3
-        world_cartesian_velocity_trans.header.frame_id = 'world'
+        world_cartesian_velocity_trans.header.frame_id = 'panda/world'
         world_cartesian_velocity_trans.header.stamp = now
         world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x
         world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y
         world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z
             
-        # Transform cartesian_velocity translation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
+        # Transform cartesian_velocity translation from 'panda/world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
         panda_link8_cartesian_velocity_trans = self.listener.transformVector3('panda/panda_link8',world_cartesian_velocity_trans)
             
         base_cartesian_velocity_trans = self.listener.transformVector3('panda/base',panda_link8_cartesian_velocity_trans)
             
         # Converse cartesian_velocity rotation to vector3
-        world_cartesian_velocity_rot.header.frame_id = 'world'
+        world_cartesian_velocity_rot.header.frame_id = 'panda/world'
         world_cartesian_velocity_rot.header.stamp = now
         world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
         world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
         world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
             
-        # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
+        # Transform cartesian_velocity rotation from 'panda/world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
         panda_link8_cartesian_velocity_rot = self.listener.transformVector3('panda/panda_link8',world_cartesian_velocity_rot)
             
         base_cartesian_velocity_rot = self.listener.transformVector3('panda/base',panda_link8_cartesian_velocity_rot)

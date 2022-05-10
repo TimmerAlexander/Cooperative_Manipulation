@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="panda_name" default="panda"/>
+
+    <arg name="panda_joint1" default="0.0"/>
+    <arg name="panda_joint2" default="0.0"/>
+    <arg name="panda_joint3" default="0.0"/>
+    <arg name="panda_joint4" default="0.0"/>
+    <arg name="panda_joint5" default="0.0"/>
+    <arg name="panda_joint6" default="0.0"/>
+    <arg name="panda_joint7" default="0.0"/>
+
+    <group ns="$(arg panda_name)">
+        <node pkg="cooperative_manipulation_controllers" type="franka_move_to_start.py" name="franka_move_to_start" output="screen">
+        <param name="ns" value="panda_simulator"/>
+        <param name="panda_joint1" value="$(arg panda_joint1)"/>
+        <param name="panda_joint2" value="$(arg panda_joint2)"/>
+        <param name="panda_joint3" value="$(arg panda_joint3)"/>
+        <param name="panda_joint4" value="$(arg panda_joint4)"/>
+        <param name="panda_joint5" value="$(arg panda_joint5)"/>
+        <param name="panda_joint6" value="$(arg panda_joint6)"/>
+        <param name="panda_joint7" value="$(arg panda_joint7)"/>
+
+        </node>
+    </group> 
+</launch>
+

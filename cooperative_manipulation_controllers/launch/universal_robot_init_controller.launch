@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="ur_name" default="ur"/>
+
+    <arg name="shoulder_pan_joint" default="0.0"/>
+    <arg name="shoulder_lift_joint" default="0.0"/>
+    <arg name="elbow_joint" default="0.0"/>
+    <arg name="wrist_1_joint" default="0.0"/>
+    <arg name="wrist_2_joint" default="0.0"/>
+    <arg name="wrist_3_joint" default="0.0"/>
+
+    <group ns="$(arg ur_name)">
+        <node pkg="cooperative_manipulation_controllers" type="ur16e_start_pose.py" name="ur16e_start_controller_node" output="screen">
+        <param name="ur_ns" value="$(arg ur_name)"/>
+        <param name="shoulder_pan_joint" value="$(arg shoulder_pan_joint)"/>
+        <param name="shoulder_lift_joint" value="$(arg shoulder_lift_joint)"/>
+        <param name="elbow_joint" value="$(arg elbow_joint)"/>
+        <param name="wrist_1_joint" value="$(arg wrist_1_joint)"/>
+        <param name="wrist_2_joint" value="$(arg wrist_2_joint)"/>
+        <param name="wrist_3_joint" value="$(arg wrist_3_joint)"/>
+        </node>
+    </group> 
+</launch>
+

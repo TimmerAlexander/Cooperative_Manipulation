@@ -59,7 +59,7 @@
   </gazebo>
   <gazebo>
     <plugin name="ft_sensor_plugin" filename="libgazebo_ros_ft_sensor.so">
-      <updateRate>250.0</updateRate>
+      <updateRate>30.0</updateRate>
       <topicName>ft_sensor/raw</topicName>
       <gaussianNoise>0.0</gaussianNoise>
       <jointName>wrist_3_joint</jointName>

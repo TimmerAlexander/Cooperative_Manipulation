@@ -26,27 +26,28 @@
 
   <!-- load other controllers -->
 
-  <!-- start ur_admittance_control -->
-  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_admittance_controller.yaml" command="load"/>
+  <!-- start ur16e start position controller -->
+  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_start_position_controller.yaml" command="load"/>
+  <node name="ur16e_start_position" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="spawn ur16e_start_position_controller" />
 
-  <node name="controller_spawner" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="spawn ur_admittance_controller" />
+  <!-- start ur_admittance_control -->
+  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_arm_controller.yaml" command="load"/>
+  <node name="controller_spawner" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="load ur_admittance_controller" />
 
   <!-- load robotiq 85 gripper controllers -->
   <rosparam if="$(arg load_gripper)" command="load" file="$(find cooperative_manipulation_controllers)/config/ur16e_robotiq_85_gripper_controller.yaml" />
-  <!-- ns="/$(arg ur_name)"-->
-
   <node name="robot_controllers" pkg="controller_manager" type="spawner" output="screen" args="gripper_grasp_controller"/>
 
 
   
-  <!--
-  <node name="ros_control_controller_manager" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="load joint_group_position_controller" />
-  -->
+  <!-- <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_arm_controller.yaml" command="load"/>
+  <node name="ros_control_controller_manager" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="load joint_group_position_controller" /> -->
+
  
   <!-- load pid controller parameters -->
-  <!--
-  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur_pid_controller.yaml" command="load"/> 
-  -->
+<!--  
+  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_pid_controller.yaml" command="load"/> 
+   -->
 
   
 

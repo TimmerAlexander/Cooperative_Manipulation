@@ -7,6 +7,5 @@ gripper_grasp_controller:
   stall_velocity_threshold: 0.001
   stall_timeout: 1.0
 
-gazebo_ros_control/pid_gains:
-    robotiq_85_left_knuckle_joint: {p: 0.0, i: 0.0, d: 0.0}
+
 

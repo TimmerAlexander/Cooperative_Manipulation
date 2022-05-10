@@ -13,7 +13,10 @@
 
     <physics type="ode">
     <real_time_factor>1</real_time_factor>
-      <real_time_update_rate>1000.0</real_time_update_rate>
+    <real_time_update_rate>1000.0</real_time_update_rate>
+    <ode>
+    <iters>500.0</iters>
+    </ode>
     </physics>
     
     <!-- Gravity -->

@@ -1,15 +1,18 @@
+<?xml version="1.0" ?>
 <launch>
-
+  <arg name="load_gripper" default="true" />
   <arg name="panda_name" default="panda"/>
 
   <group ns="$(arg panda_name)">
 
-    <!-- Launch moveit -->
-    <include file="$(find panda_sim_moveit)launch/sim_move_group.launch">
-      <remap from="/robot_description" to="/panda/robot_description" />
-    </include>
-    
-  </group> 
-    
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" args="position_joint_trajectory_controller"/>
 
+    <include file="$(find panda_moveit_config)/launch/move_group.launch">
+      <arg name="load_gripper" value="$(arg load_gripper)" />
+       <remap from="/robot_description" to="/panda/robot_description" />
+    </include>
+
+   </group> 
 </launch>
+
+
