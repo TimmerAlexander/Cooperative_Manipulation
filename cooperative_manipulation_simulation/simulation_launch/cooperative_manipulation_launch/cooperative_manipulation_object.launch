@@ -6,12 +6,12 @@
   <arg name="roll" default="0.0" />
   <arg name="pitch" default="1.57079" />
   <arg name="yaw" default="0.0" />
-  <arg name="sdf_object_file" default="$(find cooperative_manipulation_simulation)/model/cooperative_simualtion_object/model.sdf"/>
+  <arg name="sdf_object_file" default="$(find cooperative_manipulation_simulation)/model/cooperative_simulation_object/model.sdf"/>
   <arg name="object_name" default="object"/>
 
   <!-- startup simulated world -->
     <group ns="$(arg object_name)">
-        <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/object.launch">
+        <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/gazebo/object.launch">
             <arg name="sdf_object_file" value="$(arg sdf_object_file)"/>
             <arg name="object_name" value="$(arg object_name)" />
             <arg name="x" value="$(arg x)" />

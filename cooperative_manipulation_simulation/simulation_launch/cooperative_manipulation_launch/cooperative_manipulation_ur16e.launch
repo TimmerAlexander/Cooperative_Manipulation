@@ -10,11 +10,11 @@
   <arg name="debug" default="false" />
 
   <!-- default: hardware_interface/PositionJointInterface    hardware_interface/PositionJointInterface hardware_interface/VelocityJointInterface  hardware_interface/JointCommandInterface-->
-  <arg name="ur_transmission_hw_interface" default="hardware_interface/PositionJointInterface "/>
+  <arg name="ur_transmission_hw_interface" default="hardware_interface/VelocityJointInterface"/>
   
 
   <group ns="$(arg universal_robot_name)">
-    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/ur16e.launch">
+    <include file="$(find cooperative_manipulation_simulation)/simulation_launch/utils/gazebo/ur16e.launch">
       <arg name="ur_name" value="$(arg universal_robot_name)"/>
       <arg name="ur_transmission_hw_interface" value="$(arg ur_transmission_hw_interface)" />
       <arg name="ur_xyz" value="$(arg ur_base_trans)"/>

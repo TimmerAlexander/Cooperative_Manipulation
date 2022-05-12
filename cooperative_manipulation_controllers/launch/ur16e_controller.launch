@@ -27,12 +27,12 @@
   <!-- load other controllers -->
 
   <!-- start ur16e start position controller -->
-  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_start_position_controller.yaml" command="load"/>
-  <node name="ur16e_start_position" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="spawn ur16e_start_position_controller" />
+  <!-- <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_move_to_start_controller.yaml" command="load"/>
+  <node name="ur16e_start_position" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="spawn ur16e_start_position_controller" /> -->
 
   <!-- start ur_admittance_control -->
-  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_arm_controller.yaml" command="load"/>
-  <node name="controller_spawner" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="load ur_admittance_controller" />
+  <rosparam file="$(find cooperative_manipulation_controllers)/config/ur16e_admittance_controller.yaml" command="load"/>
+  <node name="controller_spawner" pkg="controller_manager" type="controller_manager" respawn="false" output="screen" args="spawn ur_admittance_controller" />
 
   <!-- load robotiq 85 gripper controllers -->
   <rosparam if="$(arg load_gripper)" command="load" file="$(find cooperative_manipulation_controllers)/config/ur16e_robotiq_85_gripper_controller.yaml" />

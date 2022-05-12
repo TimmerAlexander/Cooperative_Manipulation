@@ -10,7 +10,7 @@
     <arg name="panda_goal_force" default="10.0" />
 
     <group ns="$(arg panda_name)">
-        <node pkg="cooperative_manipulation_controllers" type="franka_gripper_goal.py" name="franka_gripper_goal">
+        <node pkg="cooperative_manipulation_simulation" type="franka_gripper_goal.py" name="franka_gripper_goal">
             <param  name="panda_ns" value="$(arg panda_name)" />
             <param  name="panda_goal_width" value="$(arg panda_goal_width)" />
             <param  name="panda_goal_epsilon_inner" value="$(arg panda_goal_epsilon_inner)" />

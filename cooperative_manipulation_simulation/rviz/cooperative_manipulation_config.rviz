@@ -5,8 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /TF1
-        - /TF1/Frames1
       Splitter Ratio: 0.501035213470459
     Tree Height: 719
   - Class: rviz/Selection
@@ -63,6 +61,69 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        panda_hand:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_leftfinger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        panda_link8:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        panda_rightfinger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
       Name: Franka Emika
       Robot Description: panda/robot_description
       TF Prefix: panda
@@ -200,6 +261,34 @@ Visualization Manager:
           Value: false
         forearm_link:
           Value: false
+        panda/base:
+          Value: true
+        panda/panda_hand:
+          Value: false
+        panda/panda_leftfinger:
+          Value: false
+        panda/panda_link0:
+          Value: false
+        panda/panda_link1:
+          Value: false
+        panda/panda_link2:
+          Value: false
+        panda/panda_link3:
+          Value: false
+        panda/panda_link4:
+          Value: false
+        panda/panda_link5:
+          Value: false
+        panda/panda_link6:
+          Value: false
+        panda/panda_link7:
+          Value: false
+        panda/panda_link8:
+          Value: true
+        panda/panda_rightfinger:
+          Value: false
+        panda/world:
+          Value: true
         robotiq_85_base_link:
           Value: false
         robotiq_85_left_finger_link:
@@ -268,6 +357,22 @@ Visualization Manager:
                               robotiq_85_right_knuckle_link:
                                 robotiq_85_right_finger_link:
                                   {}
+          panda/world:
+            panda/base:
+              panda/panda_link0:
+                panda/panda_link1:
+                  panda/panda_link2:
+                    panda/panda_link3:
+                      panda/panda_link4:
+                        panda/panda_link5:
+                          panda/panda_link6:
+                            panda/panda_link7:
+                              panda/panda_link8:
+                                panda/panda_hand:
+                                  panda/panda_leftfinger:
+                                    {}
+                                  panda/panda_rightfinger:
+                                    {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -307,7 +412,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.7505178451538086
+      Distance: 2.1533963680267334
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -315,17 +420,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.8892418742179871
-        Y: -0.4850451946258545
-        Z: 0.307412713766098
+        X: -0.1142774298787117
+        Y: -0.01879202201962471
+        Z: 0.23511381447315216
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3553982377052307
+      Pitch: 0.3803982138633728
       Target Frame: <Fixed Frame>
-      Yaw: 4.313581943511963
+      Yaw: 2.168581485748291
     Saved: ~
 Window Geometry:
   Displays:
@@ -343,5 +448,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1848
-  X: 1920
+  X: 0
   Y: 27

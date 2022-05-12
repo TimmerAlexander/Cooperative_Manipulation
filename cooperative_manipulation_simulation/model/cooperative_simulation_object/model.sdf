@@ -1,6 +1,6 @@
 <?xml version='1.0'?>
 <sdf version='1.7'>
-  <model name='cooperative_simualtion_object'>
+  <model name='cooperative_simulation_object'>
     <link name='link_1'>
       <inertial>
         <mass>0.001</mass>

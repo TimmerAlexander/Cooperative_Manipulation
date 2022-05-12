@@ -7,7 +7,7 @@
   <group ns="$(arg ur_name)">
 
     <!-- Launch moveit -->
-    <include file="$(find cooperative_manipulation_simulation)/moveit_launch/custom_move_group.launch">
+    <include file="$(find cooperative_manipulation_moveit)/utils/ur16e_moveit_utils/custom_move_group.launch">
       <arg name="debug" default="$(arg debug)" />
       <remap from="/joint_states" to="/ur/joint_states" />
       <remap from="/robot_description" to="/ur/robot_description" />
