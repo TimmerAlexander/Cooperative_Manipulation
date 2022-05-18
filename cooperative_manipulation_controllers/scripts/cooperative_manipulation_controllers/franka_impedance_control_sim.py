@@ -225,6 +225,8 @@ class franka_impedance_controller():
             # Desired task-space force using PD law
             F = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)])  + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
             
+            # print("Franka impedance F")
+            # print(F)
             J = copy.deepcopy(self.JACOBIAN)
             
             # joint torques to be commanded
