@@ -23,7 +23,7 @@
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <mesh>
-            <uri>/home/alexander/Studium/Masterarbeit/Masterarbeit_ws/src/Cooperative_Manipulation_Directroy/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
+            <uri>/home/alexander/Studium/Masterarbeit/Masterarbeit_ws/src/Cooperative_Manipulation/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
             <scale>1 1 1</scale>
           </mesh>
         </geometry>
