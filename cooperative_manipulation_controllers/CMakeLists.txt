@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  gazebo
 )
 
 ## System dependencies are found with CMake's conventions
@@ -108,7 +107,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
   LIBRARIES cooperative_manipulation_controllers
   CATKIN_DEPENDS roscpp rospy std_msgs
   pluginlib
@@ -138,9 +136,9 @@ include_directories(
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
-## The recommended prefix ensures that target names across packages don't collide
- add_executable(gazebo_ros_interface src/gazebo_ros_interface.cpp)
- target_link_libraries(gazebo_ros_interface ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
+# ## The recommended prefix ensures that target names across packages don't collide
+#  add_executable(gazebo_ros_interface src/gazebo_ros_interface.cpp)
+#  target_link_libraries(gazebo_ros_interface ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -156,8 +154,8 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
-link_directories(${GAZEBO_LIBRARY_DIRS})
-list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
+# link_directories(${GAZEBO_LIBRARY_DIRS})
+# list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
 #############
 ## Install ##
 #############

@@ -68,8 +68,6 @@
   <exec_depend>hardware_interface</exec_depend>
   <exec_depend>pluginlib</exec_depend>
 
-  <exec_depend>cooperative_manipulation_controllers</exec_depend>
-  <exec_depend>cooperative_manipulation_robot_description</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
