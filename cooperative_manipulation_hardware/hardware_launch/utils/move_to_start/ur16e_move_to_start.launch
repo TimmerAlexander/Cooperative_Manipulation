@@ -1,22 +1,26 @@
+<?xml version="1.0"?>
 <launch>
-    <!-- Defining arguments for the mur launch --> 
-    <arg name="controllers_started" default="joint_state_controller"/>
-    <arg name="controllers_stopped" default="empty"/>  <!--Must not be empty-->
-    <arg name="pose_filename" default="$(find cooperative_manipulation_hardware)/poses/ur16e_start_pose.yaml"/>
-    <arg name="tf_prefix" default="mur"/>
- 
-   
-    <!-- Bringup the base of the mur -->
-    <include file="$(find mur_launch_hardware)/launch/mur_base.launch" pass_all_args="true"/>      
+
+    <arg name="ur_name" default="ur"/>
+    <!-- the joints move one after the other in this sequence -->
+    <arg name="elbow_joint" default="0.785"/>
+    <arg name="shoulder_lift_joint" default="0.785"/>
+    <arg name="shoulder_pan_joint" default="0.0"/>
+    <arg name="wrist_1_joint" default="0.0"/>
+    <arg name="wrist_2_joint" default="1.57"/>
+    <arg name="wrist_3_joint" default="0.0"/>
 
 
-    <!-- Bringup the ur -->   
-    <param name="mur/ur/robot_state_publisher/tf_prefix" value="$(arg tf_prefix)/ur"/>   <!-- Fixing missing tf_prefix forwarding to the ur packages -->
-
-    <include file="$(find ur_hardware_helper)/launch/ur.launch" ns="mur/ur" pass_all_args="true">
-        <arg name="tf_prefix" value="$(arg tf_prefix)/ur/"/>
-    </include> 
-
-
-
+    <group ns="$(arg ur_name)">
+        <node pkg="cooperative_manipulation_hardware" type="ur16e_move_to_start.py" name="ur16e_start_controller_node" output="screen">
+            <param name="ur_ns" value="$(arg ur_name)"/>
+            <param name="shoulder_pan_joint" value="$(arg shoulder_pan_joint)"/>
+            <param name="shoulder_lift_joint" value="$(arg shoulder_lift_joint)"/>
+            <param name="elbow_joint" value="$(arg elbow_joint)"/>
+            <param name="wrist_1_joint" value="$(arg wrist_1_joint)"/>
+            <param name="wrist_2_joint" value="$(arg wrist_2_joint)"/>
+            <param name="wrist_3_joint" value="$(arg wrist_3_joint)"/>
+        </node>
+    </group> 
 </launch>
+
