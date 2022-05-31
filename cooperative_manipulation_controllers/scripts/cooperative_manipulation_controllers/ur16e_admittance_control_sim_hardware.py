@@ -28,13 +28,13 @@ import numpy, math
 class ur_admittance_controller():
     
     def config(self):
-        # Inertia gains
-        self.M_trans_x = 1
-        self.M_trans_y = 1
-        self.M_trans_z = 1
-        self.M_rot_x = 1
-        self.M_rot_y = 1
-        self.M_rot_z = 1
+        # Stiffness gains
+        self.P_trans_x = 5
+        self.P_trans_y = 5
+        self.P_trans_z = 5
+        self.P_rot_x = 5
+        self.P_rot_y = 5
+        self.P_rot_z = 5
         # Damping gains
         self.D_trans_x = 5
         self.D_trans_y = 5
@@ -42,29 +42,13 @@ class ur_admittance_controller():
         self.D_rot_x = 5
         self.D_rot_y = 5
         self.D_rot_z = 5
-        # Wrench desired contact wrench
-        # self.wrench_desired = WrenchStamped()
-        # self.wrench_desired.wrench.force.x = 2.0
-        # self.wrench_desired.wrench.force.y = 2.0
-        # self.wrench_desired.wrench.force.z = 2.0
-        # self.wrench_desired.wrench.torque.x = 2.0
-        # self.wrench_desired.wrench.torque.y = 2.0
-        # self.wrench_desired.wrench.torque.z = 2.0
-        
-        
         
         self.world_z_vector = numpy.array([0.0,0.0,1.0])
-        self.wrist_link_3_rot_velocity_cross_product_vector_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.wrist_link_3_rot_axis = numpy.array([0.0,0.0,0.0])
+        
+        self.wrist_link_3_desired_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         
         
-        # Wrench difference old
-        self.wrench_ext_filtered_old = WrenchStamped()
-        self.wrench_ext_filtered_old.wrench.force.x = 0.0
-        self.wrench_ext_filtered_old.wrench.force.y = 0.0
-        self.wrench_ext_filtered_old.wrench.force.z = 0.0
-        self.wrench_ext_filtered_old.wrench.torque.x = 0.0
-        self.wrench_ext_filtered_old.wrench.torque.y = 0.0
-        self.wrench_ext_filtered_old.wrench.torque.z = 0.0
         # Min and max limits for the cartesian velocity (trans/rot) [m/s]
         self.cartesian_velocity_trans_min_limit = 0.0009
         self.cartesian_velocity_trans_max_limit = 0.1
@@ -76,13 +60,17 @@ class ur_admittance_controller():
         self.wrench_force_filtered_x = 0.0
         self.wrench_force_filtered_y = 0.0
         self.wrench_force_filtered_z = 0.0
-        # Wrench filter treshold
-        self.wrench_filter = 0.003
+        # Wrench filter treshold (when not cooperative_manipulation: 0.05 - 0.1(cmd_vel: 0.8 or higher))
+        self.wrench_filter = 0.1
         # 
-        self.force_filter_factor = 140
+        self.force_filter_factor = 140.0
+        self.torque_filter_trans_factor = 10.9
         self.torque_filter_factor = 10.9
+
+        
+        
         self.force_filter_factor_array = numpy.array([0.0,0.0,0.0])
-        self.torque_filter_factor_array = numpy.array([0.0,0.0,0.0])
+        self.torque_filter_factor_array = numpy.array([0.0,0.0,0.0,])
 
         self.average_filter_list_force_x = []
         self.average_filter_list_force_y = []
@@ -108,6 +96,8 @@ class ur_admittance_controller():
         self.base_link_desired_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.world_cartesian_velocity_trans = Vector3Stamped()
         self.world_cartesian_velocity_rot = Vector3Stamped()
+        self.wrist_link_3_cartesian_desired_velocity_trans  = Vector3Stamped()
+        self.wrist_link_3_cartesian_desired_velocity_rot  = Vector3Stamped()
         
         
         self.world_rot_velocity_cross_product_vector = Vector3Stamped()
@@ -245,10 +235,7 @@ class ur_admittance_controller():
             self.base_link_cartesian_desired_velocity_rot.vector.z
             ]
         
-        
-        
-        
-        
+
         
         self.world_desired_velocity = [
             self.world_cartesian_velocity_trans.vector.x,
@@ -256,12 +243,32 @@ class ur_admittance_controller():
             self.world_cartesian_velocity_trans.vector.z
             ]
         
-        print("self.world_desired_velocity")
-        print(self.world_desired_velocity)
+
+        
+        # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
+        self.wrist_link_3_cartesian_desired_velocity_trans = self.listener.transformVector3('wrist_3_link',self.world_cartesian_velocity_trans)
+        
+        # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
+        self.wrist_link_3_cartesian_desired_velocity_rot = self.listener.transformVector3('wrist_3_link',self.world_cartesian_velocity_trans)
+        
+        self.wrist_link_3_desired_velocity = [
+            self.wrist_link_3_cartesian_desired_velocity_trans.vector.x,
+            self.wrist_link_3_cartesian_desired_velocity_trans.vector.y,
+            self.wrist_link_3_cartesian_desired_velocity_trans.vector.z,
+            self.wrist_link_3_cartesian_desired_velocity_rot.vector.x,
+            self.wrist_link_3_cartesian_desired_velocity_rot.vector.y,
+            self.wrist_link_3_cartesian_desired_velocity_rot.vector.z
+            ]
+        
+        
+        # print("self.wrist_link_3_desired_velocity")
+        # print(self.wrist_link_3_desired_velocity )
+        
         self.world_rot_velocity_cross_product_array = numpy.cross(self.world_desired_velocity,self.world_z_vector)
         
-        print("self.world_rot_velocity_cross_product_array")
-        print(self.world_rot_velocity_cross_product_array)
+        # print("self.world_rot_velocity_cross_product_array")
+        # print(self.world_rot_velocity_cross_product_array)
+        
         # Converse self.world_rot_velocity_cross_product_array rotation to vector3
         self.world_rot_velocity_cross_product_vector.header.frame_id = 'world'
         self.world_rot_velocity_cross_product_vector.header.stamp = now
@@ -271,16 +278,16 @@ class ur_admittance_controller():
         
         
         # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
-        self.wrist_link_3_rot_velocity_cross_product_vector = self.listener.transformVector3('wrist_3_link',self.world_rot_velocity_cross_product_vector)
+        self.wrist_link_3_rot_axis_vector = self.listener.transformVector3('wrist_3_link',self.world_rot_velocity_cross_product_vector)
         
-        self.wrist_link_3_rot_velocity_cross_product_vector_array = [
-            self.wrist_link_3_rot_velocity_cross_product_vector.vector.x,
-            self.wrist_link_3_rot_velocity_cross_product_vector.vector.y,
-            self.wrist_link_3_rot_velocity_cross_product_vector.vector.z
+        self.wrist_link_3_rot_axis = [
+            self.wrist_link_3_rot_axis_vector.vector.x,
+            self.wrist_link_3_rot_axis_vector.vector.y,
+            self.wrist_link_3_rot_axis_vector.vector.z
             ]
         
-        # print("self.wrist_link_3_rot_velocity_cross_product_vector_array")
-        # print(self.wrist_link_3_rot_velocity_cross_product_vector_array)
+        # print("self.wrist_link_3_rot_axis")
+        # print(self.wrist_link_3_rot_axis)
     
     def wrench_callback(self,wrench_ext):
         """ 
@@ -294,20 +301,19 @@ class ur_admittance_controller():
         print(wrench_ext.wrench)
         
         
-        print("self.torque_filter_factor_array[:")
-        print(self.torque_filter_factor_array)
-
         for f in range(3):
-            if self.base_link_desired_velocity[f] != 0.0:
-                
-                self.force_filter_factor_array[f] = self.force_filter_factor * numpy.abs(self.base_link_desired_velocity[f])   
+            if self.wrist_link_3_desired_velocity[f] != 0.0:
+                # self.force_filter_factor = 141
+                self.force_filter_factor_array[f] = self.force_filter_factor * numpy.abs(self.wrist_link_3_desired_velocity[f])   
             else:
                 self.force_filter_factor_array[f] = 0.0
             
-            if self.wrist_link_3_rot_velocity_cross_product_vector_array[f]!= 0.0:
+            if self.wrist_link_3_rot_axis[f]!= 0.0:
+                # self.torque_filter_trans_factor = 10.9
+                self.torque_filter_factor_array[f] = self.torque_filter_trans_factor * numpy.abs(self.wrist_link_3_rot_axis[f])
                 
-
-                self.torque_filter_factor_array[f] = self.torque_filter_factor * numpy.abs(self.wrist_link_3_rot_velocity_cross_product_vector_array[f])
+                if f == 3:
+                    self.torque_filter_factor_array[f] = self.torque_filter_factor_z * numpy.abs(self.wrist_link_3_rot_axis[f])
             else:
                 self.torque_filter_factor_array[f] = 0.0
 
@@ -318,7 +324,11 @@ class ur_admittance_controller():
         #     else:
         #         self.ftorque_filter_factor_array[f] = 0.0
 
+        # print("self.force_filter_factor_array:")
+        # print(self.force_filter_factor_array)
 
+        # print("self.torque_filter_factor_array:")
+        # print(self.torque_filter_factor_array)
 
         # * Average filter
         # Fill the empty lists with wrench values
@@ -346,8 +356,6 @@ class ur_admittance_controller():
             self.average_filter_list_force_x.append(wrench_ext.wrench.force.x - numpy.sign(wrench_ext.wrench.force.x) * self.force_filter_factor_array[0])
             self.average_filter_list_force_y.append(wrench_ext.wrench.force.y - numpy.sign(wrench_ext.wrench.force.y) *  self.force_filter_factor_array[1])
             self.average_filter_list_force_z.append(wrench_ext.wrench.force.z - numpy.sign(wrench_ext.wrench.force.z) *  self.force_filter_factor_array[2])
-            
-            
             self.average_filter_list_torque_x.append(wrench_ext.wrench.torque.x - numpy.sign(wrench_ext.wrench.torque.x) * self.torque_filter_factor_array[0])
             self.average_filter_list_torque_y.append(wrench_ext.wrench.torque.y - numpy.sign(wrench_ext.wrench.torque.y) *  self.torque_filter_factor_array[1])
             self.average_filter_list_torque_z.append(wrench_ext.wrench.torque.z - numpy.sign(wrench_ext.wrench.torque.z) *  self.torque_filter_factor_array[2])
@@ -355,24 +363,24 @@ class ur_admittance_controller():
             self.average_force_x = sum(self.average_filter_list_force_x)/self.average_filter_list_length
             self.average_force_y = sum(self.average_filter_list_force_y)/self.average_filter_list_length
             self.average_force_z = sum(self.average_filter_list_force_z)/self.average_filter_list_length
-            
             self.average_torque_x = sum(self.average_filter_list_torque_x)/self.average_filter_list_length
             self.average_torque_y = sum(self.average_filter_list_torque_y)/self.average_filter_list_length
             self.average_torque_z = sum(self.average_filter_list_torque_z)/self.average_filter_list_length
             
-        # print("self.average_force_x:")
-        # print(self.average_force_x)
-        # print("self.average_force_y:")
-        # print(self.average_force_y)
-        # print("self.average_force_z:")
-        # print(self.average_force_z)
+            
+        print("self.average_force_x:")
+        print(self.average_force_x)
+        print("self.average_force_y:")
+        print(self.average_force_y)
+        print("self.average_force_z:")
+        print(self.average_force_z)
         
-        print("self.average_torque_x:")
-        print(self.average_torque_x)
-        print("self.average_torque_y:")
-        print(self.average_torque_y)
-        print("self.average_torque_z:")
-        print(self.average_torque_z)
+        # print("self.average_torque_x:")
+        # print(self.average_torque_x)
+        # print("self.average_torque_y:")
+        # print(self.average_torque_y)
+        # print("self.average_torque_z:")
+        # print(self.average_torque_z)
         
         # * Band-passfilter
         if numpy.abs(self.average_force_x) < self.wrench_filter:
@@ -404,6 +412,9 @@ class ur_admittance_controller():
         else: 
             self.wrench_ext_filtered.wrench.torque.z = self.average_torque_z - numpy.sign(self.average_torque_z) * self.wrench_filter
             
+            
+        # print("self.wrench_ext_filtered")
+        # print(self.wrench_ext_filtered)
         self.wrench_filter_pub.publish(self.wrench_ext_filtered) 
     
     
@@ -454,28 +465,25 @@ class ur_admittance_controller():
         while not rospy.is_shutdown():
             
             # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
-            self.admittance_velocity[0] = self.wrench_ext_filtered.wrench.force.x * pow((self.M_trans_x * ((self.wrench_ext_filtered.wrench.force.x - self.wrench_ext_filtered_old.wrench.force.x)/self.publish_rate) + self.D_trans_x),-1)
+            self.admittance_velocity[0] = numpy.sign(self.wrench_ext_filtered.wrench.force.x) * (numpy.abs(self.wrench_ext_filtered.wrench.force.x) * pow((self.P_trans_x * (numpy.abs(self.wrench_ext_filtered.wrench.force.x)/self.publish_rate) + self.D_trans_x),-1))
             
-            self.admittance_velocity[1] = self.wrench_ext_filtered.wrench.force.y * pow((self.M_trans_y * ((self.wrench_ext_filtered.wrench.force.y - self.wrench_ext_filtered_old.wrench.force.y)/self.publish_rate) + self.D_trans_y),-1)         
+            self.admittance_velocity[1] = numpy.sign(self.wrench_ext_filtered.wrench.force.y) * (numpy.abs(self.wrench_ext_filtered.wrench.force.y) * pow((self.P_trans_y * (numpy.abs(self.wrench_ext_filtered.wrench.force.y)/self.publish_rate) + self.D_trans_y),-1))         
             
-            self.admittance_velocity[2] = self.wrench_ext_filtered.wrench.force.z * pow((self.M_trans_z * ((self.wrench_ext_filtered.wrench.force.z - self.wrench_ext_filtered_old.wrench.force.z)/self.publish_rate) + self.D_trans_z),-1)     
+            self.admittance_velocity[2] = numpy.sign(self.wrench_ext_filtered.wrench.force.z) * (numpy.abs(self.wrench_ext_filtered.wrench.force.z) * pow((self.P_trans_z * (numpy.abs(self.wrench_ext_filtered.wrench.force.z)/self.publish_rate) + self.D_trans_z),-1))     
             
-            self.admittance_velocity[3] = self.wrench_ext_filtered.wrench.torque.x * pow((self.M_rot_x * ((self.wrench_ext_filtered.wrench.torque.x - self.wrench_ext_filtered_old.wrench.torque.x)/self.publish_rate) + self.D_rot_x),-1)    
+            self.admittance_velocity[3] = numpy.sign(self.wrench_ext_filtered.wrench.torque.x) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.x) * pow((self.P_rot_x * (numpy.abs(self.wrench_ext_filtered.wrench.torque.x)/self.publish_rate) + self.D_rot_x),-1))    
                                                                                 
-            self.admittance_velocity[4] = self.wrench_ext_filtered.wrench.torque.y * pow((self.M_rot_y * ((self.wrench_ext_filtered.wrench.torque.y - self.wrench_ext_filtered_old.wrench.torque.y)/self.publish_rate) + self.D_rot_y),-1)
+            self.admittance_velocity[4] = numpy.sign(self.wrench_ext_filtered.wrench.torque.y) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.y) * pow((self.P_rot_y * (numpy.abs(self.wrench_ext_filtered.wrench.torque.y)/self.publish_rate) + self.D_rot_y),-1))
             
-            self.admittance_velocity[5] = self.wrench_ext_filtered.wrench.torque.z * pow((self.M_rot_z * ((self.wrench_ext_filtered.wrench.torque.z - self.wrench_ext_filtered_old.wrench.torque.z)/self.publish_rate) + self.D_rot_z),-1)
-
+            self.admittance_velocity[5] = numpy.sign(self.wrench_ext_filtered.wrench.torque.z) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.z) * pow((self.P_rot_z * (numpy.abs(self.wrench_ext_filtered.wrench.torque.z)/self.publish_rate) + self.D_rot_z),-1))
             
-            # print("self.admittance_velocity")
-            # print(self.admittance_velocity)
-            
-            # Set current wrench_ext_filtered to wrench_ext_filtered_old 
-            self.wrench_ext_filtered_old = self.wrench_ext_filtered
-
             self.admittance_velocity_transformed = self.transform_velocity(self.admittance_velocity)
-            # print("self.admittance_velocity_transformed")
-            # print(self.admittance_velocity_transformed)
+            
+            print("self.admittance_velocity_transformed")
+            print(self.admittance_velocity_transformed)
+            
+            print("self.base_link_desired_velocity")
+            print(self.base_link_desired_velocity)
             
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
             self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity_transformed[0]
@@ -558,8 +566,3 @@ class ur_admittance_controller():
 if __name__ == '__main__':
     ur_admittance_controller()
     
-        #? -------------------------------------------------------------------------------------------------
-        #self.wrench_force_filtered_x = self.wrench_force_filtered_x*(1-self.wrench_filter) + wrench_ext.wrench.wrench.force.x * self.wrench_filter 
-        #self.wrench_force_filtered_y = self.wrench_force_filtered_y*(1-self.wrench_filter) + wrench_ext.wrench.wrench.force.y * self.wrench_filter 
-        #self.wrench_force_filtered_z = self.wrench_force_filtered_z*(1-self.wrench_filter) + wrench_ext.wrench.wrench.force.z * self.wrench_filter 
-        #? ----------------------------------------------------------------------------------------------------------
