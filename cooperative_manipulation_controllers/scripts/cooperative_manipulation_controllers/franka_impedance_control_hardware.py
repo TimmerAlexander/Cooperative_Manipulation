@@ -205,6 +205,9 @@ class franka_impedance_controller():
             current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
             current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
             
+            print("current_vel_trans")
+            print(current_vel_trans)
+            
 
             # * Check self.target_cartesian_trans_velocity and self.target_cartesian_trot_velocity for the min/max velocity limits
             # Calculate the norm of target_cartesian_velocity (trans and rot)
@@ -245,30 +248,19 @@ class franka_impedance_controller():
             self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
             
             # Calculate linear and angular velocity difference
-            self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans #- numpy.array(self.wrench_force_transformed).reshape([3,1])
-            self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot 
-            #- numpy.array(self.wrench_torque_transformed).reshape([3,1])
+            self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans + numpy.array(self.wrench_force_transformed).reshape([3,1])
+            self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot + numpy.array(self.wrench_torque_transformed).reshape([3,1])
             
             # print("self.delta_linear")
             # print(self.delta_linear)
             
             # Desired task-space force using PD law
-            F_desired = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)]) + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
-            
-            print("Franka impedance F_desired")
-            print(F_desired)
-            
-            
-            delta_F = F_desired 
-            # + numpy.vstack(self.wrench_transformed)
-            
-            print("delta_F")
-            print(delta_F)
-            
+            F = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)]) + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
+
             J = copy.deepcopy(self.JACOBIAN)
             
             # joint torques to be commanded
-            tau = numpy.dot(J.T,delta_F)
+            tau = numpy.dot(J.T,F)
             
             # publish joint commands
             self.command_msg.effort = tau.flatten()
@@ -306,7 +298,7 @@ class franka_impedance_controller():
         """
             Get the cartesian velocity command and transform it from the 'panda/world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
             
-            rostopic pub -r 10 cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
+            rostopic pub -r 10 /cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
             x: 0.0
             y: 0.0
             z: 0.0
