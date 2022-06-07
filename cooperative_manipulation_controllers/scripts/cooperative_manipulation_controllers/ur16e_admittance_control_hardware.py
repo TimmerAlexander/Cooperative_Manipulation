@@ -297,8 +297,8 @@ class ur_admittance_controller():
             rostopic pub  /ur/wrench geometry_msgs/WrenchStamped '{header: {stamp: now, frame_id: base_link}, wrench:{force: {x: 0.0, y: 0.0, z: 0.0}, torque: {x: 0.0, y: 0.0, z: 0.0}}}'
         """
     
-        print("wrench_ext.wrench before filtered:")
-        print(wrench_ext.wrench)
+        # print("wrench_ext.wrench before filtered:")
+        # print(wrench_ext.wrench)
         
         
         for f in range(3):
@@ -333,16 +333,21 @@ class ur_admittance_controller():
         # * Average filter
         # Fill the empty lists with wrench values
         if len(self.average_filter_list_force_x) < self.average_filter_list_length:
-
+            # 2. Add the new wrench to the list 
             self.average_filter_list_force_x.append(wrench_ext.wrench.force.x - numpy.sign(wrench_ext.wrench.force.x) * self.force_filter_factor_array[0])
             self.average_filter_list_force_y.append(wrench_ext.wrench.force.y - numpy.sign(wrench_ext.wrench.force.y) *  self.force_filter_factor_array[1])
             self.average_filter_list_force_z.append(wrench_ext.wrench.force.z - numpy.sign(wrench_ext.wrench.force.z) *  self.force_filter_factor_array[2])
-            
-            
             self.average_filter_list_torque_x.append(wrench_ext.wrench.torque.x - numpy.sign(wrench_ext.wrench.torque.x) * self.torque_filter_factor_array[0])
             self.average_filter_list_torque_y.append(wrench_ext.wrench.torque.y - numpy.sign(wrench_ext.wrench.torque.y) *  self.torque_filter_factor_array[1])
             self.average_filter_list_torque_z.append(wrench_ext.wrench.torque.z - numpy.sign(wrench_ext.wrench.torque.z) *  self.torque_filter_factor_array[2])
-
+            # 3. Calculate the average 
+            self.average_force_x = sum(self.average_filter_list_force_x)/len(self.average_filter_list_force_x)
+            self.average_force_y = sum(self.average_filter_list_force_y)/len(self.average_filter_list_force_y)
+            self.average_force_z = sum(self.average_filter_list_force_z)/len(self.average_filter_list_force_z)
+            self.average_torque_x = sum(self.average_filter_list_torque_x)/len(self.average_filter_list_torque_x)
+            self.average_torque_y = sum(self.average_filter_list_torque_y)/len(self.average_filter_list_torque_y)
+            self.average_torque_z = sum(self.average_filter_list_torque_z)/len(self.average_filter_list_torque_z)
+            
         # If the lists reached the length of self.average_filter_list_length
         elif len(self.average_filter_list_force_x) == self.average_filter_list_length:
             # 1. Delete the first element in the list 
@@ -368,12 +373,12 @@ class ur_admittance_controller():
             self.average_torque_z = sum(self.average_filter_list_torque_z)/self.average_filter_list_length
             
             
-        print("self.average_force_x:")
-        print(self.average_force_x)
-        print("self.average_force_y:")
-        print(self.average_force_y)
-        print("self.average_force_z:")
-        print(self.average_force_z)
+        # print("self.average_force_x:")
+        # print(self.average_force_x)
+        # print("self.average_force_y:")
+        # print(self.average_force_y)
+        # print("self.average_force_z:")
+        # print(self.average_force_z)
         
         # print("self.average_torque_x:")
         # print(self.average_torque_x)
