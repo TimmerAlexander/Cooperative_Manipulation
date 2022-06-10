@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2.7
 
 # /***************************************************************************
 
@@ -127,9 +127,9 @@ class ur_admittance_controller():
         self.namespace = rospy.get_param("~ur_ns")
         
         # * Initialize move_it
-        group_name = 'manipulator'
-        print("Initialize movit_commander. Group name: ",group_name)
-        self.group = moveit_commander.MoveGroupCommander(group_name)
+        # group_name = 'manipulator'
+        # print("Initialize movit_commander. Group name: ",group_name)
+        # self.group = moveit_commander.MoveGroupCommander(group_name)
         
         # * Initialize publisher:
         # Publish final joint velocity to "/ur/ur_admittance_controller/command"
@@ -167,8 +167,13 @@ class ur_admittance_controller():
         # * Initialize tf TransformListener
         self.listener = tf.TransformListener()
         self.listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(4.0))
-        self.listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(4.0))
-        
+
+        # World frame just exits in gazebo!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # Which frame for the real robots?
+        # ---------------------------------------------------------------------------------------
+        #self.listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(4.0))
+        # ---------------------------------------------------------------------------------------
+
         # Wait for messages to be populated before proceeding
         rospy.loginfo("Subscribing to robot state topics...")
         while (True):
@@ -180,7 +185,7 @@ class ur_admittance_controller():
         
         
         # * Run control_thread
-        self.control_thread()
+        #self.control_thread()
         
         rospy.spin()
     
@@ -423,7 +428,7 @@ class ur_admittance_controller():
         self.wrench_filter_pub.publish(self.wrench_ext_filtered) 
     
     
-    def transform_velocity(self,cartesian_velocity: numpy.array):
+    def transform_velocity(self,cartesian_velocity):
         """ 
             Transform the cartesian velocity from the 'wrist_3_link' frame to the 'base_link' frame.
         """
