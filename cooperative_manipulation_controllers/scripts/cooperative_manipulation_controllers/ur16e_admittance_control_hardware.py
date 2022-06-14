@@ -180,13 +180,15 @@ class ur_admittance_controller():
         self.listener.waitForTransform("map","base_link", rospy.Time(), rospy.Duration(4.0))
         # ---------------------------------------------------------------------------------------
 
+        self.tf_time = self.listener.getLatestCommonTime("/map", "/wrist_3_link")
+        self.current_position, self.current_quaternion = self.listener.lookupTransform("/map", "/wrist_3_link", self.tf_time)
+
+
+
         # Wait for messages to be populated before proceeding
-        rospy.loginfo("Subscribing to robot state topics...")
-        while (True):
-            if not (self.wrench_ext_filtered is None):
-                print("wrench init: ")
-                print(self.wrench_ext_filtered)
-                break
+        rospy.wait_for_message("/" + self.namespace + "/ft_sensor/raw",WrenchStamped,timeout=5.0)
+        
+        
         rospy.loginfo("Recieved messages; Launch ur16e Admittance control.")
         
         
@@ -211,6 +213,55 @@ class ur_admittance_controller():
         """
         # print("desired_velocity")
         # print(desired_velocity)
+        
+        # ToDo ------------------------------------------------------------------
+        
+        # Get current_position, current_quaternion of the 'wrist_3_link in' frame in the 'map' frame 
+        self.tf_time = self.listener.getLatestCommonTime("/map", "/wrist_3_link")
+        
+        self.position, self.current_quaternion = self.listener.lookupTransform("/map", "/wrist_3_link", self.tf_time)
+        
+        print("self.current_position, self.current_quaternion")
+        print(self.current_position, self.current_quaternion)
+        
+        # if self.world_cartesian_velocity_rot.vector.z != 0.0:
+            
+        #     cmd_rot_vel = numpy.array([0.0,0.0,self.world_cartesian_velocity_rot.vector.z])
+            
+        #     print("cmd_rot_vel")
+        #     print(cmd_rot_vel)
+            
+
+        
+        # print(" wrist_3_link_velocity_array")
+        # print( wrist_3_link_velocity_array)
+            
+        #     r = numpy.round(math.sqrt((object_link_coordinates.link_state.pose.position.x - wrist_3_link_coordinates.link_state.pose.position.x)**2 + (object_link_coordinates.link_state.pose.position.y - wrist_3_link_coordinates.link_state.pose.position.y)**2),3)
+            
+            
+        #     print(r)
+        #     gamma = math.atan2(
+        #         wrist_3_link_coordinates.link_state.pose.position.y - object_link_coordinates.link_state.pose.position.y,
+        #         wrist_3_link_coordinates.link_state.pose.position.x - object_link_coordinates.link_state.pose.position.x)
+        
+        #     print(gamma)
+            
+            
+        #     rot_vel = numpy.array([
+        #         r * math.cos(gamma),
+        #         r * math.sin(gamma),
+        #         0.0
+        #     ])
+            
+        #     print("rot_vel")
+        #     print(rot_vel)
+            
+        #     rot_velocity = numpy.cross(cmd_rot_vel,rot_vel)
+            
+        #     print("rot_velocity")
+        #     print(rot_velocity)
+
+        # ToDo ------------------------------------------------------------------
         
         # Get current time stamp
         now = rospy.Time()
