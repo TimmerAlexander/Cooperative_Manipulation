@@ -22,7 +22,7 @@ import numpy, math
 import rospy
 import tf
 import moveit_commander
-from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist
+from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, PoseStamped
 from std_msgs.msg import Float64MultiArray
 
 
@@ -174,7 +174,27 @@ class ur_admittance_controller():
 
         rospy.loginfo("Recieved messages; Launch ur16e Admittance control.")
         
+        # ToDo: Calculate gripper offset
+        now = rospy.Time()
+        self.wrist_3_link_ur16e_gripper_offset  = PoseStamped()
+        self.world_ur16e_gripper_offset = PoseStamped()
         
+        self.wrist_3_link_ur16e_gripper_offset.header.frame_id = 'wrist_3_link'
+        self.wrist_3_link_ur16e_gripper_offset.header.stamp = now
+        self.wrist_3_link_ur16e_gripper_offset.pose.position.x = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.position.y = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.position.z = self.ur16_gripper_offset
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.x = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.y = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.x = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.w = 0.0
+        print("self.wrist_3_link_ur16e_gripper_offset")
+        print(self.wrist_3_link_ur16e_gripper_offset)
+        # Transform grippe offset from 'wrist_3_link' frame to 'world' frame
+        self.world_ur16e_gripper_offset = self.tf_listener.transformPose('world',self.wrist_3_link_ur16e_gripper_offset)
+        print("self.world_ur16e_gripper_offset")
+        print(self.world_ur16e_gripper_offset)
+        # ToDo: Calculate gripper offset
         # * Run control_thread
         self.control_thread()
         
@@ -182,7 +202,7 @@ class ur_admittance_controller():
     
     def cartesian_velocity_command_callback(self,desired_velocity):
         """
-            Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' and 'wrist_link_3' frame.
+            Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' and 'wrist_3_link' frame.
             
             Send example velocity:
             rostopic pub -r 10 cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
@@ -194,6 +214,9 @@ class ur_admittance_controller():
             y: 0.0
             z: 0.0" 
         """
+        # Get current time stamp
+        now = rospy.Time()
+        
         # print("desired_velocity")
         # print(desired_velocity)
         
@@ -201,6 +224,14 @@ class ur_admittance_controller():
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
         ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
         ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
+        
+        
+        print(ur16e_current_position)
+        
+        
+        
+        
+        
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
         panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
@@ -323,8 +354,7 @@ class ur_admittance_controller():
 
 
         # Transform the velcoities from 'world' frame to 'base_link' frame
-        # Get current time stamp
-        now = rospy.Time()
+
 
         # Converse cartesian_velocity translation to vector3
         self.world_cartesian_velocity_trans.header.frame_id = 'world'
