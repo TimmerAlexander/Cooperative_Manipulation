@@ -102,12 +102,9 @@ class ur_admittance_controller():
         # Initialize shutdown joint velocity, called on shutdown 
         self.shutdown_joint_velocity = Float64MultiArray()
         self.shutdown_joint_velocity.data = [0.0,0.0,0.0,0.0,0.0,0.0]
-        
-        self.world_trajectory_rotation = numpy.array([0.0,0.0,0.0])
-        
-        self.r_x = 0.0
-        self.r_y = 0.0
-        self.r_z = 0.0
+        # Initialize trajectory velocity for object rotation
+        self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
+
         
         
     def __init__(self):
@@ -242,10 +239,10 @@ class ur_admittance_controller():
                 print("world_radius_x")
                 print(world_radius_x)
                 
-                self.world_trajectory_rotation = numpy.cross(world_desired_rotation_x,world_radius_x)
+                self.world_trajectory_velocity = numpy.cross(world_desired_rotation_x,world_radius_x)
                 
-                print("self.world_trajectory_rotation")
-                print(self.world_trajectory_rotation)
+                print("self.world_trajectory_velocity")
+                print(self.world_trajectory_velocity)
                 
                 
                 
@@ -279,10 +276,10 @@ class ur_admittance_controller():
                 print("world_radius_y")
                 print(world_radius_y)
                 
-                self.world_trajectory_rotation = numpy.cross(world_desired_rotation_y,world_radius_y)
+                self.world_trajectory_velocity = numpy.cross(world_desired_rotation_y,world_radius_y)
                 
-                print("self.world_trajectory_rotation")
-                print(self.world_trajectory_rotation)
+                print("self.world_trajectory_velocity")
+                print(self.world_trajectory_velocity)
                 
                 
             # Object rotation around z axis 
@@ -314,10 +311,10 @@ class ur_admittance_controller():
                 print("world_radius_z")
                 print(world_radius_z)
                 
-                self.world_trajectory_rotation = numpy.cross(world_desired_object_rotation_z,world_radius_z)
+                self.world_trajectory_velocity = numpy.cross(world_desired_object_rotation_z,world_radius_z)
                 
-                print("self.world_trajectory_rotation")
-                print(self.world_trajectory_rotation)
+                print("self.world_trajectory_velocity")
+                print(self.world_trajectory_velocity)
 
         # Transform the velcoities from 'world' frame to 'base_link' frame
         # Get current time stamp
@@ -326,9 +323,9 @@ class ur_admittance_controller():
         # Converse cartesian_velocity translation to vector3
         self.world_cartesian_velocity_trans.header.frame_id = 'world'
         self.world_cartesian_velocity_trans.header.stamp = now
-        self.world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_rotation[0]
-        self.world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_rotation[1]
-        self.world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_rotation[2]
+        self.world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_velocity[0]
+        self.world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
+        self.world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
         
         # Transform cartesian_velocity translation from 'world' frame to 'base_link' frame
         self.base_link_cartesian_desired_velocity_trans = self.tf_listener.transformVector3('base_link',self.world_cartesian_velocity_trans)
