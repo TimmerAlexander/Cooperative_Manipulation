@@ -103,7 +103,7 @@ class ur_admittance_controller():
         self.shutdown_joint_velocity = Float64MultiArray()
         self.shutdown_joint_velocity.data = [0.0,0.0,0.0,0.0,0.0,0.0]
         
-        self.world_trans_rotation = numpy.array([0.0,0.0,0.0])
+        self.world_trajectory_rotation = numpy.array([0.0,0.0,0.0])
         
         self.r_x = 0.0
         self.r_y = 0.0
@@ -221,16 +221,16 @@ class ur_admittance_controller():
                     ur16e_current_position[2]
                     ])
                 
-                self.manipulator_distance_x = numpy.array([
+                self.robot_distance_x = numpy.array([
                     0.0,
                     panda_current_position[1] - ur16e_current_position[1],
                     panda_current_position[2] - ur16e_current_position[2],
                 ])
                 
-                print(" self.manipulator_distance_x: y,z")
-                print( self.manipulator_distance_x)
+                print(" self.robot_distance_x: y,z")
+                print( self.robot_distance_x)
             
-                center_x = (numpy.linalg.norm(self.manipulator_distance_x)/2) * (1/numpy.linalg.norm(self.manipulator_distance_x)) * self.manipulator_distance_x + ur16e_current_position_x
+                center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_current_position_x
                 
                 world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
                 
@@ -242,10 +242,10 @@ class ur_admittance_controller():
                 print("world_radius_x")
                 print(world_radius_x)
                 
-                self.world_trans_rotation = numpy.cross(world_desired_rotation_x,world_radius_x)
+                self.world_trajectory_rotation = numpy.cross(world_desired_rotation_x,world_radius_x)
                 
-                print("self.world_trans_rotation")
-                print(self.world_trans_rotation)
+                print("self.world_trajectory_rotation")
+                print(self.world_trajectory_rotation)
                 
                 
                 
@@ -258,13 +258,13 @@ class ur_admittance_controller():
                     ur16e_current_position[2]
                     ]) 
                 
-                self.manipulator_distance_y = numpy.array([
+                self.robot_distance_y = numpy.array([
                     panda_current_position[0] - ur16e_current_position[0],
                     0.0,
                     panda_current_position[2] - ur16e_current_position[2]
                     ])
                 
-                center_y = (numpy.linalg.norm(self.manipulator_distance_y)/2) * (1/numpy.linalg.norm(self.manipulator_distance_y)) * self.manipulator_distance_y + ur16e_current_position_y
+                center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_current_position_y
                 
                 
 
@@ -273,16 +273,16 @@ class ur_admittance_controller():
                 print("world_desired_rotation_y")
                 print(world_desired_rotation_y)
             
-                world_radius_y = ur16e_current_position_y - center_x
+                world_radius_y = ur16e_current_position_y - center_y
                 
                 
                 print("world_radius_y")
                 print(world_radius_y)
                 
-                self.world_trans_rotation = numpy.cross(world_desired_rotation_y,world_radius_y)
+                self.world_trajectory_rotation = numpy.cross(world_desired_rotation_y,world_radius_y)
                 
-                print("self.world_trans_rotation")
-                print(self.world_trans_rotation)
+                print("self.world_trajectory_rotation")
+                print(self.world_trajectory_rotation)
                 
                 
             # Object rotation around z axis 
@@ -293,18 +293,18 @@ class ur_admittance_controller():
                     0.0,
                     ]) 
                                 
-                self.manipulator_distance_z = numpy.array([
+                self.robot_distance_z = numpy.array([
                     panda_current_position[0] - ur16e_current_position[0],
                     panda_current_position[1] - ur16e_current_position[1],
                     0.0,
                     ])
                 
                 
-                center_z = (numpy.linalg.norm(self.manipulator_distance_z)/2) * (1/numpy.linalg.norm(self.manipulator_distance_z)) * self.manipulator_distance_z + ur16e_current_position_z
+                center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_current_position_z
                 
                 
                 
-                world_desired_object_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+                world_desired_object_rotation_z = ur16e_current_position_z - center_z
                 
                 print("world_desired_object_rotation_z")
                 print(world_desired_object_rotation_z)
@@ -314,10 +314,10 @@ class ur_admittance_controller():
                 print("world_radius_z")
                 print(world_radius_z)
                 
-                self.world_trans_rotation = numpy.cross(world_desired_object_rotation_z,world_radius_z)
+                self.world_trajectory_rotation = numpy.cross(world_desired_object_rotation_z,world_radius_z)
                 
-                print("self.world_trans_rotation")
-                print(self.world_trans_rotation)
+                print("self.world_trajectory_rotation")
+                print(self.world_trajectory_rotation)
 
         # Transform the velcoities from 'world' frame to 'base_link' frame
         # Get current time stamp
@@ -326,9 +326,9 @@ class ur_admittance_controller():
         # Converse cartesian_velocity translation to vector3
         self.world_cartesian_velocity_trans.header.frame_id = 'world'
         self.world_cartesian_velocity_trans.header.stamp = now
-        self.world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trans_rotation[0]
-        self.world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trans_rotation[1]
-        self.world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trans_rotation[2]
+        self.world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_rotation[0]
+        self.world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_rotation[1]
+        self.world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_rotation[2]
         
         # Transform cartesian_velocity translation from 'world' frame to 'base_link' frame
         self.base_link_cartesian_desired_velocity_trans = self.tf_listener.transformVector3('base_link',self.world_cartesian_velocity_trans)
