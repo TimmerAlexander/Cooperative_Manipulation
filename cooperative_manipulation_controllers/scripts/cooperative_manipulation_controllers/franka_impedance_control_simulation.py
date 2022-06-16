@@ -41,7 +41,8 @@
 import copy, numpy, quaternion
 import rospy
 import tf
-from geometry_msgs.msg import Twist, Vector3Stamped, WrenchStamped, PoseStamped
+import tf2_ros
+from geometry_msgs.msg import Twist, Vector3Stamped, WrenchStamped, TransformStamped
 from franka_core_msgs.msg import EndPointState, JointCommand, RobotState
 
 class franka_impedance_controller():
@@ -102,9 +103,9 @@ class franka_impedance_controller():
         self.wrench_torque_velocity_transformed = numpy.array([0.0,0.0,0.0,])
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
-        
-        self.panda_gripper_offset = 0.10355
-        self.ur16_gripper_offset = 0.16155
+        # The offset of the object to the 'panda/panda_link8' frame        
+        self.panda_gripper_offset = 0.10655
+
         
     def __init__(self):
         # * Load config parameters
@@ -122,11 +123,11 @@ class franka_impedance_controller():
         self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Waited for transformation 'world' to 'base_link'.")
 
+        self.set_gripper_offset()
 
+        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Waited for transformation 'world' to 'ur16e_gripper'.")
 
-
-        # * Initialize tf TransformBroadcaster
-        self.brodacaster = tf.TransformBroadcaster()
 
 
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
@@ -168,13 +169,6 @@ class franka_impedance_controller():
                 queue_size=1)
         
 
-
-        
-
-
-
-
-
         # Wait for messages to be populated before proceeding
         rospy.loginfo("Subscribing to robot state topics...")
         while (True):
@@ -206,6 +200,32 @@ class franka_impedance_controller():
         
         rospy.spin()    
     
+    def set_gripper_offset(self):
+        """
+            Set the gripper offset from 'panda/panda_link8' frame.
+        """
+        # * Initialize tf TransformBroadcaster
+        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
+
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
+        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
+
+
+        static_gripper_offset = TransformStamped()
+        static_gripper_offset.header.stamp = rospy.Time.now()
+        static_gripper_offset.header.frame_id = "world"
+        static_gripper_offset.child_frame_id = "panda/panda_gripper"
+        static_gripper_offset.transform.translation.x = panda_current_position[0]
+        static_gripper_offset.transform.translation.y = panda_current_position[1]
+        static_gripper_offset.transform.translation.z = panda_current_position[2] - self.panda_gripper_offset
+        static_gripper_offset.transform.rotation.x = panda_current_quaternion[0]
+        static_gripper_offset.transform.rotation.y = panda_current_quaternion[1]
+        static_gripper_offset.transform.rotation.z = panda_current_quaternion[2]
+        static_gripper_offset.transform.rotation.w = panda_current_quaternion[3]
+
+        self.brodacaster.sendTransform(static_gripper_offset)
+
     def control_thread(self):
         """
             Actual control loop. Uses goal pose from the feedback thread
@@ -219,15 +239,6 @@ class franka_impedance_controller():
         movement_ori = numpy.array([None])
         
         while not rospy.is_shutdown():
-
-            panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
-            panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time) 
-            
-            self.brodacaster.sendTransform((panda_current_position[0],panda_current_position[1],panda_current_position[2] - self.panda_gripper_offset),
-                (panda_current_quaternion[0],panda_current_quaternion[1],panda_current_quaternion[2],panda_current_quaternion[3]),
-                rospy.Time.now(),
-                "panda/panda_gripper",
-                "world")
             # Get current position and orientation 
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
             curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
@@ -352,6 +363,7 @@ class franka_impedance_controller():
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
         panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
+
 
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'world' frame 
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")

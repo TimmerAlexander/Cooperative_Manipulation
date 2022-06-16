@@ -21,8 +21,9 @@
 import numpy, math
 import rospy
 import tf
+import tf2_ros
 import moveit_commander
-from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, PoseStamped
+from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, TransformStamped
 from std_msgs.msg import Float64MultiArray
 
 
@@ -104,7 +105,7 @@ class ur_admittance_controller():
         self.shutdown_joint_velocity.data = [0.0,0.0,0.0,0.0,0.0,0.0]
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
-        
+        # The offset of the object to the 'wirst_3_link' frame
         self.ur16e_gripper_offset = 0.16155
 
         
@@ -161,18 +162,20 @@ class ur_admittance_controller():
             self.cartesian_velocity_command_callback,queue_size=1)
         
 
-        # * Initialize tf TransformBroadcaster
-        self.brodacaster = tf.TransformBroadcaster()
-
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
         self.tf_listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Waited for transformation 'wrist_3_link' to 'base_link'.")
+        self.tf_listener.waitForTransform("world","wrist_3_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Waited for transformation 'world' to 'wrist_3_link'.")
         self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Waited for transformation 'world' to 'base_link'.")
-        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'world' to '/panda/panda_link8'.")
         
+        self.set_gripper_offset()
+
+        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Waited for transformation 'world' to '/panda/panda_link8'.")
+
         # Wait for messages to be populated before proceeding
         rospy.wait_for_message("/" + self.namespace + "/ft_sensor/raw",WrenchStamped,timeout=5.0)
 
@@ -184,6 +187,31 @@ class ur_admittance_controller():
         
         rospy.spin()
     
+    def set_gripper_offset(self):
+        """
+            Set the gripper offset from 'wirst_3_link' frame.
+        """
+        # * Initialize tf TransformBroadcaster
+        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
+
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
+        ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
+
+        static_gripper_offset = TransformStamped()
+        static_gripper_offset.header.stamp = rospy.Time.now()
+        static_gripper_offset.header.frame_id = "world"
+        static_gripper_offset.child_frame_id = "ur16e_gripper"
+        static_gripper_offset.transform.translation.x = ur16e_current_position[0]
+        static_gripper_offset.transform.translation.y = ur16e_current_position[1]
+        static_gripper_offset.transform.translation.z = ur16e_current_position[2] - self.ur16e_gripper_offset
+        static_gripper_offset.transform.rotation.x = ur16e_current_quaternion[0]
+        static_gripper_offset.transform.rotation.y = ur16e_current_quaternion[1]
+        static_gripper_offset.transform.rotation.z = ur16e_current_quaternion[2]
+        static_gripper_offset.transform.rotation.w = ur16e_current_quaternion[3]
+
+        self.brodacaster.sendTransform(static_gripper_offset)
+
     def cartesian_velocity_command_callback(self,desired_velocity):
         """
             Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' and 'wrist_3_link' frame.
@@ -203,11 +231,12 @@ class ur_admittance_controller():
         
         # print("desired_velocity")
         # print(desired_velocity)
-        
+    
         # Calculate the trajectory velocity of the manipulator for a rotation of the object
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
         ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
         ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
+
         # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'world' frame 
         ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/ur16e_gripper")
         ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
@@ -221,7 +250,8 @@ class ur_admittance_controller():
         
         # print("self.panda_current_position, self.panda_current_quaternion")
         # print(self.panda_position, self.panda_current_quaternion)
-        
+        print(ur16e_gripper_position)
+        print(panda_gripper_position)
         self.world_trajectory_velocity = [0.0,0.0,0.0]
         # Object rotation around x axis 
         if desired_velocity.angular.x != 0.0:
@@ -600,15 +630,8 @@ class ur_admittance_controller():
         """
         rate = rospy.Rate(self.publish_rate)
         while not rospy.is_shutdown():
-            # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-            ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-            ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
-            
-            self.brodacaster.sendTransform((ur16e_current_position[0],ur16e_current_position[1],ur16e_current_position[2] - self.ur16e_gripper_offset),
-                (ur16e_current_quaternion[0],ur16e_current_quaternion[1],ur16e_current_quaternion[2],ur16e_current_quaternion[3]),
-                rospy.Time.now(),
-                "ur16e_gripper",
-                "world")
+
+
             # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
             self.admittance_velocity[0] = numpy.sign(self.wrench_ext_filtered.wrench.force.x) * (numpy.abs(self.wrench_ext_filtered.wrench.force.x) * pow((self.P_trans_x * (numpy.abs(self.wrench_ext_filtered.wrench.force.x)/self.publish_rate) + self.D_trans_x),-1))
             
