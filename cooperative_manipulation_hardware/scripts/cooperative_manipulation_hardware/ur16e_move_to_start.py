@@ -3,8 +3,6 @@ import rospy
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
 import numpy
-import moveit_commander
-
 
 class ur16e_move_to_start():
     
@@ -23,22 +21,17 @@ class ur16e_move_to_start():
         
     def __init__(self):
         
+        # Load parameters
         self.config()
             
         # * Initialize node
         rospy.init_node('ur16e_start_pose', anonymous=True)
-        # try:
-        #     print("Start ur16e_move_to_star.py")
-        #     group_name = 'manipulator'
-        #     print("Initialize movit_commander. Group name: ",group_name)
-        #     self.group = moveit_commander.MoveGroupCommander(group_name, wait_for_servers=20.0)
-        # except Exception as e: 
-        #     print(e)
-        
+
+        print("Start ur16e_move_to_star.py")
+
         # * Initialize on_shutdown clean up
         rospy.on_shutdown(self.shutdown)
         
-       
         # * Get joint poses from launch file
         self.shoulder_pan_joint_pose = float(rospy.get_param("~shoulder_pan_joint"))
         self.shoulder_lift_joint_pose = float(rospy.get_param("~shoulder_lift_joint"))
@@ -53,6 +46,7 @@ class ur16e_move_to_start():
         print(self.joint_poses)
         # ----------------------------------------------
         # Simulation
+        # self.joint_position_msg.data = [self.shoulder_pan_joint,self.shoulder_lift_joint,self.elbow_joint,self.wrist_1_joint,self.wrist_2_joint,self.wrist_3_joint]
         # * Get namespace for topics from launch file
         # self.namespace = rospy.get_param("~ur_ns")
 
@@ -65,17 +59,14 @@ class ur16e_move_to_start():
 
         # ----------------------------------------------
         # Hardware
+        # self.joint_position_msg.data = [self.shoulder_pan_joint,self.shoulder_lift_joint,self.elbow_joint,self.wrist_1_joint,self.wrist_2_joint,self.wrist_3_joint]
         self.pub_joint_velocity = rospy.Publisher("/joint_group_vel_controller/command", Float64MultiArray, queue_size=1)
-        
-        
-        
+    
         self.joint_states_sub = rospy.Subscriber("/joint_states",JointState,self.joint_state_callback)
 
         rospy.wait_for_message("/joint_states",JointState,timeout=5.0)
-
-        print("wait for messag")
-        print(self.current_joint_states_array )
         # ----------------------------------------------
+
         self.run()
         rospy.spin()
    
@@ -89,7 +80,7 @@ class ur16e_move_to_start():
 
             while self.delta_pose != 0.0 and not rospy.is_shutdown():
                 
-                
+                # Controller to calculate the velocity command
                 self.delta_pose = round(self.joint_poses[i] - self.current_joint_states_array[i],3)
 
                 vel_cmd = self.Kp * self.delta_pose
@@ -113,9 +104,8 @@ class ur16e_move_to_start():
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
 
         self.pub_joint_velocity.publish(self.shutdown_joint_velocity_msg)
-        
-        
-    
+
+             
     def joint_state_callback(self,current_joint_states):
         """
             Get current joint state.
@@ -136,10 +126,6 @@ class ur16e_move_to_start():
             current_joint_states.position[4],
             current_joint_states.position[5]]
 
-
-
-
-
     def shutdown(self):
         """ 
         This function is called by rospy.on_shutdown!
@@ -149,14 +135,6 @@ class ur16e_move_to_start():
         self.pub_joint_velocity.publish(self.shutdown_joint_velocity_msg)
         print("Unregister from joint_velocity_pub!")
         self.pub_joint_velocity.unregister()
-
-                    
-
-            # self.joint_position_msg.data = [self.shoulder_pan_joint,self.shoulder_lift_joint,self.elbow_joint,self.wrist_1_joint,self.wrist_2_joint,self.wrist_3_joint]
-            
-            # self.pub_joint_velocity.publish(self.joint_position_msg)
-            
-
 
 if __name__ == '__main__':
     ur16e_move_to_start()
