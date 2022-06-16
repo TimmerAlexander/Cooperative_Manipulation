@@ -173,28 +173,7 @@ class ur_admittance_controller():
         rospy.wait_for_message("/" + self.namespace + "/ft_sensor/raw",WrenchStamped,timeout=5.0)
 
         rospy.loginfo("Recieved messages; Launch ur16e Admittance control.")
-        
-        # ToDo: Calculate gripper offset
-        now = rospy.Time()
-        self.wrist_3_link_ur16e_gripper_offset  = PoseStamped()
-        self.world_ur16e_gripper_offset = PoseStamped()
-        
-        self.wrist_3_link_ur16e_gripper_offset.header.frame_id = 'wrist_3_link'
-        self.wrist_3_link_ur16e_gripper_offset.header.stamp = now
-        self.wrist_3_link_ur16e_gripper_offset.pose.position.x = 0.0
-        self.wrist_3_link_ur16e_gripper_offset.pose.position.y = 0.0
-        self.wrist_3_link_ur16e_gripper_offset.pose.position.z = self.ur16_gripper_offset
-        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.x = 0.0
-        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.y = 0.0
-        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.x = 0.0
-        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.w = 0.0
-        print("self.wrist_3_link_ur16e_gripper_offset")
-        print(self.wrist_3_link_ur16e_gripper_offset)
-        # Transform grippe offset from 'wrist_3_link' frame to 'world' frame
-        self.world_ur16e_gripper_offset = self.tf_listener.transformPose('world',self.wrist_3_link_ur16e_gripper_offset)
-        print("self.world_ur16e_gripper_offset")
-        print(self.world_ur16e_gripper_offset)
-        # ToDo: Calculate gripper offset
+
         # * Run control_thread
         self.control_thread()
         
@@ -236,13 +215,40 @@ class ur_admittance_controller():
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
         panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
 
+
+
+                
+        # ToDo: Calculate gripper offset------------------------------------------------------------------------
+        now = rospy.Time()
+        self.wrist_3_link_ur16e_gripper_offset  = PoseStamped()
+        self.world_ur16e_gripper_offset = PoseStamped()
+        
+        self.wrist_3_link_ur16e_gripper_offset.header.frame_id = 'wrist_3_link'
+        self.wrist_3_link_ur16e_gripper_offset.header.stamp = now
+        self.wrist_3_link_ur16e_gripper_offset.pose.position.x = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.position.y = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.position.z = self.ur16_gripper_offset
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.x = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.y = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.x = 0.0
+        self.wrist_3_link_ur16e_gripper_offset.pose.orientation.w = 0.0
+        # print("self.wrist_3_link_ur16e_gripper_offset")
+        # print(self.wrist_3_link_ur16e_gripper_offset)
+        # Transform grippe offset from 'wrist_3_link' frame to 'world' frame
+        self.world_ur16e_gripper_offset = self.tf_listener.transformPose('world',self.wrist_3_link_ur16e_gripper_offset)
+        print("self.world_ur16e_gripper_offset")
+        print(self.world_ur16e_gripper_offset.pose.position.z)
+        # ToDo: Calculate gripper offset------------------------------------------------------------------------
+
+
+
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
         
         # print("self.panda_current_position, self.panda_current_quaternion")
         # print(self.panda_position, self.panda_current_quaternion)
         
-        self.world_trajectory_velocity = [0.0,0.0,0.0]
+
         # Object rotation around x axis 
         if desired_velocity.angular.x != 0.0:
             ur16e_current_position_x = numpy.array([
@@ -254,7 +260,7 @@ class ur_admittance_controller():
             self.robot_distance_x = numpy.array([
                 0.0,
                 panda_current_position[1] - ur16e_current_position[1],
-                panda_current_position[2] - (ur16e_current_position[2] - self.ur16_gripper_offset),
+                panda_current_position[2] - self.world_ur16e_gripper_offset.pose.position.z,
             ])
             
             print(" self.robot_distance_x: y,z")
@@ -292,7 +298,7 @@ class ur_admittance_controller():
             self.robot_distance_y = numpy.array([
                 panda_current_position[0] - ur16e_current_position[0],
                 0.0,
-                panda_current_position[2] - (ur16e_current_position[2] - self.ur16_gripper_offset)
+                panda_current_position[2] - self.world_ur16e_gripper_offset.pose.position.z
                 ])
             
             center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_current_position_y
@@ -440,6 +446,9 @@ class ur_admittance_controller():
         
         # print("self.wrist_link_3_rot_axis")
         # print(self.wrist_link_3_rot_axis)
+
+        # Set the trajectory velocity for an object rotation to zero
+        self.world_trajectory_velocity = [0.0,0.0,0.0]
     
     def wrench_callback(self,wrench_ext):
         """ 
