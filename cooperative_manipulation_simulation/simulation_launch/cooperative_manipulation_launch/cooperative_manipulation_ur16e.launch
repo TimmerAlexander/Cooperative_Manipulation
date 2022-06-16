@@ -4,7 +4,7 @@
 
   <!-- Set Universal Robot arguments -->
   <!--initial_pose(translation and rotation) of base-->
-  <arg name="ur_base_trans" default="'-1 0 0'"/>
+  <arg name="ur_base_trans" default="'-1 0 0.1'"/>
   <arg name="ur_base_rot" default="'0 0 -1.57'"/>
   <arg name="load_gripper" default="true"/>
   <arg name="debug" default="false" />

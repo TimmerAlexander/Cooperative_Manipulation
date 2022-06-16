@@ -11,8 +11,8 @@
   <arg name="panda_base_rot" default="'0 0 3.14'"/>
     
   <!--arg with suffix tf for static_transform_publisher node, args without suffix "tf" fit for urdf files, also important for the correct pose in rviz-->
-  <arg name="panda_base_trans_tf" default="1 0 0"/>
-  <arg name="panda_base_rot_tf" default="0 0 1 0"/>
+  <arg name="panda_base_trans_tf" default="0.75  0 0"/>
+  <arg name="panda_base_rot_tf" default="0 0 3.14 0"/>
     
   <!-- Load Gripper -->
   <arg name="load_gripper" default="true"/> 
