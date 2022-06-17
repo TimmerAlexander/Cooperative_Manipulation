@@ -55,6 +55,11 @@ class ur_admittance_controller():
         self.world_z_vector = numpy.array([0.0,0.0,1.0])
         self.wrist_link_3_rot_axis = numpy.array([0.0,0.0,0.0])
         self.wrist_link_3_desired_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        # Declare the wrench variables
+        self.wrench_ext_filtered = WrenchStamped()
+        self.wrench_difference = WrenchStamped()        
+        self.wrench_ext_filtered_trans_array = numpy.array([])
+        self.wrench_ext_filtered_rot_array = numpy.array([])
         # Wrench filter (force and torque) treshold (when not cooperative_manipulation: 0.05 - 0.1(cmd_vel: 0.8 or higher))
         self.wrench_force_filter = 0.1
         self.wrench_torque_filter = 0.02
@@ -105,8 +110,8 @@ class ur_admittance_controller():
         self.shutdown_joint_velocity.data = [0.0,0.0,0.0,0.0,0.0,0.0]
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
-        # The offset of the object to the 'wirst_3_link' frame
-        self.ur16e_gripper_offset = 0.16155
+        # The gripper offset
+        self.ur16e_gripper_offset = 0.16163
 
         
         
@@ -120,8 +125,24 @@ class ur_admittance_controller():
         # * Initialize on_shutdown clean up
         rospy.on_shutdown(self.shutdown)
 
-        # * Get namespace for topics from launch file
-        self.namespace = rospy.get_param("~ur_ns")
+        # * Initialize tf TransformBroadcaster
+        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
+        # * Initialize tf TransformListener
+        self.tf_listener = tf.TransformListener()
+        rospy.loginfo("Wait for transformation 'wrist_3_link' to 'base_link'.")
+        self.tf_listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'world' to 'wrist_3_link'.")
+        self.tf_listener.waitForTransform("world","wrist_3_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'world' to 'base_link'.")
+        self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
+        
+        # Initialize the 'ur16e_gripper' frame in tf tree
+        self.set_gripper_offset()
+        # Wait for transformations from 'world' to 'ur16e_gripper' and 'world' to 'panda_gripper'
+        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
+        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'world' to '/panda/panda_link8'.")
+        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
         
         # * Initialize move_it
         group_name = 'manipulator'
@@ -129,24 +150,15 @@ class ur_admittance_controller():
         self.group = moveit_commander.MoveGroupCommander(group_name)
         
         # * Initialize publisher:
+        # Get namespace for topics from launch file
+        self.namespace = rospy.get_param("~ur_ns")
+        
         # Publish final joint velocity to "/ur/ur_admittance_controller/command"
         self.joint_velocity_pub = rospy.Publisher(
             "/" + self.namespace + "/ur_admittance_controller/command",
             Float64MultiArray,
             queue_size=1)
         
-        # Publish final joint velocity to "/ur/ur_admittance_controller/command"
-        self.wrench_filter_pub = rospy.Publisher(
-            "/" + self.namespace + "/ur_admittance_controller/wrench_filter",
-            WrenchStamped,
-            queue_size=1)
-
-
-        # Declare the wrench variables
-        self.wrench_ext_filtered = WrenchStamped()
-        self.wrench_difference = WrenchStamped()        
-        self.wrench_ext_filtered_trans_array = numpy.array([])
-        self.wrench_ext_filtered_rot_array = numpy.array([])
         
         # * Initialize subscriber:
         # Subscriber to "/ur/wrench"
@@ -161,33 +173,98 @@ class ur_admittance_controller():
             Twist,
             self.cartesian_velocity_command_callback,queue_size=1)
         
-        # * Initialize tf TransformBroadcaster
-        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
-        # * Initialize tf TransformListener
-        self.tf_listener = tf.TransformListener()
-        self.tf_listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'wrist_3_link' to 'base_link'.")
-        self.tf_listener.waitForTransform("world","wrist_3_link", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'world' to 'wrist_3_link'.")
-        self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'world' to 'base_link'.")
-        
-        self.set_gripper_offset()
-
-        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Waited for transformation 'world' to '/panda/panda_link8'.")
 
         # Wait for messages to be populated before proceeding
         rospy.wait_for_message("/" + self.namespace + "/ft_sensor/raw",WrenchStamped,timeout=5.0)
-
-        rospy.loginfo("Recieved messages; Launch ur16e Admittance control.")
+        rospy.loginfo("Recieved force/torque message.")
+        rospy.loginfo("Launch controller.")
         
-
         # * Run control_thread
         self.control_thread()
         
         rospy.spin()
-    
+        
+    def control_thread(self):
+        """ 
+            This thread calculates and publishes the target joint velocity using and admittance controller.
+        """
+        rate = rospy.Rate(self.publish_rate)
+        while not rospy.is_shutdown():
+            # Update the 'ur16e_gripper' frame
+            self.set_gripper_offset()
+            # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
+            self.admittance_velocity[0] = numpy.sign(self.wrench_ext_filtered.wrench.force.x) * (numpy.abs(self.wrench_ext_filtered.wrench.force.x) * pow((self.P_trans_x * (numpy.abs(self.wrench_ext_filtered.wrench.force.x)/self.publish_rate) + self.D_trans_x),-1))
+            self.admittance_velocity[1] = numpy.sign(self.wrench_ext_filtered.wrench.force.y) * (numpy.abs(self.wrench_ext_filtered.wrench.force.y) * pow((self.P_trans_y * (numpy.abs(self.wrench_ext_filtered.wrench.force.y)/self.publish_rate) + self.D_trans_y),-1))         
+            self.admittance_velocity[2] = numpy.sign(self.wrench_ext_filtered.wrench.force.z) * (numpy.abs(self.wrench_ext_filtered.wrench.force.z) * pow((self.P_trans_z * (numpy.abs(self.wrench_ext_filtered.wrench.force.z)/self.publish_rate) + self.D_trans_z),-1))     
+            self.admittance_velocity[3] = numpy.sign(self.wrench_ext_filtered.wrench.torque.x) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.x) * pow((self.P_rot_x * (numpy.abs(self.wrench_ext_filtered.wrench.torque.x)/self.publish_rate) + self.D_rot_x),-1))    
+            self.admittance_velocity[4] = numpy.sign(self.wrench_ext_filtered.wrench.torque.y) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.y) * pow((self.P_rot_y * (numpy.abs(self.wrench_ext_filtered.wrench.torque.y)/self.publish_rate) + self.D_rot_y),-1))
+            self.admittance_velocity[5] = numpy.sign(self.wrench_ext_filtered.wrench.torque.z) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.z) * pow((self.P_rot_z * (numpy.abs(self.wrench_ext_filtered.wrench.torque.z)/self.publish_rate) + self.D_rot_z),-1))
+            self.admittance_velocity_transformed = self.transform_velocity(self.admittance_velocity)
+            
+            # print("self.admittance_velocity_transformed")
+            # print(self.admittance_velocity_transformed)
+            
+            # print("self.base_link_desired_velocity")
+            # print(self.base_link_desired_velocity)
+            
+            # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
+            self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity_transformed[0]
+            self.target_cartesian_velocity[1] = self.base_link_desired_velocity[1] + self.admittance_velocity_transformed[1]
+            self.target_cartesian_velocity[2] = self.base_link_desired_velocity[2] + self.admittance_velocity_transformed[2]
+            self.target_cartesian_velocity[3] = self.base_link_desired_velocity[3] + self.admittance_velocity_transformed[3]
+            self.target_cartesian_velocity[4] = self.base_link_desired_velocity[4] + self.admittance_velocity_transformed[4]
+            self.target_cartesian_velocity[5] = self.base_link_desired_velocity[5] + self.admittance_velocity_transformed[5]
+
+            # print("target_cartesian_velocity: befor check for limits")
+            # print(self.target_cartesian_velocity)
+
+
+
+            # * Check self.target_cartesian_velocity for the min/max velocity limits
+            # Calculate the norm of target_cartesian_velocity (trans and rot)
+            target_cartesian_trans_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[0],2) + pow(self.target_cartesian_velocity[1],2) + pow(self.target_cartesian_velocity[2],2))
+            target_cartesian_rot_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[3],2) + pow(self.target_cartesian_velocity[4],2) + pow(self.target_cartesian_velocity[5],2))
+            
+
+            # print("target_cartesian_rot_velocity_norm")
+            # print(target_cartesian_rot_velocity_norm)
+
+            #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
+            if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
+                for i in range(3):
+                    self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
+                    
+            if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
+                for i in range(3,6):
+                    self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
+            
+            # Check for cartesian velocity min limit and set to null, if min limit is understeps
+            if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
+                for i in range(3):
+                    self.target_cartesian_velocity[i] = 0.0
+            
+            if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
+                for i in range(3,6):
+                    self.target_cartesian_velocity[i] = 0.0
+            
+            # print("target_cartesian_velocity: after check for limits")
+            # print(self.target_cartesian_velocity)
+            
+            
+            # * Get the current joint states 
+            self.current_joint_states_array = self.group.get_current_joint_values() 
+            # * Calculate the jacobian-matrix
+            self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array) 
+            # * Calculate the inverse of the jacobian-matrix
+            self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
+            # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
+            self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
+            # * Publish the target_joint_velocity
+            self.joint_velocity_pub.publish(self.target_joint_velocity)
+            
+            # * Sleep for publish_rate
+            rate.sleep()
+
     def set_gripper_offset(self):
         """
             Set the gripper offset from 'wirst_3_link' frame.
@@ -258,28 +335,11 @@ class ur_admittance_controller():
                 panda_gripper_position[2] - ur16e_gripper_position[2],
             ])
             
-            # print(" self.robot_distance_x: y,z")
-            # print( self.robot_distance_x)
-        
             center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_gripper_position
             world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-            
-            # print("world_desired_rotation_x")
-            # print(world_desired_rotation_x)
-            
             world_radius_x = ur16e_current_position_x - center_x
-            
-            # print("world_radius_x")
-            # print(world_radius_x)
-            
             self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
-            
-            # print("self.world_trajectory_velocity")
-            # print(self.world_trajectory_velocity)
-            
-            
-            
             
         # Object rotation around y axis 
         if desired_velocity.angular.y != 0.0: 
@@ -296,27 +356,11 @@ class ur_admittance_controller():
                 ])
             
             center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
-            
-            
-
             world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-            
-            # print("world_desired_rotation_y")
-            # print(world_desired_rotation_y)
-        
             world_radius_y = ur16e_current_position_y - center_y
-            
-            
-            # print("world_radius_y")
-            # print(world_radius_y)
-            
             self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
-            
-            # print("self.world_trajectory_velocity")
-            # print(self.world_trajectory_velocity)
-            
-            
+
         # Object rotation around z axis 
         if desired_velocity.angular.z != 0.0:
             ur16e_current_position_z = numpy.array([
@@ -331,14 +375,13 @@ class ur_admittance_controller():
                 0.0,
                 ])
             
+            
             center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
             world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
             world_radius_z = ur16e_current_position_z - center_z
             self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z 
-            
-            # print("self.world_trajectory_velocity")
-            # print(self.world_trajectory_velocity)
+
 
 
         # Transform the velcoities from 'world' frame to 'base_link' frame
@@ -371,6 +414,7 @@ class ur_admittance_controller():
             self.base_link_cartesian_desired_velocity_rot.vector.y,
             self.base_link_cartesian_desired_velocity_rot.vector.z
             ]
+        
 
         self.world_desired_velocity = [
             self.world_cartesian_velocity_trans.vector.x,
@@ -379,7 +423,6 @@ class ur_admittance_controller():
             ]
         
 
-        
         # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
         self.wrist_link_3_cartesian_desired_velocity_trans = self.tf_listener.transformVector3('wrist_3_link',self.world_cartesian_velocity_trans)
         
@@ -556,7 +599,7 @@ class ur_admittance_controller():
             
         # print("self.wrench_ext_filtered")
         # print(self.wrench_ext_filtered)
-        self.wrench_filter_pub.publish(self.wrench_ext_filtered) 
+
     
     
     def transform_velocity(self,cartesian_velocity: numpy.array):
@@ -598,104 +641,7 @@ class ur_admittance_controller():
         
         return self.velocity_transformed
 
-    def control_thread(self):
-        """ 
-            This thread calculates and publishes the target joint velocity using and admittance controller.
-        """
-        rate = rospy.Rate(self.publish_rate)
-        while not rospy.is_shutdown():
 
-            self.set_gripper_offset()
-
-            # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
-            self.admittance_velocity[0] = numpy.sign(self.wrench_ext_filtered.wrench.force.x) * (numpy.abs(self.wrench_ext_filtered.wrench.force.x) * pow((self.P_trans_x * (numpy.abs(self.wrench_ext_filtered.wrench.force.x)/self.publish_rate) + self.D_trans_x),-1))
-            
-            self.admittance_velocity[1] = numpy.sign(self.wrench_ext_filtered.wrench.force.y) * (numpy.abs(self.wrench_ext_filtered.wrench.force.y) * pow((self.P_trans_y * (numpy.abs(self.wrench_ext_filtered.wrench.force.y)/self.publish_rate) + self.D_trans_y),-1))         
-            
-            self.admittance_velocity[2] = numpy.sign(self.wrench_ext_filtered.wrench.force.z) * (numpy.abs(self.wrench_ext_filtered.wrench.force.z) * pow((self.P_trans_z * (numpy.abs(self.wrench_ext_filtered.wrench.force.z)/self.publish_rate) + self.D_trans_z),-1))     
-            
-            self.admittance_velocity[3] = numpy.sign(self.wrench_ext_filtered.wrench.torque.x) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.x) * pow((self.P_rot_x * (numpy.abs(self.wrench_ext_filtered.wrench.torque.x)/self.publish_rate) + self.D_rot_x),-1))    
-                                                                                
-            self.admittance_velocity[4] = numpy.sign(self.wrench_ext_filtered.wrench.torque.y) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.y) * pow((self.P_rot_y * (numpy.abs(self.wrench_ext_filtered.wrench.torque.y)/self.publish_rate) + self.D_rot_y),-1))
-            
-            self.admittance_velocity[5] = numpy.sign(self.wrench_ext_filtered.wrench.torque.z) * (numpy.abs(self.wrench_ext_filtered.wrench.torque.z) * pow((self.P_rot_z * (numpy.abs(self.wrench_ext_filtered.wrench.torque.z)/self.publish_rate) + self.D_rot_z),-1))
-            
-            self.admittance_velocity_transformed = self.transform_velocity(self.admittance_velocity)
-            
-            # print("self.admittance_velocity_transformed")
-            # print(self.admittance_velocity_transformed)
-            
-            # print("self.base_link_desired_velocity")
-            # print(self.base_link_desired_velocity)
-            
-            # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
-            self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity_transformed[0]
-            self.target_cartesian_velocity[1] = self.base_link_desired_velocity[1] + self.admittance_velocity_transformed[1]
-            self.target_cartesian_velocity[2] = self.base_link_desired_velocity[2] + self.admittance_velocity_transformed[2]
-            self.target_cartesian_velocity[3] = self.base_link_desired_velocity[3] + self.admittance_velocity_transformed[3]
-            self.target_cartesian_velocity[4] = self.base_link_desired_velocity[4] + self.admittance_velocity_transformed[4]
-            self.target_cartesian_velocity[5] = self.base_link_desired_velocity[5] + self.admittance_velocity_transformed[5]
-
-            # print("target_cartesian_velocity: befor check for limits")
-            # print(self.target_cartesian_velocity)
-
-
-
-            # * Check self.target_cartesian_velocity for the min/max velocity limits
-            # Calculate the norm of target_cartesian_velocity (trans and rot)
-            target_cartesian_trans_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[0],2) + pow(self.target_cartesian_velocity[1],2) + pow(self.target_cartesian_velocity[2],2))
-            
-            target_cartesian_rot_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[3],2) + pow(self.target_cartesian_velocity[4],2) + pow(self.target_cartesian_velocity[5],2))
-            
-
-            # print("target_cartesian_rot_velocity_norm")
-            # print(target_cartesian_rot_velocity_norm)
-
-            #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
-            if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
-                for i in range(3):
-                    self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
-                    
-            if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
-                for i in range(3,6):
-                    self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
-            
-            # Check for cartesian velocity min limit and set to null, if min limit is understeps
-            if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
-                for i in range(3):
-                    self.target_cartesian_velocity[i] = 0.0
-            
-            if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
-                for i in range(3,6):
-                    self.target_cartesian_velocity[i] = 0.0
-            
-            # print("target_cartesian_velocity: after check for limits")
-            # print(self.target_cartesian_velocity)
-            
-            
-            # * Get the current joint states 
-            self.current_joint_states_array = self.group.get_current_joint_values() 
-            
-            #print("self.current_joint_states_array: ")
-            #print(self.current_joint_states_array)
-            
-            # * Calculate the jacobian-matrix
-            self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array) 
-            
-            # * Calculate the inverse of the jacobian-matrix
-            self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
-
-            # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
-            self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
-            
-            # print("ur16e_admittance_velocity: ")
-            # print(self.target_joint_velocity)
-            
-            # * Publish the target_joint_velocity
-            self.joint_velocity_pub.publish(self.target_joint_velocity)
-            
-            # * Sleep for publish_rate
-            rate.sleep()
 
     def shutdown(self):
         """ 

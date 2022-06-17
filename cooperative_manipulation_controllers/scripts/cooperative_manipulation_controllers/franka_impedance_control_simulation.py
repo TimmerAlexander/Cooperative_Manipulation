@@ -52,9 +52,9 @@ class franka_impedance_controller():
         self.P_trans_x = 50.
         self.P_trans_y = 50.
         self.P_trans_z = 50.
-        self.P_rot_x = 50.
-        self.P_rot_y = 50.
-        self.P_rot_z = 50.
+        self.P_rot_x = 25.
+        self.P_rot_y = 25.
+        self.P_rot_z = 25.
         # Damping gains
         self.D_trans_x = 10.
         self.D_trans_y = 10.
@@ -103,7 +103,7 @@ class franka_impedance_controller():
         self.wrench_torque_velocity_transformed = numpy.array([0.0,0.0,0.0,])
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
-        # The offset of the object to the 'panda/panda_link8' frame        
+        # The gripper offset     
         self.panda_gripper_offset = 0.10655
 
         
@@ -113,27 +113,47 @@ class franka_impedance_controller():
 
         # * Initialize node
         rospy.init_node("ts_control_sim_only")
+
+        # * Initialize on_shutdown clean up
+        rospy.on_shutdown(self._on_shutdown)
         
         # * Initialize tf TransformBroadcaster
         self.brodacaster = tf2_ros.StaticTransformBroadcaster()
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
+        # Wait for transformations in tf tree
+        rospy.loginfo("Wait for transformation 'panda/panda_link8' to 'world'.")
         self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'panda/panda_link8' to 'world'.")
+        rospy.loginfo("Wait for transformation 'panda/base' to 'panda/panda_link8'.")
         self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'panda/base' to 'panda/panda_link8'.")
+        rospy.loginfo("Wait for transformation 'world' to 'base_link'.")
         self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Waited for transformation 'world' to 'base_link'.")
-
+        # Initialize the 'padna/panda_gripper' frame in tf tree
         self.set_gripper_offset()
-
+        # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
+        rospy.loginfo("Wait for transformation 'world' to '/panda/panda_link8'.")
+        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
         self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Waited for transformation 'world' to 'ur16e_gripper'.")
+        
+        
+        # * Initialize publisher:
+        # Also create a publisher to publish joint commands
+        self.joint_command_publisher = rospy.Publisher(
+                'panda_simulator/motion_controller/arm/joint_commands',
+                JointCommand,
+                tcp_nodelay=True,
+                queue_size=1)
+        
 
-
-
-        # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
+        self.cartesian_msg_sub = rospy.Subscriber(
+            '/cooperative_manipulation/cartesian_velocity_command', 
+            Twist, 
+            self.cartesian_msg_callback,
+            queue_size=1,
+            tcp_nodelay=True)
+        # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         self.cartesian_state_sub = rospy.Subscriber(
             'panda_simulator/custom_franka_state_controller/tip_state',
             EndPointState,
@@ -148,40 +168,22 @@ class franka_impedance_controller():
             queue_size=1,
             tcp_nodelay=True)
         
-        self.cartesian_msg_sub = rospy.Subscriber(
-            '/cooperative_manipulation/cartesian_velocity_command', 
-            Twist, 
-            self.cartesian_msg_callback,
-            queue_size=1,
-            tcp_nodelay=True)
-        
-        self.wrench_msg_sub = rospy.Subscriber(
-            '/gazebo/robot/wrist/ft', 
-            WrenchStamped, 
-            self.wrench_msg_callback,
-            queue_size=1,
-            tcp_nodelay=True)
-        
-        # * Initialize publisher:
-        # Also create a publisher to publish joint commands
-        self.joint_command_publisher = rospy.Publisher(
-                'panda_simulator/motion_controller/arm/joint_commands',
-                JointCommand,
-                tcp_nodelay=True,
-                queue_size=1)
-        
-
         # Wait for messages to be populated before proceeding
         rospy.loginfo("Subscribing to robot state topics...")
         while (True):
             if not (self.JACOBIAN is None or self.CARTESIAN_POSE is None):
                 print(self.JACOBIAN,self.CARTESIAN_POSE)
                 break
-        rospy.loginfo("Recieved messages; Launch Franka Impedance Control.")
-        
-        # * Initialize on_shutdown clean up
-        rospy.on_shutdown(self._on_shutdown)
-        
+        rospy.loginfo("Recieved robot state messages.")
+
+        self.wrench_msg_sub = rospy.Subscriber(
+            '/gazebo/robot/wrist/ft', 
+            WrenchStamped, 
+            self.wrench_msg_callback,
+            queue_size=1,
+            tcp_nodelay=True)
+        rospy.loginfo("Recieved force/torque message.")
+
         # * Get start position and orientation
         start_pose = copy.deepcopy(self.CARTESIAN_POSE)
         start_pos, start_ori = start_pose['position'],start_pose['orientation']
@@ -196,30 +198,12 @@ class franka_impedance_controller():
         self.D_trans = numpy.array([self.D_trans_x,self.D_trans_y,self.D_trans_z]).reshape([3,1])
         self.D_rot = numpy.array([self.D_rot_x,self.D_rot_y,self.D_rot_z]).reshape([3,1])
 
-        
+        rospy.loginfo("Launch controller.")
         # * Run controller thread
         self.control_thread()
         
         rospy.spin()    
     
-    def set_gripper_offset(self):
-        """
-            Set the gripper offset from 'panda/panda_link8' frame.
-        """
-        static_gripper_offset = TransformStamped()
-        static_gripper_offset.header.stamp = rospy.Time.now()
-        static_gripper_offset.header.frame_id = "/panda/panda_link8"
-        static_gripper_offset.child_frame_id = "panda/panda_gripper"
-        static_gripper_offset.transform.translation.x = 0.0
-        static_gripper_offset.transform.translation.y = 0.0
-        static_gripper_offset.transform.translation.z = self.panda_gripper_offset
-        static_gripper_offset.transform.rotation.x = 0.0
-        static_gripper_offset.transform.rotation.y = 0.0
-        static_gripper_offset.transform.rotation.z =  -0.924
-        static_gripper_offset.transform.rotation.w =  0.383
-
-        self.brodacaster.sendTransform(static_gripper_offset)
-
     def control_thread(self):
         """
             Actual control loop. Uses goal pose from the feedback thread
@@ -233,6 +217,7 @@ class franka_impedance_controller():
         movement_ori = numpy.array([None])
         
         while not rospy.is_shutdown():
+            # Update the 'panda/panda_gripper' frame
             self.set_gripper_offset()
             # Get current position and orientation 
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
@@ -240,71 +225,64 @@ class franka_impedance_controller():
             # Get current linear and angular velocity
             current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
             current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
-            
-            # print("current_vel_trans")
-            # print(numpy.linalg.norm(current_vel_trans))
-
-            
             # * Check self.target_cartesian_trans_velocity and self.target_cartesian_trot_velocity for the min/max velocity limits
             # Calculate the norm of target_cartesian_velocity (trans and rot)
             target_cartesian_trans_velocity_norm = numpy.linalg.norm(self.desired_velocity_trans_transformed)
-            target_cartesian_rot_velocity_norm = numpy.linalg.norm(self.desired_velocity_rot_transformed)
-                
+            target_cartesian_rot_velocity_norm = numpy.linalg.norm(self.desired_velocity_rot_transformed)  
             # Check whether the trans/rot velocity  limit has been exceeded. If the trans/rot velocity max limit has been exceeded, then normalize the velocity to the length of the velocity upper limit
             if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
                 for i in range(3):
-                    self.desired_velocity_trans_transformed[i] = (self.desired_velocity_trans_transformed[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
-                        
+                    self.desired_velocity_trans_transformed[i] = (self.desired_velocity_trans_transformed[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit   
             if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = (self.desired_velocity_rot_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
-                    
-                
             # Check whether the velocity limit has been undershot. If the velocity  has fallen below the min velocity limit, then set the velocity  to zero
             if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
                 for i in range(3):
-                    self.desired_velocity_trans_transformed[i] = 0.0
-                
+                    self.desired_velocity_trans_transformed[i] = 0.0 
             if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
-                    
-                    
             # Calculate the translational and rotation movement
             movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
             movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
-           
-            
-            
             # Add the movement to current pose and orientation
             self.goal_pos = (self.goal_pos + movement_trans)
             self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
             # Calculate position and orientation difference
             self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
             self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
-            
-            
-            
             # Calculate linear and angular velocity difference
             self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans + numpy.array(self.wrench_force_velocity_transformed).reshape([3,1])
             self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot + numpy.array(self.wrench_torque_velocity_transformed).reshape([3,1])
-            
-            # print("self.delta_angular")
-            # print(self.delta_angular)
-            
             # Desired task-space force using PD law
             F = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)]) + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
-
             J = copy.deepcopy(self.JACOBIAN)
-            
             # joint torques to be commanded
             tau = numpy.dot(J.T,F)
-            
             # publish joint commands
             self.command_msg.effort = tau.flatten()
             self.joint_command_publisher.publish(self.command_msg)
             rate.sleep()
-                        
+
+    def set_gripper_offset(self):
+        """
+            Set the gripper offset from 'panda/panda_link8' frame.
+        """
+        static_gripper_offset = TransformStamped()
+        static_gripper_offset.header.stamp = rospy.Time.now()
+        static_gripper_offset.header.frame_id = "/panda/panda_link8"
+        static_gripper_offset.child_frame_id = "panda/panda_gripper"
+        static_gripper_offset.transform.translation.x = 0.0
+        static_gripper_offset.transform.translation.y = 0.0
+        static_gripper_offset.transform.translation.z = self.panda_gripper_offset
+        static_gripper_offset.transform.rotation.x = 0.0
+        static_gripper_offset.transform.rotation.y = 0.0
+        static_gripper_offset.transform.rotation.z = -0.924
+        static_gripper_offset.transform.rotation.w = 0.383
+
+        self.brodacaster.sendTransform(static_gripper_offset)
+
     def _on_robot_state(self,msg):
         """
             Callback function for updating jacobian and EE velocity from robot state.
@@ -381,35 +359,17 @@ class franka_impedance_controller():
                 panda_current_position[2]
                 ])
 
-            # print("panda_current_position_x")
-            # print(panda_current_position_x)
-
             self.robot_distance_x = numpy.array([
                 0.0,
                 ur16e_gripper_position[1] - panda_gripper_position[1],
                 ur16e_gripper_position[2] - panda_gripper_position[2],
             ])
             
-            # print(" self.robot_distance_x: y,z")
-            # print( self.robot_distance_x)
-        
             center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_gripper_position
             world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-            
-            # print("world_desired_rotation_x")
-            # print(world_desired_rotation_x)
-            
             world_radius_x = panda_current_position_x - center_x
-            
-            # print("world_radius_x")
-            # print(world_radius_x)
-            
             self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
-            
-            # print("self.world_trajectory_velocity")
-            # print(self.world_trajectory_velocity)
-            
             
         # Object rotation around y axis 
         if desired_velocity.angular.y != 0.0: 
@@ -452,7 +412,6 @@ class franka_impedance_controller():
             world_radius_z = panda_current_position_z - center_z
             self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
-
 
 
         # Transform the velcoities from 'world' frame to 'panda/panda_link8' frame
@@ -585,13 +544,11 @@ class franka_impedance_controller():
         """
             Convert Euler angles to a quaternion.
             
-            Inuput
-                :param alpha: Rotation around x-axis) angle in radians.
-                :param beta: The beta (rotation around y-axis) angle in radians.
-                :param gamma: The gamma (rotation around z-axis) angle in radians.
+            Args:
+                euler_array (numpy.array):  Array with euler angles
             
-            Output
-                :return quaternion_from_euler: The orientation in quaternion 
+            Returns:
+                numpy.quaternion: Quaternion_from_euler: The orientation in quaternion 
         """
         alpha, beta, gamma = euler_array
 
@@ -638,12 +595,12 @@ class franka_impedance_controller():
         Returns:
             numpy.quaternion: Sum of both quaternions
         """
-        # Extract the values from Q0
+        # Extract the values from quat_0
         w_0 = quat_0.w
         x_0 = quat_0.x
         y_0 = quat_0.y
         z_0 = quat_0.z
-        # Extract the values from Q1
+        # Extract the values from quat_1
         w_1 = quat_1.w
         x_1 = quat_1.x
         y_1 = quat_1.y
