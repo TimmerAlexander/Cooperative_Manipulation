@@ -32,7 +32,7 @@
     Impedance controller
     
     Input: 
-    * Desired cartesian velocity of the EE: desired_velocity (In 'panda/world' frame)
+    * Desired cartesian velocity of the EE: desired_velocity (In 'world' frame)
     
     Output: 
     * Joint effort: self.command_msg.effort (Franka joints)
@@ -75,7 +75,7 @@ class franka_impedance_controller():
         self.cartesian_velocity_trans_min_limit = 0.001
         self.cartesian_velocity_trans_max_limit = 0.1
         self.cartesian_velocity_rot_min_limit = 0.001
-        self.cartesian_velocity_rot_max_limit = 0.01
+        self.cartesian_velocity_rot_max_limit = 0.1
         # Control thread publish rate
         self.publish_rate = 100 # [Hz]
         # Declare librarys for jacobian matrix, cartesian pose and velocity
@@ -106,7 +106,6 @@ class franka_impedance_controller():
         
         
     def __init__(self):
-        
         # * Load config parameters
         self.config()
 
@@ -115,7 +114,7 @@ class franka_impedance_controller():
         
         # * Initialize tf TransformListener
         self.listener = tf.TransformListener()
-        self.listener.waitForTransform("panda/panda_link8","panda/world", rospy.Time(), rospy.Duration(4.0))
+        self.listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(4.0))
         self.listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(4.0))
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
@@ -205,8 +204,8 @@ class franka_impedance_controller():
             current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
             current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
             
-            print("current_vel_trans")
-            print(current_vel_trans)
+            # print("current_vel_rot ")
+            # print(current_vel_rot )
             
 
             # * Check self.target_cartesian_trans_velocity and self.target_cartesian_trot_velocity for the min/max velocity limits
@@ -214,6 +213,9 @@ class franka_impedance_controller():
             target_cartesian_trans_velocity_norm = numpy.linalg.norm(self.desired_velocity_trans_transformed)
             target_cartesian_rot_velocity_norm = numpy.linalg.norm(self.desired_velocity_rot_transformed)
                 
+            # print("numpy.linalg.norm(self.desired_velocity_trans_transformed)")
+            # print(numpy.linalg.norm(self.desired_velocity_trans_transformed))
+
             # Check whether the trans/rot velocity  limit has been exceeded. If the trans/rot velocity max limit has been exceeded, then normalize the velocity to the length of the velocity upper limit
             if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
                 for i in range(3):
@@ -233,13 +235,12 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
                     
-                    
+            test = numpy.array([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+
             # Calculate the translational and rotation movement
             movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-            
-            movement_ori = quaternion.from_euler_angles(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))  
-            
-            
+            movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
+
             # Add the movement to current pose and orientation
             self.goal_pos = (self.goal_pos + movement_trans)
             self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
@@ -296,7 +297,7 @@ class franka_impedance_controller():
         
     def cartesian_msg_callback(self,desired_velocity):
         """
-            Get the cartesian velocity command and transform it from the 'panda/world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
+            Get the cartesian velocity command and transform it from the 'world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
             
             rostopic pub -r 10 /cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
             x: 0.0
@@ -316,26 +317,33 @@ class franka_impedance_controller():
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
         # Converse cartesian_velocity translation to vector3
-        world_cartesian_velocity_trans.header.frame_id = 'panda/world'
+        world_cartesian_velocity_trans.header.frame_id = 'world'
         world_cartesian_velocity_trans.header.stamp = now
         world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x
         world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y
         world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z
             
-        # Transform cartesian_velocity translation from 'panda/world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8
+        # Transform cartesian_velocity translation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8
         base_cartesian_velocity_trans = self.listener.transformVector3('panda/base',world_cartesian_velocity_trans)
             
         # Converse cartesian_velocity rotation to vector3
-        world_cartesian_velocity_rot.header.frame_id = 'panda/world'
+        world_cartesian_velocity_rot.header.frame_id = 'world'
         world_cartesian_velocity_rot.header.stamp = now
         world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
         world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
         world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
             
-        # Transform cartesian_velocity rotation from 'panda/world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
-        base_cartesian_velocity_rot = self.listener.transformVector3('panda/base',world_cartesian_velocity_rot)
+        # print("world_cartesian_velocity_rot")
+        # print(world_cartesian_velocity_rot)
         
-            
+        # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
+        base_cartesian_velocity_rot = self.listener.transformVector3('panda/base',world_cartesian_velocity_rot)
+
+
+
+        # print("base_cartesian_velocity_rot")
+        # print(base_cartesian_velocity_rot)
+
         # Converse cartesian_velocity from vector3 to numpy.array
         self.desired_velocity_trans_transformed = [
             base_cartesian_velocity_trans.vector.x,
@@ -349,6 +357,7 @@ class franka_impedance_controller():
             base_cartesian_velocity_rot.vector.z,
             ] 
         
+
     def wrench_msg_callback(self,wrench_ext):
         """ 
             Get external wrench in panda_link7.
@@ -437,6 +446,31 @@ class franka_impedance_controller():
         # print(self.wrench_force_transformed)
         
         
+    def euler_to_quaternion(self,euler_array: numpy.array):
+        """
+            Convert Euler angles to a quaternion.
+            
+            Inuput
+                :param alpha: Rotation around x-axis) angle in radians.
+                :param beta: The beta (rotation around y-axis) angle in radians.
+                :param gamma: The gamma (rotation around z-axis) angle in radians.
+            
+            Output
+                :return quaternion_from_euler: The orientation in quaternion 
+        """
+        alpha, beta, gamma = euler_array
+
+        q_x = numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) - numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+        q_y = numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2)
+        q_z = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2) - numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2)
+        q_w = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+
+
+        quaternion_from_euler = numpy.quaternion(q_w,q_x,q_y,q_z)
+        
+        return quaternion_from_euler
+
+
     def quatdiff_in_euler(self,quat_curr: numpy.quaternion, quat_des: numpy.quaternion):
         """            
             Compute difference between quaternions and return 
@@ -464,7 +498,7 @@ class franka_impedance_controller():
             Add two quaternions and return the sum.
             
         Args:
-            quat_0 (numpy.quaternion): Firt quaternion
+            quat_0 (numpy.quaternion): First quaternion
             quat_1 (numpy.quaternion): Second quaternion
             
         Returns:
@@ -480,7 +514,7 @@ class franka_impedance_controller():
         x_1 = quat_1.x
         y_1 = quat_1.y
         z_1 = quat_1.z
-        # Computer the product of the two quaternions, term by term
+        # Compute the product of the two quaternions, term by term
         sum_w = w_0 * w_1 - x_0 * x_1 - y_0 * y_1 - z_0 * z_1
         sum_x = w_0 * x_1 + x_0 * w_1 + y_0 * z_1 - z_0 * y_1
         sum_y = w_0 * y_1 - x_0 * z_1 + y_0 * w_1 + z_0 * x_1
