@@ -114,6 +114,8 @@ class franka_impedance_controller():
         # * Initialize node
         rospy.init_node("ts_control_sim_only")
         
+        # * Initialize tf TransformBroadcaster
+        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
         self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(5.0))
@@ -204,25 +206,17 @@ class franka_impedance_controller():
         """
             Set the gripper offset from 'panda/panda_link8' frame.
         """
-        # * Initialize tf TransformBroadcaster
-        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
-
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
-        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
-
-
         static_gripper_offset = TransformStamped()
         static_gripper_offset.header.stamp = rospy.Time.now()
-        static_gripper_offset.header.frame_id = "world"
+        static_gripper_offset.header.frame_id = "/panda/panda_link8"
         static_gripper_offset.child_frame_id = "panda/panda_gripper"
-        static_gripper_offset.transform.translation.x = panda_current_position[0]
-        static_gripper_offset.transform.translation.y = panda_current_position[1]
-        static_gripper_offset.transform.translation.z = panda_current_position[2] - self.panda_gripper_offset
-        static_gripper_offset.transform.rotation.x = panda_current_quaternion[0]
-        static_gripper_offset.transform.rotation.y = panda_current_quaternion[1]
-        static_gripper_offset.transform.rotation.z = panda_current_quaternion[2]
-        static_gripper_offset.transform.rotation.w = panda_current_quaternion[3]
+        static_gripper_offset.transform.translation.x = 0.0
+        static_gripper_offset.transform.translation.y = 0.0
+        static_gripper_offset.transform.translation.z = self.panda_gripper_offset
+        static_gripper_offset.transform.rotation.x = 0.0
+        static_gripper_offset.transform.rotation.y = 0.0
+        static_gripper_offset.transform.rotation.z =  -0.924
+        static_gripper_offset.transform.rotation.w =  0.383
 
         self.brodacaster.sendTransform(static_gripper_offset)
 
@@ -239,6 +233,7 @@ class franka_impedance_controller():
         movement_ori = numpy.array([None])
         
         while not rospy.is_shutdown():
+            self.set_gripper_offset()
             # Get current position and orientation 
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
             curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
@@ -277,8 +272,8 @@ class franka_impedance_controller():
                     
             # Calculate the translational and rotation movement
             movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-            
-            movement_ori = quaternion.from_euler_angles(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))  
+            movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
+           
             
             
             # Add the movement to current pose and orientation
@@ -372,20 +367,11 @@ class franka_impedance_controller():
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
         ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
         ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
-        
-
-
-        
-
+    
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
-        
         # print("self.panda_current_position, self.panda_current_quaternion")
         # print(self.panda_position, self.panda_current_quaternion)
-
-
-
-        
 
         # Object rotation around x axis 
         if desired_velocity.angular.x != 0.0:
@@ -395,7 +381,9 @@ class franka_impedance_controller():
                 panda_current_position[2]
                 ])
 
-            
+            # print("panda_current_position_x")
+            # print(panda_current_position_x)
+
             self.robot_distance_x = numpy.array([
                 0.0,
                 ur16e_gripper_position[1] - panda_gripper_position[1],
@@ -406,7 +394,6 @@ class franka_impedance_controller():
             # print( self.robot_distance_x)
         
             center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_gripper_position
-            
             world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
             
             # print("world_desired_rotation_x")
@@ -420,10 +407,8 @@ class franka_impedance_controller():
             self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
             
-            print("self.world_trajectory_velocity")
-            print(self.world_trajectory_velocity)
-            
-            
+            # print("self.world_trajectory_velocity")
+            # print(self.world_trajectory_velocity)
             
             
         # Object rotation around y axis 
@@ -434,7 +419,6 @@ class franka_impedance_controller():
                 panda_current_position[2]
                 ]) 
 
-
             self.robot_distance_y = numpy.array([
                 ur16e_gripper_position[0] - panda_gripper_position[0],
                 0.0,
@@ -442,26 +426,12 @@ class franka_impedance_controller():
                 ])
             
             center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_gripper_position
-            
-            
-
             world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-            
-            print("world_desired_rotation_y")
-            print(world_desired_rotation_y)
-        
             world_radius_y = panda_current_position_y - center_y
-            
-            
-            print("world_radius_y")
-            print(world_radius_y)
-            
             self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
             
-            print("self.world_trajectory_velocity")
-            print(self.world_trajectory_velocity)
-            
+
             
         # Object rotation around z axis 
         if desired_velocity.angular.z != 0.0:
@@ -471,37 +441,21 @@ class franka_impedance_controller():
                 0.0,
                 ]) 
 
-
             self.robot_distance_z = numpy.array([
                 ur16e_gripper_position[0] - panda_gripper_position[0],
                 ur16e_gripper_position[1] - panda_gripper_position[1],
                 0.0,
                 ])
             
-            
             center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_gripper_position
-            
-            
-            
             world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-            
-            
-            print("world_desired_object_rotation_z")
-            print( world_desired_rotation_z)
-            
             world_radius_z = panda_current_position_z - center_z
-            
-            print("world_radius_z")
-            print(world_radius_z)
-            
             self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
-            print("self.world_trajectory_velocity")
-            print(self.world_trajectory_velocity)
+
 
 
         # Transform the velcoities from 'world' frame to 'panda/panda_link8' frame
-        
         # Get current time stamp
         now = rospy.Time()
         world_cartesian_velocity_trans  = Vector3Stamped()
@@ -526,7 +480,11 @@ class franka_impedance_controller():
         # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
         base_cartesian_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
         
-            
+        # print("world_cartesian_velocity_rot")
+        # print(world_cartesian_velocity_rot)
+
+        # print("ase_cartesian_velocity_rot")
+        # print(base_cartesian_velocity_rot )
         # Converse cartesian_velocity from vector3 to numpy.array
         self.desired_velocity_trans_transformed = [
             base_cartesian_velocity_trans.vector.x,
@@ -535,11 +493,13 @@ class franka_impedance_controller():
             ]
             
         self.desired_velocity_rot_transformed = [
-            -1 * base_cartesian_velocity_rot.vector.x,
+            base_cartesian_velocity_rot.vector.x,
             -1 * base_cartesian_velocity_rot.vector.y,
             -1 * base_cartesian_velocity_rot.vector.z,
             ] 
 
+        print("self.desired_velocity_rot_transformed")
+        print(self.desired_velocity_rot_transformed)
         # Set the trajectory velocity for an object rotation to zero
         self.world_trajectory_velocity = [0.0,0.0,0.0]
         
@@ -605,16 +565,7 @@ class franka_impedance_controller():
             base_wrench_torque.vector.z = base_wrench_torque.vector.z - numpy.sign(base_wrench_torque.vector.z) * self.wrench_filter_torque 
             
         
-        # Converse cartesian_velocity from vector3 to numpy.array and multipy the compliance gains
-        self.wrenc_transformed = [
-            base_wrench_force.vector.x * self.wrench_force_x,
-            base_wrench_force.vector.y * self.wrench_force_y,
-            base_wrench_force.vector.z * self.wrench_force_z,
-            base_wrench_torque.vector.x * self.wrench_torque_x,
-            base_wrench_torque.vector.y * self.wrench_torque_y,
-            base_wrench_torque.vector.z * self.wrench_torque_z,
-            ]
-            
+        # Converse cartesian_velocity from vector3 to numpy.array and multipy the compliance gains            
         self.wrench_force_velocity_transformed = [
             base_wrench_force.vector.x * self.wrench_force_x,
             base_wrench_force.vector.y * self.wrench_force_y,
@@ -630,7 +581,30 @@ class franka_impedance_controller():
         # print("self.wrench_force_velocity_transformed")
         # print(self.wrench_force_velocity_transformed)
         
+    def euler_to_quaternion(self,euler_array: numpy.array):
+        """
+            Convert Euler angles to a quaternion.
+            
+            Inuput
+                :param alpha: Rotation around x-axis) angle in radians.
+                :param beta: The beta (rotation around y-axis) angle in radians.
+                :param gamma: The gamma (rotation around z-axis) angle in radians.
+            
+            Output
+                :return quaternion_from_euler: The orientation in quaternion 
+        """
+        alpha, beta, gamma = euler_array
+
+        q_x = numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) - numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+        q_y = numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2)
+        q_z = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2) - numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2)
+        q_w = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+
+
+        quaternion_from_euler = numpy.quaternion(q_w,q_x,q_y,q_z)
         
+        return quaternion_from_euler
+
     def quatdiff_in_euler(self,quat_curr: numpy.quaternion, quat_des: numpy.quaternion):
         """            
             Compute difference between quaternions and return 

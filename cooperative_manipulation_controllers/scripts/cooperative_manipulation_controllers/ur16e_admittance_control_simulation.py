@@ -161,7 +161,8 @@ class ur_admittance_controller():
             Twist,
             self.cartesian_velocity_command_callback,queue_size=1)
         
-
+        # * Initialize tf TransformBroadcaster
+        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
         self.tf_listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(5.0))
@@ -191,24 +192,17 @@ class ur_admittance_controller():
         """
             Set the gripper offset from 'wirst_3_link' frame.
         """
-        # * Initialize tf TransformBroadcaster
-        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
-
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-        ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
-
         static_gripper_offset = TransformStamped()
         static_gripper_offset.header.stamp = rospy.Time.now()
-        static_gripper_offset.header.frame_id = "world"
+        static_gripper_offset.header.frame_id = "wrist_3_link"
         static_gripper_offset.child_frame_id = "ur16e_gripper"
-        static_gripper_offset.transform.translation.x = ur16e_current_position[0]
-        static_gripper_offset.transform.translation.y = ur16e_current_position[1]
-        static_gripper_offset.transform.translation.z = ur16e_current_position[2] - self.ur16e_gripper_offset
-        static_gripper_offset.transform.rotation.x = ur16e_current_quaternion[0]
-        static_gripper_offset.transform.rotation.y = ur16e_current_quaternion[1]
-        static_gripper_offset.transform.rotation.z = ur16e_current_quaternion[2]
-        static_gripper_offset.transform.rotation.w = ur16e_current_quaternion[3]
+        static_gripper_offset.transform.translation.x = 0.0
+        static_gripper_offset.transform.translation.y = 0.0
+        static_gripper_offset.transform.translation.z = self.ur16e_gripper_offset
+        static_gripper_offset.transform.rotation.x = 0.0
+        static_gripper_offset.transform.rotation.y = 0.0
+        static_gripper_offset.transform.rotation.z = 0.0
+        static_gripper_offset.transform.rotation.w = 1.0
 
         self.brodacaster.sendTransform(static_gripper_offset)
 
@@ -247,11 +241,8 @@ class ur_admittance_controller():
 
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
-        
         # print("self.panda_current_position, self.panda_current_quaternion")
         # print(self.panda_position, self.panda_current_quaternion)
-        print(ur16e_gripper_position)
-        print(panda_gripper_position)
         self.world_trajectory_velocity = [0.0,0.0,0.0]
         # Object rotation around x axis 
         if desired_velocity.angular.x != 0.0:
@@ -267,26 +258,25 @@ class ur_admittance_controller():
                 panda_gripper_position[2] - ur16e_gripper_position[2],
             ])
             
-            print(" self.robot_distance_x: y,z")
-            print( self.robot_distance_x)
+            # print(" self.robot_distance_x: y,z")
+            # print( self.robot_distance_x)
         
             center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_gripper_position
-            
             world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
             
-            print("world_desired_rotation_x")
-            print(world_desired_rotation_x)
+            # print("world_desired_rotation_x")
+            # print(world_desired_rotation_x)
             
             world_radius_x = ur16e_current_position_x - center_x
             
-            print("world_radius_x")
-            print(world_radius_x)
+            # print("world_radius_x")
+            # print(world_radius_x)
             
             self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
             
-            print("self.world_trajectory_velocity")
-            print(self.world_trajectory_velocity)
+            # print("self.world_trajectory_velocity")
+            # print(self.world_trajectory_velocity)
             
             
             
@@ -311,20 +301,20 @@ class ur_admittance_controller():
 
             world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
             
-            print("world_desired_rotation_y")
-            print(world_desired_rotation_y)
+            # print("world_desired_rotation_y")
+            # print(world_desired_rotation_y)
         
             world_radius_y = ur16e_current_position_y - center_y
             
             
-            print("world_radius_y")
-            print(world_radius_y)
+            # print("world_radius_y")
+            # print(world_radius_y)
             
             self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
             
-            print("self.world_trajectory_velocity")
-            print(self.world_trajectory_velocity)
+            # print("self.world_trajectory_velocity")
+            # print(self.world_trajectory_velocity)
             
             
         # Object rotation around z axis 
@@ -341,31 +331,17 @@ class ur_admittance_controller():
                 0.0,
                 ])
             
-            
             center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
-            
-            
-            
             world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-            
-            print("world_desired_object_rotation_z")
-            print(world_desired_rotation_z)
-            
             world_radius_z = ur16e_current_position_z - center_z
-            
-            print("world_radius_z")
-            print(world_radius_z)
-            
             self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z 
             
-            print("self.world_trajectory_velocity")
-            print(self.world_trajectory_velocity)
+            # print("self.world_trajectory_velocity")
+            # print(self.world_trajectory_velocity)
 
 
         # Transform the velcoities from 'world' frame to 'base_link' frame
-
-
         # Converse cartesian_velocity translation to vector3
         self.world_cartesian_velocity_trans.header.frame_id = 'world'
         self.world_cartesian_velocity_trans.header.stamp = now
@@ -395,9 +371,7 @@ class ur_admittance_controller():
             self.base_link_cartesian_desired_velocity_rot.vector.y,
             self.base_link_cartesian_desired_velocity_rot.vector.z
             ]
-        
 
-        
         self.world_desired_velocity = [
             self.world_cartesian_velocity_trans.vector.x,
             self.world_cartesian_velocity_trans.vector.y,
@@ -631,6 +605,7 @@ class ur_admittance_controller():
         rate = rospy.Rate(self.publish_rate)
         while not rospy.is_shutdown():
 
+            self.set_gripper_offset()
 
             # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
             self.admittance_velocity[0] = numpy.sign(self.wrench_ext_filtered.wrench.force.x) * (numpy.abs(self.wrench_ext_filtered.wrench.force.x) * pow((self.P_trans_x * (numpy.abs(self.wrench_ext_filtered.wrench.force.x)/self.publish_rate) + self.D_trans_x),-1))
