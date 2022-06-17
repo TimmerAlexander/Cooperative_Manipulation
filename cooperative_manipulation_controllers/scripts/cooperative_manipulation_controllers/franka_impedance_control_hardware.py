@@ -113,9 +113,9 @@ class franka_impedance_controller():
         rospy.init_node("ts_control_sim_only")
         
         # * Initialize tf TransformListener
-        self.listener = tf.TransformListener()
-        self.listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(4.0))
-        self.listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(4.0))
+        self.tf_listener = tf.TransformListener()
+        self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(4.0))
+        self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(4.0))
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
         self.cartesian_state_sub = rospy.Subscriber(
@@ -178,6 +178,7 @@ class franka_impedance_controller():
         self.P_rot = numpy.array([self.P_rot_x,self.P_rot_y,self.P_rot_z]).reshape([3,1])
         self.D_trans = numpy.array([self.D_trans_x,self.D_trans_y,self.D_trans_z]).reshape([3,1])
         self.D_rot = numpy.array([self.D_rot_x,self.D_rot_y,self.D_rot_z]).reshape([3,1])
+
 
         # * Run controller thread
         self.control_thread()
@@ -324,7 +325,7 @@ class franka_impedance_controller():
         world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z
             
         # Transform cartesian_velocity translation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8
-        base_cartesian_velocity_trans = self.listener.transformVector3('panda/base',world_cartesian_velocity_trans)
+        base_cartesian_velocity_trans = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_trans)
             
         # Converse cartesian_velocity rotation to vector3
         world_cartesian_velocity_rot.header.frame_id = 'world'
@@ -337,7 +338,7 @@ class franka_impedance_controller():
         # print(world_cartesian_velocity_rot)
         
         # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
-        base_cartesian_velocity_rot = self.listener.transformVector3('panda/base',world_cartesian_velocity_rot)
+        base_cartesian_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
 
 
 
@@ -378,7 +379,7 @@ class franka_impedance_controller():
         panda_link7_wrench_force.vector.z = wrench_ext.wrench.force.z
             
         # Transform cartesian_velocity translation from 'panda/panda_link7' frame to 'panda/panda_link8'
-        base_wrench_force = self.listener.transformVector3('panda/base',panda_link7_wrench_force)
+        base_wrench_force = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_force)
             
         # Converse cartesian_velocity rotation to vector3
         panda_link7_wrench_torque.header.frame_id = 'panda/panda_link7'
@@ -388,7 +389,7 @@ class franka_impedance_controller():
         panda_link7_wrench_torque.vector.z = wrench_ext.wrench.torque.z
             
         # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
-        base_wrench_torque = self.listener.transformVector3('panda/base',panda_link7_wrench_torque)
+        base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
             
         # * Band-passfilter
         if numpy.abs(base_wrench_force.vector.x) < self.wrench_filter_force:
