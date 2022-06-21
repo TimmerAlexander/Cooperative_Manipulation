@@ -90,7 +90,7 @@ class ur_admittance_controller():
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
         # The gripper offset
-        self.ur16e_gripper_offset = 0.16163
+        self.r16e_gripper_offset_trans_z = 0.16163
         # * Initialize the needed velocity data types:
         # Initialize desired velocity transformed form 'wrorld' frame to 'base_link' frame (xdot_desired_baselink)
         self.base_link_desired_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -199,11 +199,8 @@ class ur_admittance_controller():
         self.listener = tf.TransformListener()
         self.listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(4.0))
 
-        # world frame just exits in gazebo!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # Which frame for the real robots? 'world'frame????
-        # ---------------------------------------------------------------------------------------
         self.listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(4.0))
-        # ---------------------------------------------------------------------------------------
+
 
         self.tf_time = self.listener.getLatestCommonTime("/world", "/wrist_3_link")
         self.current_position, self.current_quaternion = self.listener.lookupTransform("/world", "/wrist_3_link", self.tf_time)
@@ -231,7 +228,7 @@ class ur_admittance_controller():
         static_gripper_offset.child_frame_id = "ur16e_gripper"
         static_gripper_offset.transform.translation.x = 0.0
         static_gripper_offset.transform.translation.y = 0.0
-        static_gripper_offset.transform.translation.z = self.ur16e_gripper_offset
+        static_gripper_offset.transform.translation.z = self.r16e_gripper_offset_trans_z
         static_gripper_offset.transform.rotation.x = 0.0
         static_gripper_offset.transform.rotation.y = 0.0
         static_gripper_offset.transform.rotation.z = 0.0

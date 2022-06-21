@@ -63,20 +63,20 @@ class franka_impedance_controller():
         self.D_rot_y = 1.
         self.D_rot_z = 1.
         # Wrench compliance gains
-        self.wrench_force_x = 0.1
-        self.wrench_force_y = 0.1
-        self.wrench_force_z = 0.1
-        self.wrench_torque_x = 0.1
-        self.wrench_torque_y = 0.1
-        self.wrench_torque_z = 0.1
+        self.wrench_force_x = 0.2
+        self.wrench_force_y = 0.2
+        self.wrench_force_z = 0.2
+        self.wrench_torque_x = 0.2
+        self.wrench_torque_y = 0.2
+        self.wrench_torque_z = 0.2
         # Wrench filter force treshold (1.5 - 2.7)
-        self.wrench_filter_force = 1.55
+        self.wrench_filter_force = 1.07
         # Wrench filter torque treshold (0.14 - 0.2)
         self.wrench_filter_torque = 0.14
         # Min and max limits for the cartesian velocity (trans/rot) (unit: [m/s],[rad/s])
-        self.cartesian_velocity_trans_min_limit = 0.001
+        self.cartesian_velocity_trans_min_limit = 0.0009
         self.cartesian_velocity_trans_max_limit = 0.1
-        self.cartesian_velocity_rot_min_limit = 0.001
+        self.cartesian_velocity_rot_min_limit = 0.0009
         self.cartesian_velocity_rot_max_limit = 0.1
         # Control thread publish rate
         self.publish_rate = 100 # [Hz]
@@ -106,7 +106,9 @@ class franka_impedance_controller():
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
         # The gripper offset     
-        self.panda_gripper_offset = 0.10655
+        self.panda_gripper_offset_trans_z = 0.10655
+        self.panda_gripper_offset_rot_z = -0.924
+        self.panda_gripper_offset_rot_w = 0.383
 
         
         
@@ -269,6 +271,8 @@ class franka_impedance_controller():
             self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
             self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
             
+            print("self.wrench_force_transformed")
+            print(self.wrench_force_transformed)
             # Calculate linear and angular velocity difference
             self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans + numpy.array(self.wrench_force_transformed).reshape([3,1])
             self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot + numpy.array(self.wrench_torque_transformed).reshape([3,1])
@@ -470,8 +474,8 @@ class franka_impedance_controller():
         """ 
             Get external wrench in panda_link7.
         """
-        # print("wrench_ext")
-        # print(wrench_ext)
+        print("wrench_ext")
+        print(wrench_ext)
         
         # Get current time stamp
         now = rospy.Time()
@@ -527,17 +531,13 @@ class franka_impedance_controller():
         else: 
             base_wrench_torque.vector.z = base_wrench_torque.vector.z - numpy.sign(base_wrench_torque.vector.z) * self.wrench_filter_torque 
             
-        
-        # Converse cartesian_velocity from vector3 to numpy.array and multipy the compliance gains
-        self.wrenc_transformed = [
-            base_wrench_force.vector.x * self.wrench_force_x,
-            base_wrench_force.vector.y * self.wrench_force_y,
-            base_wrench_force.vector.z * self.wrench_force_z,
-            base_wrench_torque.vector.x * self.wrench_torque_x,
-            base_wrench_torque.vector.y * self.wrench_torque_y,
-            base_wrench_torque.vector.z * self.wrench_torque_z,
-            ]
-            
+        print("base_wrench_torque.vector.x")
+        print(base_wrench_torque.vector.x)
+        print("base_wrench_torque.vector.y")
+        print(base_wrench_torque.vector.y)
+        print("base_wrench_torque.vector.z")
+        print(base_wrench_torque.vector.z)
+        # Converse cartesian_velocity from vector3 to numpy.array and multipy the compliance gains            
         self.wrench_force_transformed = [
             base_wrench_force.vector.x * self.wrench_force_x,
             base_wrench_force.vector.y * self.wrench_force_y,
@@ -550,8 +550,7 @@ class franka_impedance_controller():
             base_wrench_torque.vector.z * self.wrench_torque_z,
             ]
 
-        # print("self.wrench_force_transformed")
-        # print(self.wrench_force_transformed)
+
         
     def set_gripper_offset(self):
         """
@@ -563,11 +562,11 @@ class franka_impedance_controller():
         static_gripper_offset.child_frame_id = "panda/panda_gripper"
         static_gripper_offset.transform.translation.x = 0.0
         static_gripper_offset.transform.translation.y = 0.0
-        static_gripper_offset.transform.translation.z = self.panda_gripper_offset
+        static_gripper_offset.transform.translation.z = self.panda_gripper_offset_trans_z
         static_gripper_offset.transform.rotation.x = 0.0
         static_gripper_offset.transform.rotation.y = 0.0
-        static_gripper_offset.transform.rotation.z = -0.924
-        static_gripper_offset.transform.rotation.w = 0.383
+        static_gripper_offset.transform.rotation.z = self.panda_gripper_offset_rot_z
+        static_gripper_offset.transform.rotation.w = self.panda_gripper_offset_rot_w
 
         self.brodacaster.sendTransform(static_gripper_offset)
         
