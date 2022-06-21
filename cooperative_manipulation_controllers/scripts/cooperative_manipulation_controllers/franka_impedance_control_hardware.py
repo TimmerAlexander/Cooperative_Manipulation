@@ -40,8 +40,10 @@
 import copy, numpy, quaternion
 import rospy
 import tf
-from geometry_msgs.msg import Twist, Vector3Stamped, WrenchStamped
+import tf2_ros
+from geometry_msgs.msg import Twist, Vector3Stamped, WrenchStamped, TransformStamped
 from franka_core_msgs.msg import EndPointState, JointCommand, RobotState
+
 
 class franka_impedance_controller():
     
@@ -101,6 +103,10 @@ class franka_impedance_controller():
         
         self.wrench_force_transformed = numpy.array([0.0,0.0,0.0,])
         self.wrench_torque_transformed = numpy.array([0.0,0.0,0.0,])
+        # Initialize trajectory velocity for object rotation
+        self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
+        # The gripper offset     
+        self.panda_gripper_offset = 0.10655
 
         
         
@@ -112,10 +118,24 @@ class franka_impedance_controller():
         # * Initialize node
         rospy.init_node("ts_control_sim_only")
         
+         # * Initialize tf TransformBroadcaster
+        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
-        self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(4.0))
-        self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(4.0))
+        # Wait for transformations in tf tree
+        rospy.loginfo("Wait for transformation 'panda/panda_link8' to 'world'.")
+        self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'panda/base' to 'panda/panda_link8'.")
+        self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'world' to 'base_link'.")
+        self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
+        # Initialize the 'padna/panda_gripper' frame in tf tree
+        self.set_gripper_offset()
+        # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
+        rospy.loginfo("Wait for transformation 'world' to '/panda/panda_link8'.")
+        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
+        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
         self.cartesian_state_sub = rospy.Subscriber(
@@ -314,15 +334,98 @@ class franka_impedance_controller():
         """
         # Get current time stamp
         now = rospy.Time()
+        #------------------------------
+        # Calculate the trajectory velocity of the manipulator for a rotation of the object
+        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
+        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
+
+
+        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'world' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")
+        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
+
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
+        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+    
+        # print("self.ur16e_current_position, self.ur16e_current_quaternion")
+        # print(self.ur16e_current_position, self.ur16e_current_quaternion)
+        # print("self.panda_current_position, self.panda_current_quaternion")
+        # print(self.panda_position, self.panda_current_quaternion)
+
+        # Object rotation around x axis 
+        if desired_velocity.angular.x != 0.0:
+            panda_current_position_x = numpy.array([
+                0.0,
+                panda_current_position[1],
+                panda_current_position[2]
+                ])
+
+            self.robot_distance_x = numpy.array([
+                0.0,
+                ur16e_gripper_position[1] - panda_gripper_position[1],
+                ur16e_gripper_position[2] - panda_gripper_position[2],
+            ])
+            
+            center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_gripper_position
+            world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
+            world_radius_x = panda_current_position_x - center_x
+            self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
+            
+        # Object rotation around y axis 
+        if desired_velocity.angular.y != 0.0: 
+            panda_current_position_y = numpy.array([
+                panda_current_position[0],
+                0.0,
+                panda_current_position[2]
+                ]) 
+
+            self.robot_distance_y = numpy.array([
+                ur16e_gripper_position[0] - panda_gripper_position[0],
+                0.0,
+                ur16e_gripper_position[2] - panda_gripper_position[2],
+                ])
+            
+            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_gripper_position
+            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+            world_radius_y = panda_current_position_y - center_y
+            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
+            
+
+            
+        # Object rotation around z axis 
+        if desired_velocity.angular.z != 0.0:
+            panda_current_position_z = numpy.array([
+                panda_current_position[0],
+                panda_current_position[1],
+                0.0,
+                ]) 
+
+            self.robot_distance_z = numpy.array([
+                ur16e_gripper_position[0] - panda_gripper_position[0],
+                ur16e_gripper_position[1] - panda_gripper_position[1],
+                0.0,
+                ])
+            
+            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_gripper_position
+            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+            world_radius_z = panda_current_position_z - center_z
+            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
+
+        #------------------------------
             
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
-        # Converse cartesian_velocity translation to vector3
+         # Converse cartesian_velocity translation to vector3
         world_cartesian_velocity_trans.header.frame_id = 'world'
         world_cartesian_velocity_trans.header.stamp = now
-        world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x
-        world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y
-        world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z
+        world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_velocity[0]
+        world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
+        world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
             
         # Transform cartesian_velocity translation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8
         base_cartesian_velocity_trans = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_trans)
@@ -354,9 +457,13 @@ class franka_impedance_controller():
             
         self.desired_velocity_rot_transformed = [
             base_cartesian_velocity_rot.vector.x,
-            base_cartesian_velocity_rot.vector.y,
-            base_cartesian_velocity_rot.vector.z,
+            -1 * base_cartesian_velocity_rot.vector.y,
+            -1 * base_cartesian_velocity_rot.vector.z,
             ] 
+
+
+        # Set the trajectory velocity for an object rotation to zero
+        self.world_trajectory_velocity = [0.0,0.0,0.0]
         
 
     def wrench_msg_callback(self,wrench_ext):
@@ -446,6 +553,23 @@ class franka_impedance_controller():
         # print("self.wrench_force_transformed")
         # print(self.wrench_force_transformed)
         
+    def set_gripper_offset(self):
+        """
+            Set the gripper offset from 'panda/panda_link8' frame.
+        """
+        static_gripper_offset = TransformStamped()
+        static_gripper_offset.header.stamp = rospy.Time.now()
+        static_gripper_offset.header.frame_id = "/panda/panda_link8"
+        static_gripper_offset.child_frame_id = "panda/panda_gripper"
+        static_gripper_offset.transform.translation.x = 0.0
+        static_gripper_offset.transform.translation.y = 0.0
+        static_gripper_offset.transform.translation.z = self.panda_gripper_offset
+        static_gripper_offset.transform.rotation.x = 0.0
+        static_gripper_offset.transform.rotation.y = 0.0
+        static_gripper_offset.transform.rotation.z = -0.924
+        static_gripper_offset.transform.rotation.w = 0.383
+
+        self.brodacaster.sendTransform(static_gripper_offset)
         
     def euler_to_quaternion(self,euler_array: numpy.array):
         """
