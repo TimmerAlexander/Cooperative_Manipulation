@@ -69,9 +69,9 @@ class franka_impedance_controller():
         self.wrench_torque_x = 0.2
         self.wrench_torque_y = 0.2
         self.wrench_torque_z = 0.2
-        # Wrench filter force treshold (1.5 - 2.7)
+        # Wrench filter force threshold (1.5 - 2.7)
         self.wrench_filter_force = 1.07
-        # Wrench filter torque treshold (0.14 - 0.2)
+        # Wrench filter torque threshold (0.14 - 0.2)
         self.wrench_filter_torque = 0.14
         # Min and max limits for the cartesian velocity (trans/rot) (unit: [m/s],[rad/s])
         self.cartesian_velocity_trans_min_limit = 0.0009
@@ -109,6 +109,9 @@ class franka_impedance_controller():
         self.panda_gripper_offset_trans_z = 0.10655
         self.panda_gripper_offset_rot_z = -0.924
         self.panda_gripper_offset_rot_w = 0.383
+        # 
+        self.wrench_force_filtered = Vector3Stamped()
+        self.wrench_torque_filtered = Vector3Stamped()
 
         
         
@@ -271,8 +274,8 @@ class franka_impedance_controller():
             self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
             self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
             
-            print("self.wrench_force_transformed")
-            print(self.wrench_force_transformed)
+            # print("self.wrench_force_transformed")
+            # print(self.wrench_force_transformed)
             # Calculate linear and angular velocity difference
             self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans + numpy.array(self.wrench_force_transformed).reshape([3,1])
             self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot + numpy.array(self.wrench_torque_transformed).reshape([3,1])
@@ -292,7 +295,7 @@ class franka_impedance_controller():
             self.command_msg.effort = tau.flatten()
             self.joint_command_publisher.publish(self.command_msg)
             rate.sleep()
-                        
+                    
     def _on_robot_state(self,msg):
         """
             Callback function for updating jacobian and EE velocity from robot state.
@@ -338,8 +341,7 @@ class franka_impedance_controller():
         """
         # Get current time stamp
         now = rospy.Time()
-        #------------------------------
-        # Calculate the trajectory velocity of the manipulator for a rotation of the object
+        # Calculate the trajectory velocity of the manipulator for the rotation of the object ------------------------------
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
         panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
@@ -398,8 +400,6 @@ class franka_impedance_controller():
             self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
             
-
-            
         # Object rotation around z axis 
         if desired_velocity.angular.z != 0.0:
             panda_current_position_z = numpy.array([
@@ -419,9 +419,8 @@ class franka_impedance_controller():
             world_radius_z = panda_current_position_z - center_z
             self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
-
-        #------------------------------
-            
+        #-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        # Transform the cartesian velocity in the 'panda/base' frame--------------------------------------
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
          # Converse cartesian_velocity translation to vector3
@@ -446,13 +445,11 @@ class franka_impedance_controller():
         
         # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
         base_cartesian_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
-
-
-
+        #-----------------------------------------------------------------------------------------------------------------------------------------------------------------
         # print("base_cartesian_velocity_rot")
         # print(base_cartesian_velocity_rot)
 
-        # Converse cartesian_velocity from vector3 to numpy.array
+        # Converse cartesian_velocity from Vector3Stamped to numpy.array----------------------------------------
         self.desired_velocity_trans_transformed = [
             base_cartesian_velocity_trans.vector.x,
             base_cartesian_velocity_trans.vector.y,
@@ -464,18 +461,17 @@ class franka_impedance_controller():
             -1 * base_cartesian_velocity_rot.vector.y,
             -1 * base_cartesian_velocity_rot.vector.z,
             ] 
-
-
-        # Set the trajectory velocity for an object rotation to zero
+        #-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        # Set the trajectory velocity for the object rotation to zero
         self.world_trajectory_velocity = [0.0,0.0,0.0]
         
 
     def wrench_msg_callback(self,wrench_ext):
         """ 
-            Get external wrench in panda_link7.
+            Get external wrench in 'panda/panda_link7' frame.
         """
-        print("wrench_ext")
-        print(wrench_ext)
+        # print("wrench_ext")
+        # print(wrench_ext)
         
         # Get current time stamp
         now = rospy.Time()
@@ -501,56 +497,76 @@ class franka_impedance_controller():
             
         # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
         base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
-            
-        # * Band-passfilter
-        if numpy.abs(base_wrench_force.vector.x) < self.wrench_filter_force:
-            base_wrench_force.vector.x = 0.0
-        else: 
-            base_wrench_force.vector.x = base_wrench_force.vector.x - numpy.sign(base_wrench_force.vector.x) * self.wrench_filter_force
-            
-        if(numpy.abs(base_wrench_force.vector.y) < self.wrench_filter_force):
-            base_wrench_force.vector.y = 0.0
-        else: 
-            base_wrench_force.vector.y = base_wrench_force.vector.y - numpy.sign(base_wrench_force.vector.y) * self.wrench_filter_force
+        
+        print(type(base_wrench_force))
 
-        if(numpy.abs(base_wrench_force.vector.z) < self.wrench_filter_force):
-            base_wrench_force.vector.z = 0.0
-        else: 
-           base_wrench_force.vector.z = base_wrench_force.vector.z - numpy.sign(base_wrench_force.vector.z) * self.wrench_filter_force
-
-        if(numpy.abs(base_wrench_torque.vector.x) < self.wrench_filter_torque):
-            base_wrench_torque.vector.x = 0.0
-        else: 
-            base_wrench_torque.vector.x = base_wrench_torque.vector.x - numpy.sign(base_wrench_torque.vector.x) * self.wrench_filter_torque
-        if(numpy.abs(base_wrench_torque.vector.y) < self.wrench_filter_torque):
-            base_wrench_torque.vector.y = 0.0
-        else: 
-            base_wrench_torque.vector.y = base_wrench_torque.vector.y - numpy.sign(base_wrench_torque.vector.y) * self.wrench_filter_torque
-        if(numpy.abs(base_wrench_torque.vector.z) < self.wrench_filter_torque):
-            base_wrench_torque.vector.z = 0.0
-        else: 
-            base_wrench_torque.vector.z = base_wrench_torque.vector.z - numpy.sign(base_wrench_torque.vector.z) * self.wrench_filter_torque 
-            
-        print("base_wrench_torque.vector.x")
-        print(base_wrench_torque.vector.x)
-        print("base_wrench_torque.vector.y")
-        print(base_wrench_torque.vector.y)
-        print("base_wrench_torque.vector.z")
-        print(base_wrench_torque.vector.z)
-        # Converse cartesian_velocity from vector3 to numpy.array and multipy the compliance gains            
+        # Bandpassfilter 
+        self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
+           
         self.wrench_force_transformed = [
-            base_wrench_force.vector.x * self.wrench_force_x,
-            base_wrench_force.vector.y * self.wrench_force_y,
-            base_wrench_force.vector.z * self.wrench_force_z,
+            self.wrench_force_filtered.vector.x * self.wrench_force_x,
+            self.wrench_force_filtered.vector.y * self.wrench_force_y,
+            self.wrench_force_filtered.vector.z * self.wrench_force_z,
             ]
         
         self.wrench_torque_transformed = [
-            base_wrench_torque.vector.x * self.wrench_torque_x,
-            base_wrench_torque.vector.y * self.wrench_torque_y,
-            base_wrench_torque.vector.z * self.wrench_torque_z,
+            self.wrench_torque_filtered.vector.x * self.wrench_torque_x,
+            self.wrench_torque_filtered.vector.y * self.wrench_torque_y,
+            self.wrench_torque_filtered.vector.z * self.wrench_torque_z,
             ]
 
+    def band_pass_filter(self,force_unfiltered: Vector3Stamped, torque_unfiltered: Vector3Stamped, force_filter_threshold: float, torque_filter_threshold: float):
+        """            
+            Bandpass-filter for the measured wrench.
 
+        Args:
+            force_unfiltered (Vector3Stamped): Unfiltered forces
+            torque_unfiltered (Vector3Stamped): Unfiltered torqus
+            force_unfiltered (float): Force threshold
+            torque_unfiltered (flaot): Torque threshold
+
+        Returns:
+            Vector3Stamped,Vector3Stamped: The filtered forces and torques
+        """
+        print(force_unfiltered)
+        force_filtered = Vector3Stamped()
+        force_filtered.header.frame_id = force_unfiltered.header.frame_id
+        force_filtered.header.stamp  = force_unfiltered.header.stamp 
+
+        torque_filtered = Vector3Stamped()
+        torque_filtered.header.frame_id = torque_unfiltered.header.frame_id
+        torque_filtered.header.stamp  = torque_unfiltered.header.stamp 
+
+        # * Band-passfilter
+        if numpy.abs(force_unfiltered.vector.x) < force_filter_threshold:
+            force_filtered.vector.x = 0.0
+        else: 
+            force_filtered.vector.x = force_unfiltered.vector.x - numpy.sign(force_unfiltered.vector.x) * force_filter_threshold
+            
+        if(numpy.abs(force_unfiltered.vector.y) < force_filter_threshold):
+            force_filtered.vector.y = 0.0
+        else: 
+            force_filtered.vector.y = force_unfiltered.vector.y - numpy.sign(force_unfiltered.vector.y) * force_filter_threshold
+
+        if(numpy.abs(force_unfiltered.vector.z) < force_filter_threshold):
+            force_filtered.vector.z = 0.0
+        else: 
+            force_filtered.vector.z = force_unfiltered.vector.z - numpy.sign(force_unfiltered.vector.z) * force_filter_threshold
+
+        if(numpy.abs(torque_unfiltered.vector.x) < torque_filter_threshold):
+            torque_filtered.vector.x = 0.0
+        else: 
+            torque_filtered.vector.x = torque_unfiltered.vector.x - numpy.sign(torque_unfiltered.vector.x) * torque_filter_threshold
+        if(numpy.abs(torque_unfiltered.vector.y) < torque_filter_threshold):
+            torque_filtered.vector.y = 0.0
+        else: 
+            torque_filtered.vector.y = torque_unfiltered.vector.y - numpy.sign(torque_unfiltered.vector.y) * torque_filter_threshold
+        if(numpy.abs(torque_unfiltered.vector.z) < torque_filter_threshold):
+            torque_filtered.vector.z = 0.0
+        else: 
+            torque_filtered.vector.z = torque_unfiltered.vector.z - numpy.sign(torque_unfiltered.vector.z) * torque_filter_threshold 
+        
+        return force_filtered, torque_filtered
         
     def set_gripper_offset(self):
         """
@@ -574,12 +590,12 @@ class franka_impedance_controller():
         """
             Convert Euler angles to a quaternion.
             
-            Inuput
+            Args:
                 :param alpha: Rotation around x-axis) angle in radians.
                 :param beta: The beta (rotation around y-axis) angle in radians.
                 :param gamma: The gamma (rotation around z-axis) angle in radians.
             
-            Output
+            Returns:
                 :return quaternion_from_euler: The orientation in quaternion 
         """
         alpha, beta, gamma = euler_array
