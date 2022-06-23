@@ -32,7 +32,7 @@
     Impedance controller
     
     Input: 
-    * Desired cartesian velocity of the EE: desired_velocity (In 'world' frame)
+    * Desired cartesian velocity of the EE: desired_velocity (In 'map' frame)
     
     Output: 
     * Joint effort: self.command_msg.effort (Franka joints)
@@ -123,19 +123,19 @@ class franka_impedance_controller():
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
         # Wait for transformations in tf tree
-        rospy.loginfo("Wait for transformation 'panda/panda_link8' to 'world'.")
-        self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'panda/panda_link8' to 'map'.")
+        self.tf_listener.waitForTransform("panda/panda_link8","map", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Wait for transformation 'panda/base' to 'panda/panda_link8'.")
         self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Wait for transformation 'world' to 'base_link'.")
-        self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'map' to 'base_link'.")
+        self.tf_listener.waitForTransform("map","base_link", rospy.Time(), rospy.Duration(5.0))
         # Initialize the 'padna/panda_gripper' frame in tf tree
         self.set_gripper_offset()
-        # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
-        rospy.loginfo("Wait for transformation 'world' to '/panda/panda_link8'.")
-        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
-        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        # Wait for transformations from 'map' to 'panda_gripper' and 'map' to 'ur16e_gripper'
+        rospy.loginfo("Wait for transformation 'map' to 'panda/panda_gripper'.")
+        self.tf_listener.waitForTransform("map","panda/panda_gripper", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'map' to 'ur16e_gripper'.")
+        self.tf_listener.waitForTransform("map","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
         self.cartesian_state_sub = rospy.Subscriber(
@@ -318,7 +318,7 @@ class franka_impedance_controller():
         
     def cartesian_msg_callback(self,desired_velocity):
         """
-            Get the cartesian velocity command and transform it from the 'world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
+            Get the cartesian velocity command and transform it from the 'map' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
             
             rostopic pub -r 10 /cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
             x: 0.0
@@ -336,18 +336,18 @@ class franka_impedance_controller():
         now = rospy.Time()
         #------------------------------
         # Calculate the trajectory velocity of the manipulator for a rotation of the object
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
-        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
+        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'map' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/map", "/panda/panda_link8")
+        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/map", "/panda/panda_link8", panda_tf_time)
 
 
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")
-        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
+        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'map' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/map", "/panda/panda_gripper")
+        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/map", "/panda/panda_gripper", panda_tf_time)
 
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'map' frame 
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/map", "/wrist_3_link")
+        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/map", "/ur16e_gripper", ur16e_tf_time)
     
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
@@ -421,17 +421,17 @@ class franka_impedance_controller():
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
          # Converse cartesian_velocity translation to vector3
-        world_cartesian_velocity_trans.header.frame_id = 'world'
+        world_cartesian_velocity_trans.header.frame_id = 'map'
         world_cartesian_velocity_trans.header.stamp = now
         world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_velocity[0]
         world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
         world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
             
-        # Transform cartesian_velocity translation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8
+        # Transform cartesian_velocity translation from 'map' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8
         base_cartesian_velocity_trans = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_trans)
             
         # Converse cartesian_velocity rotation to vector3
-        world_cartesian_velocity_rot.header.frame_id = 'world'
+        world_cartesian_velocity_rot.header.frame_id = 'map'
         world_cartesian_velocity_rot.header.stamp = now
         world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
         world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
@@ -440,7 +440,7 @@ class franka_impedance_controller():
         # print("world_cartesian_velocity_rot")
         # print(world_cartesian_velocity_rot)
         
-        # Transform cartesian_velocity rotation from 'world' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
+        # Transform cartesian_velocity rotation from 'map' frame to 'panda/base' frame and from 'panda/base' frame to 'panda/panda_link8'
         base_cartesian_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
 
 
@@ -498,6 +498,13 @@ class franka_impedance_controller():
         # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
         base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
             
+
+
+        # Bandpassfilter function---------------------------------
+        #self.wrench_force_transformed,self.wrench_torque_transformed = self.bband_pass_filter(base_wrench_force,base_wrench_torque,self.wrench_filter_force,self.wrench_filter_torque)
+        # --------------------------------------------------------
+
+
         # * Band-passfilter
         if numpy.abs(base_wrench_force.vector.x) < self.wrench_filter_force:
             base_wrench_force.vector.x = 0.0
@@ -529,14 +536,14 @@ class franka_impedance_controller():
             
         
         # Converse cartesian_velocity from vector3 to numpy.array and multipy the compliance gains
-        self.wrenc_transformed = [
-            base_wrench_force.vector.x * self.wrench_force_x,
-            base_wrench_force.vector.y * self.wrench_force_y,
-            base_wrench_force.vector.z * self.wrench_force_z,
-            base_wrench_torque.vector.x * self.wrench_torque_x,
-            base_wrench_torque.vector.y * self.wrench_torque_y,
-            base_wrench_torque.vector.z * self.wrench_torque_z,
-            ]
+        # self.wrenc_transformed = [
+        #     base_wrench_force.vector.x * self.wrench_force_x,
+        #     base_wrench_force.vector.y * self.wrench_force_y,
+        #     base_wrench_force.vector.z * self.wrench_force_z,
+        #     base_wrench_torque.vector.x * self.wrench_torque_x,
+        #     base_wrench_torque.vector.y * self.wrench_torque_y,
+        #     base_wrench_torque.vector.z * self.wrench_torque_z,
+        #     ]
             
         self.wrench_force_transformed = [
             base_wrench_force.vector.x * self.wrench_force_x,
@@ -552,7 +559,11 @@ class franka_impedance_controller():
 
         # print("self.wrench_force_transformed")
         # print(self.wrench_force_transformed)
-        
+    
+ 
+
+
+
     def set_gripper_offset(self):
         """
             Set the gripper offset from 'panda/panda_link8' frame.

@@ -10,7 +10,7 @@
     Admittance controller
     
     Input: 
-    * Desired cartesian velocity of the EE: desired_velocity (In 'world' frame)
+    * Desired cartesian velocity of the EE: desired_velocity (In 'map' frame)
     * External wrench from the f/t sensor: wrench_ext (In 'wrist_3_link' frame)
     
     Output: 
@@ -140,18 +140,18 @@ class ur_admittance_controller():
         self.tf_listener = tf.TransformListener()
         rospy.loginfo("Wait for transformation 'wrist_3_link' to 'base_link'.")
         self.tf_listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Wait for transformation 'world' to 'wrist_3_link'.")
-        self.tf_listener.waitForTransform("world","wrist_3_link", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Wait for transformation 'world' to 'base_link'.")
-        self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'map' to 'wrist_3_link'.")
+        self.tf_listener.waitForTransform("map","wrist_3_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'map' to 'base_link'.")
+        self.tf_listener.waitForTransform("map","base_link", rospy.Time(), rospy.Duration(5.0))
         
         # Initialize the 'ur16e_gripper' frame in tf tree
         self.set_gripper_offset()
-        # Wait for transformations from 'world' to 'ur16e_gripper' and 'world' to 'panda_gripper'
-        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
-        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Wait for transformation 'world' to '/panda/panda_link8'.")
-        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
+        # Wait for transformations from 'map' to 'ur16e_gripper' and 'map' to 'panda_gripper'
+        rospy.loginfo("Wait for transformation 'map' to 'ur16e_gripper'.")
+        self.tf_listener.waitForTransform("map","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'map' to '/panda/panda_link8'.")
+        self.tf_listener.waitForTransform("map","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
 
         # * Get namespace for topics from launch file
         self.namespace = rospy.get_param("~ur_ns")
@@ -199,14 +199,14 @@ class ur_admittance_controller():
         self.listener = tf.TransformListener()
         self.listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(4.0))
 
-        # world frame just exits in gazebo!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # Which frame for the real robots? 'world'frame????
+        # map frame just exits in gazebo!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # Which frame for the real robots? 'map'frame????
         # ---------------------------------------------------------------------------------------
-        self.listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(4.0))
+        self.listener.waitForTransform("map","base_link", rospy.Time(), rospy.Duration(4.0))
         # ---------------------------------------------------------------------------------------
 
-        self.tf_time = self.listener.getLatestCommonTime("/world", "/wrist_3_link")
-        self.current_position, self.current_quaternion = self.listener.lookupTransform("/world", "/wrist_3_link", self.tf_time)
+        self.tf_time = self.listener.getLatestCommonTime("/map", "/wrist_3_link")
+        self.current_position, self.current_quaternion = self.listener.lookupTransform("/map", "/wrist_3_link", self.tf_time)
 
 
 
@@ -240,7 +240,7 @@ class ur_admittance_controller():
         self.brodacaster.sendTransform(static_gripper_offset)   
     def cartesian_velocity_command_callback(self,desired_velocity):
         """
-            Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' and 'wrist_link_3' frame.
+            Get the cartesian velocity command and transform it from from the 'map' frame to the 'base_link' and 'wrist_link_3' frame.
             
             Send example velocity:
             rostopic pub -r 10 cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
@@ -264,17 +264,17 @@ class ur_admittance_controller():
         # print(desired_velocity)
     
         # Calculate the trajectory velocity of the manipulator for a rotation of the object
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-        ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'map' frame 
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/map", "/wrist_3_link")
+        ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/map", "/wrist_3_link", ur16e_tf_time)
 
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/ur16e_gripper")
-        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'map' frame 
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/map", "/ur16e_gripper")
+        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/map", "/ur16e_gripper", ur16e_tf_time)
 
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
-        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
+        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'map' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/map", "/panda/panda_link8")
+        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/map", "/panda/panda_gripper", panda_tf_time)
 
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
@@ -349,24 +349,24 @@ class ur_admittance_controller():
         now = rospy.Time()
 
         # Converse cartesian_velocity translation to vector3
-        self.world_cartesian_velocity_trans.header.frame_id = 'world'
+        self.world_cartesian_velocity_trans.header.frame_id = 'map'
         self.world_cartesian_velocity_trans.header.stamp = now
         self.world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_velocity[0]
         self.world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
         self.world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
         
-        # Transform cartesian_velocity translation from 'world' frame to 'base_link' frame
+        # Transform cartesian_velocity translation from 'map' frame to 'base_link' frame
         self.base_link_cartesian_desired_velocity_trans = self.listener.transformVector3('base_link',self.world_cartesian_velocity_trans)
         
         
         # Converse cartesian_velocity rotation to vector3
-        self.world_cartesian_velocity_rot.header.frame_id = 'world'
+        self.world_cartesian_velocity_rot.header.frame_id = 'map'
         self.world_cartesian_velocity_rot.header.stamp = now
         self.world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
         self.world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
         self.world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
         
-        # Transform cartesian_velocity rotation from 'world' frame to 'base_link' frame
+        # Transform cartesian_velocity rotation from 'map' frame to 'base_link' frame
         self.base_link_cartesian_desired_velocity_rot = self.listener.transformVector3('base_link',self.    world_cartesian_velocity_rot)
         
         # Converse cartesian_velocity from vector3 to numpy.array
@@ -389,10 +389,10 @@ class ur_admittance_controller():
         
 
         
-        # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
+        # Transform cartesian_velocity rotation from 'map' frame to 'wrist_3_link' frame
         self.wrist_link_3_cartesian_desired_velocity_trans = self.listener.transformVector3('wrist_3_link',self.world_cartesian_velocity_trans)
         
-        # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
+        # Transform cartesian_velocity rotation from 'map' frame to 'wrist_3_link' frame
         self.wrist_link_3_cartesian_desired_velocity_rot = self.listener.transformVector3('wrist_3_link',self.world_cartesian_velocity_trans)
         
         self.wrist_link_3_desired_velocity = [
@@ -414,14 +414,14 @@ class ur_admittance_controller():
         # print(self.world_rot_velocity_cross_product_array)
         
         # Converse self.world_rot_velocity_cross_product_array rotation to vector3
-        self.world_rot_velocity_cross_product_vector.header.frame_id = 'world'
+        self.world_rot_velocity_cross_product_vector.header.frame_id = 'map'
         self.world_rot_velocity_cross_product_vector.header.stamp = now
         self.world_rot_velocity_cross_product_vector.vector.x = self.world_rot_velocity_cross_product_array[0]
         self.world_rot_velocity_cross_product_vector.vector.y = self.world_rot_velocity_cross_product_array[1]
         self.world_rot_velocity_cross_product_vector.vector.z = self.world_rot_velocity_cross_product_array[2]
         
         
-        # Transform cartesian_velocity rotation from 'world' frame to 'wrist_3_link' frame
+        # Transform cartesian_velocity rotation from 'map' frame to 'wrist_3_link' frame
         self.wrist_link_3_rot_axis_vector = self.listener.transformVector3('wrist_3_link',self.world_rot_velocity_cross_product_vector)
         
         self.wrist_link_3_rot_axis = [
