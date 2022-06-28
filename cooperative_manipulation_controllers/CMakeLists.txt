@@ -15,6 +15,19 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  dynamic_reconfigure
+  eigen_conversions
+  franka_hw
+  franka_gripper
+  geometry_msgs
+  hardware_interface
+  joint_limits_interface
+  tf
+  tf_conversions
+  message_generation
+  realtime_tools
+  urdf
+  visualization_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -137,8 +150,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 # ## The recommended prefix ensures that target names across packages don't collide
-#  add_executable(gazebo_ros_interface src/gazebo_ros_interface.cpp)
-#  target_link_libraries(gazebo_ros_interface ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
+add_executable(franka_joint_torque_controller src/franka_joint_torque_controller.cpp)
+target_link_libraries(franka_joint_torque_controller ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
