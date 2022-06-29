@@ -1,4 +1,4 @@
-joint_impedance_example_controller:
+franka_joint_torque_controller:
     type: franka_joint_torque_controller/FrankaJointTorqueController
     arm_id: panda
     joint_names:
