@@ -1,0 +1,1 @@
+If moveit cannot connect to action server, launch the controller via rusrun
