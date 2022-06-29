@@ -1,16 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
-    <arg name="panda_name" default="panda"/>
-    <arg name="base_name" default="$(arg panda_name)/base"/>
- 
-    <group ns="$(arg panda_name)">
-
-        <node pkg="cooperative_manipulation_controllers" type="franka_impedance_control_hardware.py" name="ts_control_sim_only" output="screen">
-            <param name="base" value="$(arg base_name)"/>
-        </node>
-
-    </group>  
+    <rosparam command="load" file="$(find cooperative_manipulation_controllers)/config/franka_joint_torque_controller.yaml.yaml" />
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_joint_torque_controller"/>
 
 </launch>
 
