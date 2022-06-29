@@ -7,4 +7,7 @@
     <arg name="load_gripper" value="$(arg load_gripper)" />
   </include>
 
+  <rosparam command="load" file="$(find cooperative_manipulation_controllers)/config/franka_joint_torque_controller.yaml.yaml" />
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_joint_torque_controller"/>
+
 </launch>
