@@ -21,24 +21,7 @@ bool FrankaJointTorqueController::init(hardware_interface::RobotHW* robot_hw,
     ROS_ERROR("FrankaJointTorqueController: Could not read parameter arm_id");
     return false;
   }
-  // if (!node_handle.getParam("radius", radius_)) {
-  //   ROS_INFO_STREAM(
-  //       "FrankaJointTorqueController: No parameter radius, defaulting to: " << radius_);
-  // }
-  // if (std::fabs(radius_) < 0.005) {
-  //   ROS_INFO_STREAM("FrankaJointTorqueController: Set radius to small, defaulting to: " << 0.1);
-  //   radius_ = 0.1;
-  // }
 
-  // if (!node_handle.getParam("vel_max", vel_max_)) {
-  //   ROS_INFO_STREAM(
-  //       "FrankaJointTorqueController: No parameter vel_max, defaulting to: " << vel_max_);
-  // }
-  // if (!node_handle.getParam("acceleration_time", acceleration_time_)) {
-  //   ROS_INFO_STREAM(
-  //       "FrankaJointTorqueController: No parameter acceleration_time, defaulting to: "
-  //       << acceleration_time_);
-  // }
 
   std::vector<std::string> joint_names;
   if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
@@ -48,19 +31,6 @@ bool FrankaJointTorqueController::init(hardware_interface::RobotHW* robot_hw,
     return false;
   }
 
-  // if (!node_handle.getParam("k_gains", k_gains_) || k_gains_.size() != 7) {
-  //   ROS_ERROR(
-  //       "FrankaJointTorqueController:  Invalid or no k_gain parameters provided, aborting "
-  //       "controller init!");
-  //   return false;
-  // }
-
-  // if (!node_handle.getParam("d_gains", d_gains_) || d_gains_.size() != 7) {
-  //   ROS_ERROR(
-  //       "FrankaJointTorqueController:  Invalid or no d_gain parameters provided, aborting "
-  //       "controller init!");
-  //   return false;
-  // }
 
   double publish_rate(30.0);
   if (!node_handle.getParam("publish_rate", publish_rate)) {
@@ -121,14 +91,10 @@ bool FrankaJointTorqueController::init(hardware_interface::RobotHW* robot_hw,
       return false;
     }
   }
-//-------------------------------------------------------------------------------------------------------
-  sub_tau_command_ = node_handle.subscribe("tau_command", 1, &FrankaJointTorqueController::chatterCallback,this,ros::TransportHints().reliable().tcpNoDelay());
 
-//-------------------------------------------------------------------------------------------------------
+  sub_tau_command_ = node_handle.subscribe("tau_command", 1, &FrankaJointTorqueController::jointTorqueCmdCallback,this,ros::TransportHints().reliable().tcpNoDelay());
 
   torques_publisher_.init(node_handle, "torque_comparison", 1);
-
-  std::fill(dq_filtered_.begin(), dq_filtered_.end(), 0);
 
   return true;
 }
@@ -137,62 +103,17 @@ void FrankaJointTorqueController::starting(const ros::Time& /*time*/) {
   initial_pose_ = cartesian_pose_handle_->getRobotState().O_T_EE_d;
 }
 
-//------------------------------------------------------------------------------------------------
-void FrankaJointTorqueController::chatterCallback(const std_msgs::Float64MultiArray::ConstPtr& tau_cmd)
-{
-  if (sizeof(tau_cmd) != 7) {
-    ROS_ERROR_STREAM(
-          "EffortJointTorqueController: Published Commands are not of size 7");
-  }
-  else{
-    for (size_t i = 0; i < 7; ++i) {
-    tau_command[i] = tau_cmd->data[i];
-    ROS_INFO("I heard: [%f]", tau_cmd->data[i]);
-    }
-  }
-
-}
-
 
 void FrankaJointTorqueController::update(const ros::Time& /*time*/, const ros::Duration& period) {
                                               
-  // if (vel_current_ < vel_max_) {
-  //   vel_current_ += period.toSec() * std::fabs(vel_max_ / acceleration_time_);
-  // }
-
-  // angle_ += period.toSec() * vel_current_ / std::fabs(radius_);
-  // if (angle_ > 2 * M_PI) {
-  //   angle_ -= 2 * M_PI;
-  // }
-
-  // double delta_y = radius_ * (1 - std::cos(angle_));
-  // double delta_z = radius_ * std::sin(angle_);
-
-  // std::array<double, 16> pose_desired = initial_pose_; //current endeffector pose
-  // pose_desired[13] += delta_y;
-  // pose_desired[14] += delta_z;
-  // cartesian_pose_handle_->setCommand(pose_desired);
-
-  float test = period.toSec();
-  // ROS_INFO_STREAM(test);
-
   franka::RobotState robot_state = cartesian_pose_handle_->getRobotState();
   std::array<double, 7> coriolis = model_handle_->getCoriolis();
   std::array<double, 7> gravity = model_handle_->getGravity();
 
-  // double alpha = 0.99;
-  // for (size_t i = 0; i < 7; i++) {
-  //   dq_filtered_[i] = (1 - alpha) * dq_filtered_[i] + alpha * robot_state.dq[i];
-  // }
-
   std::array<double, 7> tau_d_calculated;
   for (size_t i = 0; i < 7; ++i) {
-    tau_d_calculated[i] = coriolis_factor_ * coriolis[i]; //+ double tau_command[i];
-    
-    
-    // +
-    //                       k_gains_[i] * (robot_state.q_d[i] - robot_state.q[i]) +
-    //                       d_gains_[i] * (robot_state.dq_d[i] - dq_filtered_[i]);
+    tau_d_calculated[i] = coriolis_factor_ * coriolis[i] + tau_command[i];
+
   }
 
   // Maximum torque difference with a sampling rate of 1 kHz. The maximum torque rate is
@@ -228,8 +149,21 @@ void FrankaJointTorqueController::update(const ros::Time& /*time*/, const ros::D
   }
 }
 
+void FrankaJointTorqueController::jointTorqueCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& tau_cmd)
+{
+  if (sizeof(tau_cmd) != 7) {
+    ROS_ERROR_STREAM(
+          "EffortJointTorqueController: Published Commands are not of size 7");
+  }
+  else{
+    for (size_t i = 0; i < 7; ++i) {
+    tau_command[i] = tau_cmd->data[i];
+    // ROS_INFO("I heard: [%f]", tau_cmd->data[i]);
+    }
+  }
 
-//------------------------------------------------------------------------------------------------
+}
+
 std::array<double, 7> FrankaJointTorqueController::saturateTorqueRate(
     const std::array<double, 7>& tau_d_calculated,
     const std::array<double, 7>& tau_J_d) {  // NOLINT (readability-identifier-naming)

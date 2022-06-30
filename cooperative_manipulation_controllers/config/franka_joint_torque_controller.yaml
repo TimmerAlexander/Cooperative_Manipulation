@@ -1,7 +1,7 @@
 franka_joint_torque_controller:
-    type: franka_joint_torque_controller/FrankaJointTorqueController
+    type: effort_controllers/JointGroupEffortController
     arm_id: panda
-    joint_names:
+    joints:
         - panda_joint1
         - panda_joint2
         - panda_joint3
@@ -9,22 +9,5 @@ franka_joint_torque_controller:
         - panda_joint5
         - panda_joint6
         - panda_joint7
-    k_gains:
-        - 600.0
-        - 600.0
-        - 600.0
-        - 600.0
-        - 250.0
-        - 150.0
-        - 50.0
-    d_gains:
-        - 50.0
-        - 50.0
-        - 50.0
-        - 20.0
-        - 20.0
-        - 20.0
-        - 10.0
-    acceleration_time: 2.0
     publish_rate: 10.0
     coriolis_factor: 1.0
