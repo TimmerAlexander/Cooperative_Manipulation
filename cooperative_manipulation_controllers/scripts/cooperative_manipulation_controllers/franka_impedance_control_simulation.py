@@ -132,15 +132,15 @@ class franka_impedance_controller():
         self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Wait for transformation 'panda/base' to 'panda/panda_link8'.")
         self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Wait for transformation 'world' to 'base_link'.")
-        self.tf_listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(5.0))
+        rospy.loginfo("Wait for transformation 'world' to 'base'.")
+        self.tf_listener.waitForTransform("world","panda/base", rospy.Time(), rospy.Duration(5.0))
         # Initialize the 'padna/panda_gripper' frame in tf tree
         self.set_gripper_offset()
         # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
         rospy.loginfo("Wait for transformation 'world' to '/panda/panda_link8'.")
-        self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
-        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        # self.tf_listener.waitForTransform("world","panda/panda_link8", rospy.Time(), rospy.Duration(10.0))
+        # rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
+        # self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize subscriber:
         self.cartesian_state_sub = rospy.Subscriber(
@@ -197,6 +197,7 @@ class franka_impedance_controller():
         # * Initialize self.goal_pos and self.goal_ori
         self.goal_pos = numpy.asarray(start_pos.reshape([1,3]))
         self.goal_ori = start_ori
+
         
         # * Initialize P_trans/P_rot and D_trans/D_rot numpy.array
         self.P_trans = numpy.array([self.P_trans_x,self.P_trans_y,self.P_trans_z]).reshape([3,1])
@@ -222,6 +223,8 @@ class franka_impedance_controller():
         movement_trans = numpy.array([None])
         movement_ori = numpy.array([None])
         
+        time_old = rospy.Time.now()
+        time_old = time_old.to_sec() - 0.01
         while not rospy.is_shutdown():
             # Get current position and orientation 
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
@@ -230,8 +233,8 @@ class franka_impedance_controller():
             current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
             current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
             
-            # print("current_vel_rot ")
-            # print(current_vel_rot )
+            print("current_rot_trans ")
+            print(current_vel_rot)
             
 
             # * Check self.target_cartesian_trans_velocity and self.target_cartesian_trot_velocity for the min/max velocity limits
@@ -261,39 +264,70 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
                     
-            test = numpy.array([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+                    
+                    
+            time_now = rospy.Time.now()
+            time_now = time_now.to_sec()
+            time_diff = numpy.round(time_now - time_old,3)
+            time_old = time_now
 
-            # Calculate the translational and rotation movement
-            movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-            movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
+            if target_cartesian_trans_velocity_norm == 0.0 and target_cartesian_rot_velocity_norm == 0.0:
+                tau = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+                # ! Only for real robot with effort_controllers/JointGroupEffoertController. If you send zero torques to the effort_controllers/JointGroupEffoertController the controller compute the equilibrium pose.
+                self.command_msg.effort = tau.flatten()
+                self.joint_command_publisher.publish(self.command_msg)
+                # ! -------------------------------------------------------------------
+                
+                self.goal_pos = curr_pos
+                self.goal_ori = curr_ori
+                
+            else:
+                # Calculate the translational and rotation movement
+                movement_trans = numpy.asarray([x * time_diff for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+                movement_ori = self.euler_to_quaternion(numpy.asarray([x / time_diff for x in self.desired_velocity_rot_transformed]))
 
-            # Add the movement to current pose and orientation
-            self.goal_pos = (self.goal_pos + movement_trans)
-            self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
-            # Calculate position and orientation difference
-            self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
-            self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
-            
-            # print("self.wrench_force_transformed")
-            # print(self.wrench_force_transformed)
-            # Calculate linear and angular velocity difference
-            self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans + numpy.array(self.wrench_force_transformed).reshape([3,1])
-            self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot + numpy.array(self.wrench_torque_transformed).reshape([3,1])
-            
-            # print("self.delta_linear")
-            # print(self.delta_linear)
-            
-            # Desired task-space force using PD law
-            F = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)]) + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
-
-            J = copy.deepcopy(self.JACOBIAN)
-            
-            # joint torques to be commanded
-            tau = numpy.dot(J.T,F)
-            
-            # publish joint commands
-            self.command_msg.effort = tau.flatten()
-            self.joint_command_publisher.publish(self.command_msg)
+                # Add the movement to current pose and orientation
+                self.goal_pos = (self.goal_pos + movement_trans)
+                self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
+                # Calculate position and orientation difference
+                self.delta_pos = ((self.goal_pos - curr_pos)).reshape([3,1]) 
+                self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
+                
+                # print("self.delta_pos")
+                # print(self.delta_pos)
+                # print("self.wrench_force_transformed")
+                # print(self.wrench_force_transformed)
+                    
+                # Calculate linear and angular velocity difference
+                self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans 
+                #+ numpy.array(self.wrench_force_transformed).reshape([3,1])
+                self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot 
+                #+ numpy.array(self.wrench_torque_transformed).reshape([3,1])
+                
+                # print("self.desired_velocity_rot_transformed")
+                # print(self.desired_velocity_rot_transformed)
+                # print("self.delta_angular")
+                # print(self.delta_angular)
+                
+                print("self.delta_pos")
+                print(self.delta_pos)
+                
+                
+                print("self.delta_linguar")
+                print(self.delta_linear)
+                
+                # Desired task-space force using PD law
+                F = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)]) + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
+                
+                J = copy.deepcopy(self.JACOBIAN)
+                
+                # joint torques to be commanded
+                tau = numpy.dot(J.T,F)
+                print("tau")
+                print(tau)
+                # publish joint commands
+                self.command_msg.effort = tau.flatten()
+                self.joint_command_publisher.publish(self.command_msg)
             rate.sleep()
                     
     def _on_robot_state(self,msg):
@@ -352,8 +386,8 @@ class franka_impedance_controller():
         panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
 
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
+        # ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
     
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
@@ -361,64 +395,64 @@ class franka_impedance_controller():
         # print(self.panda_position, self.panda_current_quaternion)
 
         # Object rotation around x axis 
-        if desired_velocity.angular.x != 0.0:
-            panda_current_position_x = numpy.array([
-                0.0,
-                panda_current_position[1],
-                panda_current_position[2]
-                ])
+        # if desired_velocity.angular.x != 0.0:
+        #     panda_current_position_x = numpy.array([
+        #         0.0,
+        #         panda_current_position[1],
+        #         panda_current_position[2]
+        #         ])
 
-            self.robot_distance_x = numpy.array([
-                0.0,
-                ur16e_gripper_position[1] - panda_gripper_position[1],
-                ur16e_gripper_position[2] - panda_gripper_position[2],
-            ])
+        #     self.robot_distance_x = numpy.array([
+        #         0.0,
+        #         ur16e_gripper_position[1] - panda_gripper_position[1],
+        #         ur16e_gripper_position[2] - panda_gripper_position[2],
+        #     ])
             
-            center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_gripper_position
-            world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-            world_radius_x = panda_current_position_x - center_x
-            self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
+        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_gripper_position
+        #     world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
+        #     world_radius_x = panda_current_position_x - center_x
+        #     self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
             
-        # Object rotation around y axis 
-        if desired_velocity.angular.y != 0.0: 
-            panda_current_position_y = numpy.array([
-                panda_current_position[0],
-                0.0,
-                panda_current_position[2]
-                ]) 
+        # # Object rotation around y axis 
+        # if desired_velocity.angular.y != 0.0: 
+        #     panda_current_position_y = numpy.array([
+        #         panda_current_position[0],
+        #         0.0,
+        #         panda_current_position[2]
+        #         ]) 
 
-            self.robot_distance_y = numpy.array([
-                ur16e_gripper_position[0] - panda_gripper_position[0],
-                0.0,
-                ur16e_gripper_position[2] - panda_gripper_position[2],
-                ])
+        #     self.robot_distance_y = numpy.array([
+        #         ur16e_gripper_position[0] - panda_gripper_position[0],
+        #         0.0,
+        #         ur16e_gripper_position[2] - panda_gripper_position[2],
+        #         ])
             
-            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_gripper_position
-            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-            world_radius_y = panda_current_position_y - center_y
-            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
+        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_gripper_position
+        #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+        #     world_radius_y = panda_current_position_y - center_y
+        #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
             
-        # Object rotation around z axis 
-        if desired_velocity.angular.z != 0.0:
-            panda_current_position_z = numpy.array([
-                panda_current_position[0],
-                panda_current_position[1],
-                0.0,
-                ]) 
+        # # Object rotation around z axis 
+        # if desired_velocity.angular.z != 0.0:
+        #     panda_current_position_z = numpy.array([
+        #         panda_current_position[0],
+        #         panda_current_position[1],
+        #         0.0,
+        #         ]) 
 
-            self.robot_distance_z = numpy.array([
-                ur16e_gripper_position[0] - panda_gripper_position[0],
-                ur16e_gripper_position[1] - panda_gripper_position[1],
-                0.0,
-                ])
+        #     self.robot_distance_z = numpy.array([
+        #         ur16e_gripper_position[0] - panda_gripper_position[0],
+        #         ur16e_gripper_position[1] - panda_gripper_position[1],
+        #         0.0,
+        #         ])
             
-            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_gripper_position
-            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-            world_radius_z = panda_current_position_z - center_z
-            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
+        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_gripper_position
+        #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+        #     world_radius_z = panda_current_position_z - center_z
+        #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
         #-----------------------------------------------------------------------------------------------------------------------------------------------------------------
         # Transform the cartesian velocity in the 'panda/base' frame--------------------------------------
         world_cartesian_velocity_trans  = Vector3Stamped()
@@ -498,7 +532,7 @@ class franka_impedance_controller():
         # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
         base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
         
-        print(type(base_wrench_force))
+        # print(type(base_wrench_force))
 
         # Bandpassfilter 
         self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
@@ -528,7 +562,7 @@ class franka_impedance_controller():
         Returns:
             Vector3Stamped,Vector3Stamped: The filtered forces and torques
         """
-        print(force_unfiltered)
+        # print(force_unfiltered)
         force_filtered = Vector3Stamped()
         force_filtered.header.frame_id = force_unfiltered.header.frame_id
         force_filtered.header.stamp  = force_unfiltered.header.stamp 
