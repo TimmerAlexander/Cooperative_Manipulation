@@ -49,16 +49,16 @@ class franka_impedance_controller():
     
     def config(self):
         # Stiffness gains
-        self.P_trans_x = 50.
-        self.P_trans_y = 50.
-        self.P_trans_z = 50.
-        self.P_rot_x = 25.
-        self.P_rot_y = 25.
-        self.P_rot_z = 25.
+        self.P_trans_x = 500.
+        self.P_trans_y = 500.
+        self.P_trans_z = 500.
+        self.P_rot_x = 100.
+        self.P_rot_y = 100.
+        self.P_rot_z = 100.
         # Damping gains
-        self.D_trans_x = 10.
-        self.D_trans_y = 10.
-        self.D_trans_z = 10.
+        self.D_trans_x = 100.
+        self.D_trans_y = 100.
+        self.D_trans_z = 100.
         self.D_rot_x = 1.
         self.D_rot_y = 1.
         self.D_rot_z = 1.
@@ -132,7 +132,7 @@ class franka_impedance_controller():
         self.tf_listener.waitForTransform("panda/panda_link8","world", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Wait for transformation 'panda/base' to 'panda/panda_link8'.")
         self.tf_listener.waitForTransform("panda/base","panda/panda_link8", rospy.Time(), rospy.Duration(5.0))
-        rospy.loginfo("Wait for transformation 'world' to 'base'.")
+        rospy.loginfo("Wait for transformation 'world' to 'panda/base'.")
         self.tf_listener.waitForTransform("world","panda/base", rospy.Time(), rospy.Duration(5.0))
         # Initialize the 'padna/panda_gripper' frame in tf tree
         self.set_gripper_offset()
@@ -164,12 +164,12 @@ class franka_impedance_controller():
             queue_size=1,
             tcp_nodelay=True)
         
-        self.wrench_msg_sub = rospy.Subscriber(
-            '/gazebo/robot/wrist/ft', 
-            WrenchStamped, 
-            self.wrench_msg_callback,
-            queue_size=1,
-            tcp_nodelay=True)
+        # self.wrench_msg_sub = rospy.Subscriber(
+        #     '/gazebo/robot/wrist/ft', 
+        #     WrenchStamped, 
+        #     self.wrench_msg_callback,
+        #     queue_size=1,
+        #     tcp_nodelay=True)
         
         # * Initialize publisher:
         # Also create a publisher to publish joint commands
@@ -197,7 +197,6 @@ class franka_impedance_controller():
         # * Initialize self.goal_pos and self.goal_ori
         self.goal_pos = numpy.asarray(start_pos.reshape([1,3]))
         self.goal_ori = start_ori
-
         
         # * Initialize P_trans/P_rot and D_trans/D_rot numpy.array
         self.P_trans = numpy.array([self.P_trans_x,self.P_trans_y,self.P_trans_z]).reshape([3,1])
@@ -223,8 +222,6 @@ class franka_impedance_controller():
         movement_trans = numpy.array([None])
         movement_ori = numpy.array([None])
         
-        time_old = rospy.Time.now()
-        time_old = time_old.to_sec() - 0.01
         while not rospy.is_shutdown():
             # Get current position and orientation 
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
@@ -233,8 +230,8 @@ class franka_impedance_controller():
             current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
             current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
             
-            print("current_rot_trans ")
-            print(current_vel_rot)
+            # print("current_vel_rot ")
+            # print(current_vel_rot )
             
 
             # * Check self.target_cartesian_trans_velocity and self.target_cartesian_trot_velocity for the min/max velocity limits
@@ -264,13 +261,7 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
                     
-                    
-                    
-            time_now = rospy.Time.now()
-            time_now = time_now.to_sec()
-            time_diff = numpy.round(time_now - time_old,3)
-            time_old = time_now
-
+           
             if target_cartesian_trans_velocity_norm == 0.0 and target_cartesian_rot_velocity_norm == 0.0:
                 tau = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
                 # ! Only for real robot with effort_controllers/JointGroupEffoertController. If you send zero torques to the effort_controllers/JointGroupEffoertController the controller compute the equilibrium pose.
@@ -283,48 +274,37 @@ class franka_impedance_controller():
                 
             else:
                 # Calculate the translational and rotation movement
-                movement_trans = numpy.asarray([x * time_diff for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-                movement_ori = self.euler_to_quaternion(numpy.asarray([x / time_diff for x in self.desired_velocity_rot_transformed]))
+                movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+                movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
 
                 # Add the movement to current pose and orientation
                 self.goal_pos = (self.goal_pos + movement_trans)
                 self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
                 # Calculate position and orientation difference
-                self.delta_pos = ((self.goal_pos - curr_pos)).reshape([3,1]) 
+                self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
                 self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
                 
-                # print("self.delta_pos")
-                # print(self.delta_pos)
                 # print("self.wrench_force_transformed")
                 # print(self.wrench_force_transformed)
-                    
                 # Calculate linear and angular velocity difference
-                self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans 
+                self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans
+                
                 #+ numpy.array(self.wrench_force_transformed).reshape([3,1])
                 self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot 
+                
                 #+ numpy.array(self.wrench_torque_transformed).reshape([3,1])
                 
-                # print("self.desired_velocity_rot_transformed")
-                # print(self.desired_velocity_rot_transformed)
-                # print("self.delta_angular")
-                # print(self.delta_angular)
-                
-                print("self.delta_pos")
-                print(self.delta_pos)
-                
-                
-                print("self.delta_linguar")
-                print(self.delta_linear)
+                # print("self.delta_linear")
+                # print(self.delta_linear)
                 
                 # Desired task-space force using PD law
                 F = numpy.vstack([numpy.multiply(self.P_trans,self.delta_pos), numpy.multiply(self.P_rot,self.delta_ori)]) + numpy.vstack([numpy.multiply(self.D_trans,self.delta_linear), numpy.multiply(self.D_rot,self.delta_angular)])
-                
+
                 J = copy.deepcopy(self.JACOBIAN)
                 
                 # joint torques to be commanded
                 tau = numpy.dot(J.T,F)
-                print("tau")
-                print(tau)
+                
                 # publish joint commands
                 self.command_msg.effort = tau.flatten()
                 self.joint_command_publisher.publish(self.command_msg)
@@ -377,24 +357,24 @@ class franka_impedance_controller():
         now = rospy.Time()
         # Calculate the trajectory velocity of the manipulator for the rotation of the object ------------------------------
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
-        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
+        # panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
+        # panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
 
 
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")
-        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
+        # # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'world' frame 
+        # panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")
+        # panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
 
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
+        # # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
         # ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
         # ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
     
-        # print("self.ur16e_current_position, self.ur16e_current_quaternion")
-        # print(self.ur16e_current_position, self.ur16e_current_quaternion)
-        # print("self.panda_current_position, self.panda_current_quaternion")
-        # print(self.panda_position, self.panda_current_quaternion)
+        # # print("self.ur16e_current_position, self.ur16e_current_quaternion")
+        # # print(self.ur16e_current_position, self.ur16e_current_quaternion)
+        # # print("self.panda_current_position, self.panda_current_quaternion")
+        # # print(self.panda_position, self.panda_current_quaternion)
 
-        # Object rotation around x axis 
+        # # Object rotation around x axis 
         # if desired_velocity.angular.x != 0.0:
         #     panda_current_position_x = numpy.array([
         #         0.0,
@@ -500,54 +480,54 @@ class franka_impedance_controller():
         self.world_trajectory_velocity = [0.0,0.0,0.0]
         
 
-    def wrench_msg_callback(self,wrench_ext):
-        """ 
-            Get external wrench in 'panda/panda_link7' frame.
-        """
-        # print("wrench_ext")
-        # print(wrench_ext)
+    # def wrench_msg_callback(self,wrench_ext):
+    #     """ 
+    #         Get external wrench in 'panda/panda_link7' frame.
+    #     """
+    #     # print("wrench_ext")
+    #     # print(wrench_ext)
         
-        # Get current time stamp
-        now = rospy.Time()
+    #     # Get current time stamp
+    #     now = rospy.Time()
             
-        panda_link7_wrench_force  = Vector3Stamped()
-        panda_link7_wrench_torque  = Vector3Stamped()
-        # Converse cartesian_velocity translation to vector3
-        panda_link7_wrench_force.header.frame_id = 'panda/panda_link7'
-        panda_link7_wrench_force.header.stamp = now
-        panda_link7_wrench_force.vector.x = wrench_ext.wrench.force.x
-        panda_link7_wrench_force.vector.y = wrench_ext.wrench.force.y
-        panda_link7_wrench_force.vector.z = wrench_ext.wrench.force.z
+    #     panda_link7_wrench_force  = Vector3Stamped()
+    #     panda_link7_wrench_torque  = Vector3Stamped()
+    #     # Converse cartesian_velocity translation to vector3
+    #     panda_link7_wrench_force.header.frame_id = 'panda/panda_link7'
+    #     panda_link7_wrench_force.header.stamp = now
+    #     panda_link7_wrench_force.vector.x = wrench_ext.wrench.force.x
+    #     panda_link7_wrench_force.vector.y = wrench_ext.wrench.force.y
+    #     panda_link7_wrench_force.vector.z = wrench_ext.wrench.force.z
             
-        # Transform cartesian_velocity translation from 'panda/panda_link7' frame to 'panda/panda_link8'
-        base_wrench_force = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_force)
+    #     # Transform cartesian_velocity translation from 'panda/panda_link7' frame to 'panda/panda_link8'
+    #     base_wrench_force = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_force)
             
-        # Converse cartesian_velocity rotation to vector3
-        panda_link7_wrench_torque.header.frame_id = 'panda/panda_link7'
-        panda_link7_wrench_torque.header.stamp = now
-        panda_link7_wrench_torque.vector.x = wrench_ext.wrench.torque.x
-        panda_link7_wrench_torque.vector.y = wrench_ext.wrench.torque.y
-        panda_link7_wrench_torque.vector.z = wrench_ext.wrench.torque.z
+    #     # Converse cartesian_velocity rotation to vector3
+    #     panda_link7_wrench_torque.header.frame_id = 'panda/panda_link7'
+    #     panda_link7_wrench_torque.header.stamp = now
+    #     panda_link7_wrench_torque.vector.x = wrench_ext.wrench.torque.x
+    #     panda_link7_wrench_torque.vector.y = wrench_ext.wrench.torque.y
+    #     panda_link7_wrench_torque.vector.z = wrench_ext.wrench.torque.z
             
-        # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
-        base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
+    #     # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
+    #     base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
         
-        # print(type(base_wrench_force))
+    #     print(type(base_wrench_force))
 
-        # Bandpassfilter 
-        self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
+    #     # Bandpassfilter 
+    #     self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
            
-        self.wrench_force_transformed = [
-            self.wrench_force_filtered.vector.x * self.wrench_force_x,
-            self.wrench_force_filtered.vector.y * self.wrench_force_y,
-            self.wrench_force_filtered.vector.z * self.wrench_force_z,
-            ]
+    #     self.wrench_force_transformed = [
+    #         self.wrench_force_filtered.vector.x * self.wrench_force_x,
+    #         self.wrench_force_filtered.vector.y * self.wrench_force_y,
+    #         self.wrench_force_filtered.vector.z * self.wrench_force_z,
+    #         ]
         
-        self.wrench_torque_transformed = [
-            self.wrench_torque_filtered.vector.x * self.wrench_torque_x,
-            self.wrench_torque_filtered.vector.y * self.wrench_torque_y,
-            self.wrench_torque_filtered.vector.z * self.wrench_torque_z,
-            ]
+    #     self.wrench_torque_transformed = [
+    #         self.wrench_torque_filtered.vector.x * self.wrench_torque_x,
+    #         self.wrench_torque_filtered.vector.y * self.wrench_torque_y,
+    #         self.wrench_torque_filtered.vector.z * self.wrench_torque_z,
+    #         ]
 
     def band_pass_filter(self,force_unfiltered: Vector3Stamped, torque_unfiltered: Vector3Stamped, force_filter_threshold: float, torque_filter_threshold: float):
         """            
@@ -562,7 +542,7 @@ class franka_impedance_controller():
         Returns:
             Vector3Stamped,Vector3Stamped: The filtered forces and torques
         """
-        # print(force_unfiltered)
+        print(force_unfiltered)
         force_filtered = Vector3Stamped()
         force_filtered.header.frame_id = force_unfiltered.header.frame_id
         force_filtered.header.stamp  = force_unfiltered.header.stamp 
