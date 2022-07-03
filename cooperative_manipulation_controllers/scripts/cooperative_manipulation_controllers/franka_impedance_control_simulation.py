@@ -221,7 +221,8 @@ class franka_impedance_controller():
         # Declare movement_trans and movement_ori
         movement_trans = numpy.array([None])
         movement_ori = numpy.array([None])
-        
+        time_old = rospy.Time.now()
+        time_old = time_old.to_sec() - 0.01
         while not rospy.is_shutdown():
             # Get current position and orientation 
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
@@ -261,7 +262,11 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
                     
-           
+            time_now = rospy.Time.now()
+            time_now = time_now.to_sec()
+            time_diff = numpy.round(time_now - time_old,3)
+            time_old = time_now
+            
             if target_cartesian_trans_velocity_norm == 0.0 and target_cartesian_rot_velocity_norm == 0.0:
                 tau = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
                 # ! Only for real robot with effort_controllers/JointGroupEffoertController. If you send zero torques to the effort_controllers/JointGroupEffoertController the controller compute the equilibrium pose.
@@ -274,8 +279,8 @@ class franka_impedance_controller():
                 
             else:
                 # Calculate the translational and rotation movement
-                movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-                movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
+                movement_trans = numpy.asarray([x * time_diff for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+                movement_ori = self.euler_to_quaternion(numpy.asarray([x * time_diff for x in self.desired_velocity_rot_transformed]))
 
                 # Add the movement to current pose and orientation
                 self.goal_pos = (self.goal_pos + movement_trans)
@@ -357,13 +362,13 @@ class franka_impedance_controller():
         now = rospy.Time()
         # Calculate the trajectory velocity of the manipulator for the rotation of the object ------------------------------
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_link8' frame in the 'world' frame 
-        # panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
-        # panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_link8")
+        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_link8", panda_tf_time)
 
 
         # # Get self.panda_current_position, self.panda_current_quaternion of the '/panda/panda_gripper' frame in the 'world' frame 
-        # panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")
-        # panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda/panda_gripper")
+        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda/panda_gripper", panda_tf_time)
 
         # # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
         # ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
