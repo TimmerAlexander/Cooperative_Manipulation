@@ -18,11 +18,13 @@
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/trigger_rate.h>
 
+#include <moveit/move_group_interface/move_group_interface.h>
 #include <std_msgs/Float64MultiArray.h>
+#include <geometry_msgs/Twist.h>
 
 namespace franka_example_controllers {
 
-class FrankaJointTorqueController : public controller_interface::MultiInterfaceController<
+class JointImpedanceExampleController : public controller_interface::MultiInterfaceController<
                                             franka_hw::FrankaModelInterface,
                                             hardware_interface::EffortJointInterface,
                                             franka_hw::FrankaPoseCartesianInterface> {
@@ -31,11 +33,26 @@ class FrankaJointTorqueController : public controller_interface::MultiInterfaceC
   void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
 
-  // Tau command subscriber
+    // Tau command subscriber
   ros::Subscriber sub_tau_command_;
-  void jointTorqueCmdCallback(const std_msgs::Float64MultiArray::ConstPtr&  tau_cmd);
-  std::array<double, 7> tau_command = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+  ros::Subscriber sub_velocity_command_;
 
+  void velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd);
+
+
+  void jointTorqueCmdCallback(const std_msgs::Float64MultiArray::ConstPtr&  tau_cmd);
+  
+  std::array<double, 7> tau_command = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+  std::array<double, 6> velocity_command = {0.0,0.0,0.0,0.0,0.0,0.0};
+  std::array<double, 6> test = {0.0,0.0,0.0,0.0,0.0,0.0};
+  std::array<double, 3>  vel_trans_command = {0.0,0.0,0.0};
+  double vel_y{0.0};
+
+
+  
+
+  double delta_y = 0.0;
+  double delta_y_old = 0.0;
  private:
   // Saturation
   std::array<double, 7> saturateTorqueRate(
@@ -47,10 +64,17 @@ class FrankaJointTorqueController : public controller_interface::MultiInterfaceC
   std::vector<hardware_interface::JointHandle> joint_handles_;
 
   static constexpr double kDeltaTauMax{1.0};
+  double radius_{0.1};
+  double acceleration_time_{2.0};
+  double vel_max_{0.05};
+  double vel_acc_{0.05};
+  double angle_{0.0};
+  double vel_current_{0.0};
 
-
-
+  std::vector<double> k_gains_;
+  std::vector<double> d_gains_;
   double coriolis_factor_{1.0};
+  std::array<double, 7> dq_filtered_;
   std::array<double, 16> initial_pose_;
 
   franka_hw::TriggerRate rate_trigger_{1.0};

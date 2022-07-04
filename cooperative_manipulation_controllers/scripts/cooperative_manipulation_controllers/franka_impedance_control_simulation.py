@@ -49,16 +49,16 @@ class franka_impedance_controller():
     
     def config(self):
         # Stiffness gains
-        self.P_trans_x = 500.
-        self.P_trans_y = 500.
-        self.P_trans_z = 500.
-        self.P_rot_x = 100.
-        self.P_rot_y = 100.
-        self.P_rot_z = 100.
+        self.P_trans_x = 50.
+        self.P_trans_y = 50.
+        self.P_trans_z = 50.
+        self.P_rot_x = 25.
+        self.P_rot_y = 25.
+        self.P_rot_z = 25.
         # Damping gains
-        self.D_trans_x = 100.
-        self.D_trans_y = 100.
-        self.D_trans_z = 100.
+        self.D_trans_x = 10.
+        self.D_trans_y = 10.
+        self.D_trans_z = 10.
         self.D_rot_x = 1.
         self.D_rot_y = 1.
         self.D_rot_z = 1.
