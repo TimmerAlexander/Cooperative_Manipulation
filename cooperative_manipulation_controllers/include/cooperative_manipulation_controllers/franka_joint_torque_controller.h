@@ -44,16 +44,19 @@ class JointImpedanceExampleController : public controller_interface::MultiInterf
   
   std::array<double, 7> tau_command = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
   std::array<double, 6> velocity_command = {0.0,0.0,0.0,0.0,0.0,0.0};
-  std::array<double, 6> test = {0.0,0.0,0.0,0.0,0.0,0.0};
+
   std::array<double, 3>  vel_trans_command = {0.0,0.0,0.0};
+
   double vel_y{0.0};
 
 
-  
+
 
   double delta_y = 0.0;
   double delta_y_old = 0.0;
  private:
+  // Do not change the publish rate
+ 
   // Saturation
   std::array<double, 7> saturateTorqueRate(
       const std::array<double, 7>& tau_d_calculated,
@@ -69,7 +72,10 @@ class JointImpedanceExampleController : public controller_interface::MultiInterf
   double vel_max_{0.05};
   double vel_acc_{0.05};
   double angle_{0.0};
-  double vel_current_{0.0};
+  //double vel_current_{0.0};
+  std::array<double, 3>  vel_current_ = {0.0,0.0,0.0};
+  std::array<double, 3>  delta_trans = {0.0,0.0,0.0};
+
 
   std::vector<double> k_gains_;
   std::vector<double> d_gains_;
