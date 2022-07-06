@@ -182,7 +182,7 @@ include_directories(
 )
 
 add_library(cooperative_manipulation_controllers
-  src/franka_impedance_controller.cpp
+  src/franka_impedance_control_hardware.cpp
 )
 
 ## Declare a C++ library

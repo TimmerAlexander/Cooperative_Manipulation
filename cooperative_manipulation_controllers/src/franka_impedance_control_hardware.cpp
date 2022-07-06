@@ -1,6 +1,6 @@
 // Copyright (c) 2017 Franka Emika GmbH
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <cooperative_manipulation_controllers/franka_impedance_controller.h>
+#include <cooperative_manipulation_controllers/franka_impedance_control_hardware.h>
 
 #include <cmath>
 #include <memory>

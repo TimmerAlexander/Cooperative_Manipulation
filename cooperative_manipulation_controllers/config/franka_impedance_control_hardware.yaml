@@ -1,4 +1,4 @@
-franka_impedance_controller:
+franka_impedance_control_hardware:
     type: cooperative_manipulation_controllers/FrankaImpedanceController
     arm_id: panda
     joint_names:

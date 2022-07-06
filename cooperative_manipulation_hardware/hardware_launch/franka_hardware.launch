@@ -3,6 +3,10 @@
   <arg name="robot_ip" value="192.168.13.90" />
   <arg name="load_gripper" default="true" />
 
+    <!-- <arg name="panda_name" default="panda"/>
+    <arg name="base_name" default="$(arg panda_name)/base"/>
+ 
+  <group ns="$(arg panda_name)"> -->
   <include file="$(find franka_control)/launch/franka_control.launch" >
     <arg name="robot_ip" value="$(arg robot_ip)" />
     <arg name="load_gripper" value="$(arg load_gripper)" />
@@ -10,5 +14,6 @@
 
   <!-- Launch the franka_hardware_node -->
   <node pkg="cooperative_manipulation_hardware" name="franka_hardware_node" type="franka_hardware_node.py" output="screen"/>
+   <!-- </group>   -->
 
 </launch>
