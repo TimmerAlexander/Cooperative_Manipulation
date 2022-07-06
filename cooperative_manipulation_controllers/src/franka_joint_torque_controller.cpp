@@ -20,24 +20,6 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
     ROS_ERROR("JointImpedanceExampleController: Could not read parameter arm_id");
     return false;
   }
-  if (!node_handle.getParam("radius", radius_)) {
-    ROS_INFO_STREAM(
-        "JointImpedanceExampleController: No parameter radius, defaulting to: " << radius_);
-  }
-  if (std::fabs(radius_) < 0.005) {
-    ROS_INFO_STREAM("JointImpedanceExampleController: Set radius to small, defaulting to: " << 0.1);
-    radius_ = 0.1;
-  }
-
-  if (!node_handle.getParam("vel_max", vel_max_)) {
-    ROS_INFO_STREAM(
-        "JointImpedanceExampleController: No parameter vel_max, defaulting to: " << vel_max_);
-  }
-  if (!node_handle.getParam("acceleration_time", acceleration_time_)) {
-    ROS_INFO_STREAM(
-        "JointImpedanceExampleController: No parameter acceleration_time, defaulting to: "
-        << acceleration_time_);
-  }
 
   std::vector<std::string> joint_names;
   if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
@@ -89,24 +71,6 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
     return false;
   }
 
-  // auto* cartesian_pose_interface = robot_hw->get<franka_hw::FrankaPoseCartesianInterface>();
-  // if (cartesian_pose_interface == nullptr) {
-  //   ROS_ERROR_STREAM(
-  //       "JointImpedanceExampleController: Error getting cartesian pose interface from hardware");
-  //   return false;
-  // }
-  // try {
-  //   cartesian_pose_handle_ = std::make_unique<franka_hw::FrankaCartesianPoseHandle>(
-  //       cartesian_pose_interface->getHandle(arm_id + "_robot"));
-  // } catch (hardware_interface::HardwareInterfaceException& ex) {
-  //   ROS_ERROR_STREAM(
-  //       "JointImpedanceExampleController: Exception getting cartesian pose handle from interface: "
-  //       << ex.what());
-  //   return false;
-  // }
-
-
-
   auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
   if (effort_joint_interface == nullptr) {
     ROS_ERROR_STREAM(
@@ -144,7 +108,6 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
   sub_velocity_command_ = node_handle.subscribe(
     "desired_velocity", 1, &JointImpedanceExampleController::velocityCmdCallback,this,ros::TransportHints().reliable().tcpNoDelay());
 
-
   std::fill(dq_filtered_.begin(), dq_filtered_.end(), 0);
 
   return true;
@@ -152,15 +115,13 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
 
 void JointImpedanceExampleController::velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd)
 {
-  //  vel_cmd->data[0:2] = vel_trans,vel_cmd->data[3:11] = vel_rot(as roation matrix)
-  
   if (vel_cmd->data.size() != 6) {
     ROS_ERROR_STREAM(
           "EffortJointTorqueController: Published Commands are not of size 12");
   }
   else{
     for (size_t i = 0; i < 6; ++i) {
-    vel_command[i] = vel_cmd->data[i];
+    velocity_command[i] = vel_cmd->data[i];
     }
   }
 }
@@ -174,26 +135,26 @@ void JointImpedanceExampleController::update(const ros::Time& /*time*/,
   std::array<double, 6> velocity_desired = velocity_cartesian_handle_->getRobotState().O_dP_EE_d;
 
   for (size_t i = 0; i < 6; i++) {
-    if (vel_current_[i] < vel_command[i]) {
+    if (vel_current_[i] < velocity_command[i]) {
     // Acceleration
-    vel_current_[i] += 0.0001;
-    vel_current_[i] = std::fmin(vel_current_[i], vel_command[i]);
+    vel_current_[i] += vel_acc_;
+    vel_current_[i] = std::fmin(vel_current_[i], velocity_command[i]);
     }
-    else if (vel_current_[i] > vel_command[i]) {
+    else if (vel_current_[i] > velocity_command[i]) {
       // Deceleration
-      vel_current_[i] -= 0.0001;
-      vel_current_[i] = std::fmax(vel_current_[i], vel_command[i]);
+      vel_current_[i] -= vel_acc_;
+      vel_current_[i] = std::fmax(vel_current_[i], velocity_command[i]);
     }
-    else if(vel_command[i] == 0.0){
+    else if(velocity_command[i] == 0.0){
       if (vel_current_[i] > 0.0){
         // Stop when vel_current_ > 0.0
-        vel_current_[i] -= 0.0001;
-        vel_current_[i] = std::fmax(vel_current_[i], vel_command[i]);
+        vel_current_[i] -= vel_acc_;
+        vel_current_[i] = std::fmax(vel_current_[i], velocity_command[i]);
       }
       else if (vel_current_[i] < 0.0){
         // Stop when vel_current_ < 0.0
-        vel_current_[i] += 0.0001;
-        vel_current_[i] = std::fmax(vel_current_[i], vel_command[i]);
+        vel_current_[i] += vel_acc_;
+        vel_current_[i] = std::fmax(vel_current_[i], velocity_command[i]);
       }
     }
   }
@@ -201,16 +162,16 @@ void JointImpedanceExampleController::update(const ros::Time& /*time*/,
   // Set velocity command
   std::array<double, 6> command = {vel_current_};
   velocity_cartesian_handle_->setCommand(command);
-
+  // Get the robot_state, coriolis and gravity
   franka::RobotState robot_state = velocity_cartesian_handle_->getRobotState();
   std::array<double, 7> coriolis = model_handle_->getCoriolis();
   std::array<double, 7> gravity = model_handle_->getGravity();
-
+  // Filter the joint velocity
   double alpha = 0.99;
   for (size_t i = 0; i < 7; i++) {
     dq_filtered_[i] = (1 - alpha) * dq_filtered_[i] + alpha * robot_state.dq[i];
   }
-
+  // Calculate the joint moment with the impedance control law
   std::array<double, 7> tau_d_calculated;
   for (size_t i = 0; i < 7; ++i) {
     tau_d_calculated[i] = coriolis_factor_ * coriolis[i] +
@@ -222,6 +183,7 @@ void JointImpedanceExampleController::update(const ros::Time& /*time*/,
   // 1000 * (1 / sampling_time).
   std::array<double, 7> tau_d_saturated = saturateTorqueRate(tau_d_calculated, robot_state.tau_J_d);
 
+  // Set the torque for each joint
   for (size_t i = 0; i < 7; ++i) {
     joint_handles_[i].setCommand(tau_d_saturated[i]);
   }
