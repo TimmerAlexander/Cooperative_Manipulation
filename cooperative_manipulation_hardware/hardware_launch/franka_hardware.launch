@@ -8,8 +8,7 @@
     <arg name="load_gripper" value="$(arg load_gripper)" />
   </include>
 
-  <!-- Launch the franka_joint_torque_controller -->
-  <rosparam command="load" file="$(find cooperative_manipulation_controllers)/config/franka_impedance_controller.yaml" />
-  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_impedance_controller"/>
+  <!-- Launch the franka_hardware_node -->
+  <node pkg="cooperative_manipulation_hardware" name="franka_hardware_node" type="franka_hardware_node.py" output="screen"/>
 
 </launch>
