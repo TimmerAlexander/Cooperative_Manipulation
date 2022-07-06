@@ -498,7 +498,46 @@ class franka_impedance_controller():
         # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
         base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
         
-        print(type(base_wrench_force))
+         # * Band-passfilter
+        # if numpy.abs(base_wrench_force.vector.x) < self.wrench_filter_force:
+        #     base_wrench_force.vector.x = 0.0
+        # else: 
+        #     base_wrench_force.vector.x = base_wrench_force.vector.x - numpy.sign(base_wrench_force.vector.x) * self.wrench_filter_force
+            
+        # if(numpy.abs(base_wrench_force.vector.y) < self.wrench_filter_force):
+        #     base_wrench_force.vector.y = 0.0
+        # else: 
+        #     base_wrench_force.vector.y = base_wrench_force.vector.y - numpy.sign(base_wrench_force.vector.y) * self.wrench_filter_force
+
+        # if(numpy.abs(base_wrench_force.vector.z) < self.wrench_filter_force):
+        #     base_wrench_force.vector.z = 0.0
+        # else: 
+        #    base_wrench_force.vector.z = base_wrench_force.vector.z - numpy.sign(base_wrench_force.vector.z) * self.wrench_filter_force
+
+        # if(numpy.abs(base_wrench_torque.vector.x) < self.wrench_filter_torque):
+        #     base_wrench_torque.vector.x = 0.0
+        # else: 
+        #     base_wrench_torque.vector.x = base_wrench_torque.vector.x - numpy.sign(base_wrench_torque.vector.x) * self.wrench_filter_torque
+        # if(numpy.abs(base_wrench_torque.vector.y) < self.wrench_filter_torque):
+        #     base_wrench_torque.vector.y = 0.0
+        # else: 
+        #     base_wrench_torque.vector.y = base_wrench_torque.vector.y - numpy.sign(base_wrench_torque.vector.y) * self.wrench_filter_torque
+        # if(numpy.abs(base_wrench_torque.vector.z) < self.wrench_filter_torque):
+        #     base_wrench_torque.vector.z = 0.0
+        # else: 
+        #     base_wrench_torque.vector.z = base_wrench_torque.vector.z - numpy.sign(base_wrench_torque.vector.z) * self.wrench_filter_torque 
+
+        # self.wrench_force_transformed = [
+        #     base_wrench_force.vector.x * self.wrench_force_x,
+        #     base_wrench_force.vector.y * self.wrench_force_y,
+        #     base_wrench_force.vector.z * self.wrench_force_z,
+        #     ]
+        
+        # self.wrench_torque_transformed = [
+        #     base_wrench_torque.vector.x * self.wrench_torque_x,
+        #     base_wrench_torque.vector.y * self.wrench_torque_y,
+        #     base_wrench_torque.vector.z * self.wrench_torque_z,
+        #     ]
 
         # Bandpassfilter 
         self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)

@@ -15,7 +15,24 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  dynamic_reconfigure
+  eigen_conversions
+  franka_hw
+  franka_gripper
+  geometry_msgs
+  hardware_interface
+  joint_limits_interface
+  tf
+  tf_conversions
+  message_generation
+  realtime_tools
+  urdf
+  visualization_msgs
 )
+
+find_package(Eigen3 REQUIRED)
+find_package(Franka 0.7.0 REQUIRED)
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -107,11 +124,25 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
+  INCLUDE_DIRS include
   LIBRARIES cooperative_manipulation_controllers
-  CATKIN_DEPENDS roscpp rospy std_msgs
-  pluginlib
-  CATKIN_DEPENDS
-  rospy)
+  CATKIN_DEPENDS 
+    roscpp
+    rospy
+    std_msgs
+    controller_interface
+    dynamic_reconfigure
+    eigen_conversions
+    franka_hw
+    geometry_msgs
+    hardware_interface
+    tf
+    tf_conversions
+    message_runtime
+    pluginlib
+    realtime_tools
+    DEPENDS Franka
+  )
 
 ###########
 ## Build ##
@@ -119,26 +150,31 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(
-# include
+include_directories( 
+  include 
   ${catkin_INCLUDE_DIRS}
-  ${GAZEBO_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  #${GAZEBO_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME} 
-# )
-
+add_library(cooperative_manipulation_controllers src/franka_joint_torque_controller.cpp)
+target_link_libraries(cooperative_manipulation_controllers
+      ${Franka_LIBRARIES}
+      ${catkin_LIBRARIES}
+)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(cooperative_manipulation_controllers 
+#       ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+#       ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 # ## The recommended prefix ensures that target names across packages don't collide
-#  add_executable(gazebo_ros_interface src/gazebo_ros_interface.cpp)
-#  target_link_libraries(gazebo_ros_interface ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
+# add_executable(cooperative_manipulation_controllers src/franka_joint_torque_controller.cpp)
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
