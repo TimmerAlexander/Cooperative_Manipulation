@@ -180,7 +180,7 @@ class franka_impedance_controller():
         # * Initialize publisher:
         # Also create a publisher to publish joint commands
         self.velocity_command_publisher = rospy.Publisher(
-                'joint_impedance_example_controller/desired_velocity',
+                '/franka_impedance_controller/desired_velocity',
                 Float64MultiArray,
                 tcp_nodelay=True,
                 queue_size=1)
