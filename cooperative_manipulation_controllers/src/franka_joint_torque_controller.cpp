@@ -89,21 +89,23 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
     return false;
   }
 
-  auto* cartesian_pose_interface = robot_hw->get<franka_hw::FrankaPoseCartesianInterface>();
-  if (cartesian_pose_interface == nullptr) {
-    ROS_ERROR_STREAM(
-        "JointImpedanceExampleController: Error getting cartesian pose interface from hardware");
-    return false;
-  }
-  try {
-    cartesian_pose_handle_ = std::make_unique<franka_hw::FrankaCartesianPoseHandle>(
-        cartesian_pose_interface->getHandle(arm_id + "_robot"));
-  } catch (hardware_interface::HardwareInterfaceException& ex) {
-    ROS_ERROR_STREAM(
-        "JointImpedanceExampleController: Exception getting cartesian pose handle from interface: "
-        << ex.what());
-    return false;
-  }
+  // auto* cartesian_pose_interface = robot_hw->get<franka_hw::FrankaPoseCartesianInterface>();
+  // if (cartesian_pose_interface == nullptr) {
+  //   ROS_ERROR_STREAM(
+  //       "JointImpedanceExampleController: Error getting cartesian pose interface from hardware");
+  //   return false;
+  // }
+  // try {
+  //   cartesian_pose_handle_ = std::make_unique<franka_hw::FrankaCartesianPoseHandle>(
+  //       cartesian_pose_interface->getHandle(arm_id + "_robot"));
+  // } catch (hardware_interface::HardwareInterfaceException& ex) {
+  //   ROS_ERROR_STREAM(
+  //       "JointImpedanceExampleController: Exception getting cartesian pose handle from interface: "
+  //       << ex.what());
+  //   return false;
+  // }
+
+
 
   auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
   if (effort_joint_interface == nullptr) {
@@ -120,6 +122,23 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
       return false;
     }
   }
+
+  velocity_cartesian_interface_ =
+      robot_hw->get<franka_hw::FrankaVelocityCartesianInterface>();
+  if (velocity_cartesian_interface_ == nullptr) {
+    ROS_ERROR(
+        "CartesianVelocityExampleController: Could not get Cartesian velocity interface from "
+        "hardware");
+    return false;
+  }
+  try {
+    velocity_cartesian_handle_ = std::make_unique<franka_hw::FrankaCartesianVelocityHandle>(
+        velocity_cartesian_interface_->getHandle(arm_id + "_robot"));
+  } catch (const hardware_interface::HardwareInterfaceException& e) {
+    ROS_ERROR_STREAM(
+        "CartesianVelocityExampleController: Exception getting Cartesian handle: " << e.what());
+    return false;
+  }
   torques_publisher_.init(node_handle, "torque_comparison", 1);
 
   sub_velocity_command_ = node_handle.subscribe(
@@ -133,70 +152,57 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
 
 void JointImpedanceExampleController::velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd)
 {
-  if (vel_cmd->data.size() != 3) {
+  //  vel_cmd->data[0:2] = vel_trans,vel_cmd->data[3:11] = vel_rot(as roation matrix)
+  
+  if (vel_cmd->data.size() != 6) {
     ROS_ERROR_STREAM(
-          "EffortJointTorqueController: Published Commands are not of size 7");
+          "EffortJointTorqueController: Published Commands are not of size 12");
   }
   else{
-    for (size_t i = 0; i < 3; ++i) {
-    vel_trans_command[i] = vel_cmd->data[i];
-    ROS_INFO("I heard: [%f]", vel_trans_command[i]);
+    for (size_t i = 0; i < 6; ++i) {
+    vel_command[i] = vel_cmd->data[i];
     }
   }
 }
 
 void JointImpedanceExampleController::starting(const ros::Time& /*time*/) {
-  initial_pose_ = cartesian_pose_handle_->getRobotState().O_T_EE_d;
 }
 
 void JointImpedanceExampleController::update(const ros::Time& /*time*/,
                                              const ros::Duration& period) {
-  // ROS_INFO_STREAM("vel_max_ ");
-  // ROS_INFO_STREAM(vel_max_); 
+  
+  std::array<double, 6> velocity_desired = velocity_cartesian_handle_->getRobotState().O_dP_EE_d;
 
-  std::array<double, 16> pose_desired = cartesian_pose_handle_->getRobotState().O_T_EE_d;
-  for (size_t i = 0; i < 3; i++) {
-    if (vel_current_[i] < vel_trans_command[i]) {
+  for (size_t i = 0; i < 6; i++) {
+    if (vel_current_[i] < vel_command[i]) {
     // Acceleration
-    vel_current_[i] += period.toSec() * std::fabs(vel_acc_/10);
-    vel_current_[i] = std::fmin(vel_current_[i], vel_trans_command[i]);
+    vel_current_[i] += 0.0001;
+    vel_current_[i] = std::fmin(vel_current_[i], vel_command[i]);
     }
-    else if (vel_current_[i] > vel_trans_command[i]) {
+    else if (vel_current_[i] > vel_command[i]) {
       // Deceleration
-      vel_current_[i] -= period.toSec() * std::fabs(vel_acc_/100);
-      vel_current_[i] = std::fmax(vel_current_[i], vel_trans_command[i]);
+      vel_current_[i] -= 0.0001;
+      vel_current_[i] = std::fmax(vel_current_[i], vel_command[i]);
     }
-    else if(vel_trans_command[i] == 0.0){
-      // Stop
-      if (vel_current_[i] != 0.0){
-        vel_current_[i] -= period.toSec() * std::fabs(vel_acc_/100);
-        vel_current_[i] = std::fmax(vel_current_[i], vel_trans_command[i]);
+    else if(vel_command[i] == 0.0){
+      if (vel_current_[i] > 0.0){
+        // Stop when vel_current_ > 0.0
+        vel_current_[i] -= 0.0001;
+        vel_current_[i] = std::fmax(vel_current_[i], vel_command[i]);
+      }
+      else if (vel_current_[i] < 0.0){
+        // Stop when vel_current_ < 0.0
+        vel_current_[i] += 0.0001;
+        vel_current_[i] = std::fmax(vel_current_[i], vel_command[i]);
       }
     }
-    // ROS_INFO_STREAM(i);
-    // ROS_INFO_STREAM("vel_current_[i]");
-    // ROS_INFO_STREAM(vel_current_[i]);
-    pose_desired[12 + i] += vel_current_[i] / 1000;
   }
   
-  cartesian_pose_handle_->setCommand(pose_desired);
+  // Set velocity command
+  std::array<double, 6> command = {vel_current_};
+  velocity_cartesian_handle_->setCommand(command);
 
-  // The maximum torque rate is
-  // double delta_y = vel_current_ / 1000;
-  // ROS_INFO_STREAM("delta_y - delta_y_old");
-  // ROS_INFO_STREAM(delta_y - delta_y_old);
-  // delta_y_old = delta_y;
-
-  // ROS_INFO_STREAM("delta_y");
-  // ROS_INFO_STREAM(delta_y);
-
-
-
-
-  
-  
-
-  franka::RobotState robot_state = cartesian_pose_handle_->getRobotState();
+  franka::RobotState robot_state = velocity_cartesian_handle_->getRobotState();
   std::array<double, 7> coriolis = model_handle_->getCoriolis();
   std::array<double, 7> gravity = model_handle_->getGravity();
 

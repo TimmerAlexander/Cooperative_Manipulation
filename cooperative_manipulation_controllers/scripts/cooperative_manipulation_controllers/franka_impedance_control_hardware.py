@@ -37,7 +37,9 @@
     Output:
     * Joint effort: self.command_msg.effort (Float64MultiArray)
 """
-import copy, numpy, quaternion
+from tf import transformations
+import copy, numpy, quaternion, math
+from matplotlib.cbook import flatten
 import rospy
 import tf
 import tf2_ros
@@ -277,8 +279,13 @@ class franka_impedance_controller():
             if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
+                    
+            self.command_msg.data = numpy.append(self.desired_velocity_trans_transformed,self.desired_velocity_rot_transformed) 
 
-            self.command_msg.data = self.desired_velocity_trans_transformed
+            print("self.command_msg")
+            print(self.command_msg)
+            # Transpose the transformation_matrix to hand the impedance controller the values in the correct order
+ 
             self.velocity_command_publisher.publish(self.command_msg)
 
             # Calculate the translational and rotation movement
@@ -340,9 +347,6 @@ class franka_impedance_controller():
             #     self.command_msg.data = tau.flatten()
             #     self.velocity_command_publisher.publish(self.command_msg)
             
-            
-            
-            
             rate.sleep()
 
 
@@ -357,10 +361,13 @@ class franka_impedance_controller():
         # pose message received is a vectorised column major transformation matrix
         cart_pose_trans_mat = numpy.asarray(msg.O_T_EE).reshape(4,4,order='F')
 
+        # print("cart_pose_trans_mat")
+        # print(cart_pose_trans_mat)
+        
         self.CARTESIAN_POSE = {
             'position': cart_pose_trans_mat[:3,3],
             'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
-
+        
         # * Get the current joint states
         self.current_joint_states_array = self.group.get_current_joint_values()
 
@@ -514,8 +521,8 @@ class franka_impedance_controller():
 
         self.desired_velocity_rot_transformed = [
             desired_velocity.angular.x,
-            -1 * desired_velocity.angular.y,
-            -1 * desired_velocity.angular.z,
+            desired_velocity.angular.y,
+            desired_velocity.angular.z,
             ]
 
 
@@ -644,7 +651,23 @@ class franka_impedance_controller():
 
         quaternion_from_euler = numpy.quaternion(q_w,q_x,q_y,q_z)
 
+
         return quaternion_from_euler
+    
+    
+    # Calculates Rotation Matrix given euler angles.
+    def euler_to_matrix(self,euler_array: numpy.array):
+        
+        if(numpy.linalg.norm(euler_array) != 0.0):
+            matrix_from_rotation = transformations.euler_matrix(euler_array[0],euler_array[1],euler_array[2])
+        else:
+            matrix_from_rotation = numpy.array([[0.0,0.0,0.0,0.0],
+                                    [0.0,0.0,0.0,0.0],
+                                    [0.0,0.0,0.0,0.0],
+                                    [0.0,0.0,0.0,0.0]])
+        return matrix_from_rotation
+
+    
 
 
     def quatdiff_in_euler(self,quat_curr: numpy.quaternion, quat_des: numpy.quaternion):

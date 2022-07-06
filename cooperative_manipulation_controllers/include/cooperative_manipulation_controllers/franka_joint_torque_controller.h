@@ -13,6 +13,7 @@
 #include <ros/node_handle.h>
 #include <ros/time.h>
 
+
 #include <franka_example_controllers/JointTorqueComparison.h>
 #include <franka_hw/franka_cartesian_command_interface.h>
 #include <franka_hw/franka_model_interface.h>
@@ -26,8 +27,8 @@ namespace franka_example_controllers {
 
 class JointImpedanceExampleController : public controller_interface::MultiInterfaceController<
                                             franka_hw::FrankaModelInterface,
-                                            hardware_interface::EffortJointInterface,
-                                            franka_hw::FrankaPoseCartesianInterface> {
+                                            franka_hw::FrankaVelocityCartesianInterface,
+                                            hardware_interface::EffortJointInterface> {
  public:
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
   void starting(const ros::Time&) override;
@@ -44,11 +45,14 @@ class JointImpedanceExampleController : public controller_interface::MultiInterf
   
   std::array<double, 7> tau_command = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
   std::array<double, 6> velocity_command = {0.0,0.0,0.0,0.0,0.0,0.0};
-
-  std::array<double, 3>  vel_trans_command = {0.0,0.0,0.0};
+  std::array<double, 6>  vel_command = {0.0,0.0,0.0,0.0,0.0,0.0};
+  std::array<double, 6> velocity_desired = {0.0,0.0,0.0,0.0,0.0,0.0};
 
   double vel_y{0.0};
 
+  franka_hw::FrankaVelocityCartesianInterface* velocity_cartesian_interface_;
+  std::unique_ptr<franka_hw::FrankaCartesianVelocityHandle> velocity_cartesian_handle_;
+  ros::Duration elapsed_time_;
 
 
 
@@ -62,6 +66,7 @@ class JointImpedanceExampleController : public controller_interface::MultiInterf
       const std::array<double, 7>& tau_d_calculated,
       const std::array<double, 7>& tau_J_d);  // NOLINT (readability-identifier-naming)
 
+  std::vector<hardware_interface::JointHandle> velocity_joint_handles_;
   std::unique_ptr<franka_hw::FrankaCartesianPoseHandle> cartesian_pose_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
   std::vector<hardware_interface::JointHandle> joint_handles_;
@@ -73,7 +78,7 @@ class JointImpedanceExampleController : public controller_interface::MultiInterf
   double vel_acc_{0.05};
   double angle_{0.0};
   //double vel_current_{0.0};
-  std::array<double, 3>  vel_current_ = {0.0,0.0,0.0};
+  std::array<double, 6>  vel_current_ = {0.0,0.0,0.0,0.0,0.0,0.0};
   std::array<double, 3>  delta_trans = {0.0,0.0,0.0};
 
 
