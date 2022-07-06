@@ -103,7 +103,6 @@ bool FrankaImpedanceController::init(hardware_interface::RobotHW* robot_hw,
         "CartesianVelocityExampleController: Exception getting Cartesian handle: " << e.what());
     return false;
   }
-  torques_publisher_.init(node_handle, "torque_comparison", 1);
 
   sub_velocity_command_ = node_handle.subscribe(
     "desired_velocity", 1, &FrankaImpedanceController::velocityCmdCallback,this,ros::TransportHints().reliable().tcpNoDelay());
@@ -117,17 +116,16 @@ void FrankaImpedanceController::velocityCmdCallback(const std_msgs::Float64Multi
 {
   if (vel_cmd->data.size() != 6) {
     ROS_ERROR_STREAM(
-          "EffortJointTorqueController: Published Commands are not of size 12");
+          "EffortJointTorqueController: Published Commands are not of size 6");
   }
   else{
     for (size_t i = 0; i < 6; ++i) {
     velocity_command[i] = vel_cmd->data[i];
+    ROS_INFO_STREAM(velocity_command[i]);
     }
   }
 }
 
-void FrankaImpedanceController::starting(const ros::Time& /*time*/) {
-}
 
 void FrankaImpedanceController::update(const ros::Time& /*time*/,
                                              const ros::Duration& period) {
@@ -158,7 +156,7 @@ void FrankaImpedanceController::update(const ros::Time& /*time*/,
       }
     }
   }
-  ROS_INFO("test");
+
   // Set velocity command
   std::array<double, 6> command = {vel_current_};
   velocity_cartesian_handle_->setCommand(command);
@@ -186,27 +184,6 @@ void FrankaImpedanceController::update(const ros::Time& /*time*/,
   // Set the torque for each joint
   for (size_t i = 0; i < 7; ++i) {
     joint_handles_[i].setCommand(tau_d_saturated[i]);
-  }
-
-  if (rate_trigger_() && torques_publisher_.trylock()) {
-    std::array<double, 7> tau_j = robot_state.tau_J;
-    std::array<double, 7> tau_error;
-    double error_rms(0.0);
-    for (size_t i = 0; i < 7; ++i) {
-      tau_error[i] = last_tau_d_[i] - tau_j[i];
-      error_rms += std::sqrt(std::pow(tau_error[i], 2.0)) / 7.0;
-    }
-    torques_publisher_.msg_.root_mean_square_error = error_rms;
-    for (size_t i = 0; i < 7; ++i) {
-      torques_publisher_.msg_.tau_commanded[i] = last_tau_d_[i];
-      torques_publisher_.msg_.tau_error[i] = tau_error[i];
-      torques_publisher_.msg_.tau_measured[i] = tau_j[i];
-    }
-    torques_publisher_.unlockAndPublish();
-  }
-
-  for (size_t i = 0; i < 7; ++i) {
-    last_tau_d_[i] = tau_d_saturated[i] + gravity[i];
   }
 }
 

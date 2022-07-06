@@ -31,7 +31,6 @@ class FrankaImpedanceController : public controller_interface::MultiInterfaceCon
                                             hardware_interface::EffortJointInterface> {
  public:
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
-  void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
   void velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd);
 
@@ -62,7 +61,6 @@ class FrankaImpedanceController : public controller_interface::MultiInterfaceCon
 
   franka_hw::TriggerRate rate_trigger_{1.0};
   std::array<double, 7> last_tau_d_{};
-  realtime_tools::RealtimePublisher<franka_example_controllers::JointTorqueComparison> torques_publisher_;
 };
 
 }  // namespace cooperative_manipulation_controllers
