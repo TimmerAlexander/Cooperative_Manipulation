@@ -1,8 +1,8 @@
-<library path="lib/libcooperative_manipulation_controllers_lib">
+<library path="lib/libcooperative_manipulation_controllers">
 
-  <class name=" effort_controllers/JointGroupEffortController" type="cooperative_manipulation_controllers::FrankaJointTorqueController" base_class_type="controller_interface::ControllerBase">
+  <class name="cooperative_manipulation_controllers/FrankaImpedanceController" type="cooperative_manipulation_controllers::FrankaImpedanceController" base_class_type="controller_interface::ControllerBase">
     <description>
-      A controller that tracks a cartesian path with a joint impedance controller that compensates coriolis torques. The torque commands are compared to measured torques in Console outputs.
+      A controller that tracks a velocity with a joint impedance controller that compensates coriolis torques. The torque commands are compared to measured torques in Console outputs.
     </description>
   </class>
 

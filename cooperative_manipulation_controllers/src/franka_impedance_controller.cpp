@@ -1,6 +1,6 @@
 // Copyright (c) 2017 Franka Emika GmbH
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <franka_example_controllers/joint_impedance_example_controller.h>
+#include <cooperative_manipulation_controllers/franka_impedance_controller.h>
 
 #include <cmath>
 #include <memory>
@@ -11,54 +11,54 @@
 
 #include <franka/robot_state.h>
 
-namespace franka_example_controllers {
+namespace cooperative_manipulation_controllers {
 
-bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw,
+bool FrankaImpedanceController::init(hardware_interface::RobotHW* robot_hw,
                                            ros::NodeHandle& node_handle) {
   std::string arm_id;
   if (!node_handle.getParam("arm_id", arm_id)) {
-    ROS_ERROR("JointImpedanceExampleController: Could not read parameter arm_id");
+    ROS_ERROR("FrankaImpedanceController: Could not read parameter arm_id");
     return false;
   }
 
   std::vector<std::string> joint_names;
   if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
     ROS_ERROR(
-        "JointImpedanceExampleController: Invalid or no joint_names parameters provided, aborting "
+        "FrankaImpedanceController: Invalid or no joint_names parameters provided, aborting "
         "controller init!");
     return false;
   }
 
   if (!node_handle.getParam("k_gains", k_gains_) || k_gains_.size() != 7) {
     ROS_ERROR(
-        "JointImpedanceExampleController:  Invalid or no k_gain parameters provided, aborting "
+        "FrankaImpedanceController:  Invalid or no k_gain parameters provided, aborting "
         "controller init!");
     return false;
   }
 
   if (!node_handle.getParam("d_gains", d_gains_) || d_gains_.size() != 7) {
     ROS_ERROR(
-        "JointImpedanceExampleController:  Invalid or no d_gain parameters provided, aborting "
+        "FrankaImpedanceController:  Invalid or no d_gain parameters provided, aborting "
         "controller init!");
     return false;
   }
 
   double publish_rate(30.0);
   if (!node_handle.getParam("publish_rate", publish_rate)) {
-    ROS_INFO_STREAM("JointImpedanceExampleController: publish_rate not found. Defaulting to "
+    ROS_INFO_STREAM("FrankaImpedanceController: publish_rate not found. Defaulting to "
                     << publish_rate);
   }
   rate_trigger_ = franka_hw::TriggerRate(publish_rate);
 
   if (!node_handle.getParam("coriolis_factor", coriolis_factor_)) {
-    ROS_INFO_STREAM("JointImpedanceExampleController: coriolis_factor not found. Defaulting to "
+    ROS_INFO_STREAM("FrankaImpedanceController: coriolis_factor not found. Defaulting to "
                     << coriolis_factor_);
   }
 
   auto* model_interface = robot_hw->get<franka_hw::FrankaModelInterface>();
   if (model_interface == nullptr) {
     ROS_ERROR_STREAM(
-        "JointImpedanceExampleController: Error getting model interface from hardware");
+        "FrankaImpedanceController: Error getting model interface from hardware");
     return false;
   }
   try {
@@ -66,7 +66,7 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
         model_interface->getHandle(arm_id + "_model"));
   } catch (hardware_interface::HardwareInterfaceException& ex) {
     ROS_ERROR_STREAM(
-        "JointImpedanceExampleController: Exception getting model handle from interface: "
+        "FrankaImpedanceController: Exception getting model handle from interface: "
         << ex.what());
     return false;
   }
@@ -74,7 +74,7 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
   auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
   if (effort_joint_interface == nullptr) {
     ROS_ERROR_STREAM(
-        "JointImpedanceExampleController: Error getting effort joint interface from hardware");
+        "FrankaImpedanceController: Error getting effort joint interface from hardware");
     return false;
   }
   for (size_t i = 0; i < 7; ++i) {
@@ -82,7 +82,7 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
       joint_handles_.push_back(effort_joint_interface->getHandle(joint_names[i]));
     } catch (const hardware_interface::HardwareInterfaceException& ex) {
       ROS_ERROR_STREAM(
-          "JointImpedanceExampleController: Exception getting joint handles: " << ex.what());
+          "FrankaImpedanceController: Exception getting joint handles: " << ex.what());
       return false;
     }
   }
@@ -106,14 +106,14 @@ bool JointImpedanceExampleController::init(hardware_interface::RobotHW* robot_hw
   torques_publisher_.init(node_handle, "torque_comparison", 1);
 
   sub_velocity_command_ = node_handle.subscribe(
-    "desired_velocity", 1, &JointImpedanceExampleController::velocityCmdCallback,this,ros::TransportHints().reliable().tcpNoDelay());
+    "desired_velocity", 1, &FrankaImpedanceController::velocityCmdCallback,this,ros::TransportHints().reliable().tcpNoDelay());
 
   std::fill(dq_filtered_.begin(), dq_filtered_.end(), 0);
 
   return true;
 }
 
-void JointImpedanceExampleController::velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd)
+void FrankaImpedanceController::velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd)
 {
   if (vel_cmd->data.size() != 6) {
     ROS_ERROR_STREAM(
@@ -126,10 +126,10 @@ void JointImpedanceExampleController::velocityCmdCallback(const std_msgs::Float6
   }
 }
 
-void JointImpedanceExampleController::starting(const ros::Time& /*time*/) {
+void FrankaImpedanceController::starting(const ros::Time& /*time*/) {
 }
 
-void JointImpedanceExampleController::update(const ros::Time& /*time*/,
+void FrankaImpedanceController::update(const ros::Time& /*time*/,
                                              const ros::Duration& period) {
   
   std::array<double, 6> velocity_desired = velocity_cartesian_handle_->getRobotState().O_dP_EE_d;
@@ -158,7 +158,7 @@ void JointImpedanceExampleController::update(const ros::Time& /*time*/,
       }
     }
   }
-  
+  ROS_INFO("test");
   // Set velocity command
   std::array<double, 6> command = {vel_current_};
   velocity_cartesian_handle_->setCommand(command);
@@ -210,7 +210,7 @@ void JointImpedanceExampleController::update(const ros::Time& /*time*/,
   }
 }
 
-std::array<double, 7> JointImpedanceExampleController::saturateTorqueRate(
+std::array<double, 7> FrankaImpedanceController::saturateTorqueRate(
     const std::array<double, 7>& tau_d_calculated,
     const std::array<double, 7>& tau_J_d) {  // NOLINT (readability-identifier-naming)
   std::array<double, 7> tau_d_saturated{};
@@ -221,8 +221,8 @@ std::array<double, 7> JointImpedanceExampleController::saturateTorqueRate(
   return tau_d_saturated;
 }
 
-}  // namespace franka_example_controllers
+}  // namespace cooperative_manipulation_controllers
 
-PLUGINLIB_EXPORT_CLASS(franka_example_controllers::JointImpedanceExampleController,
+PLUGINLIB_EXPORT_CLASS(cooperative_manipulation_controllers::FrankaImpedanceController,
                        controller_interface::ControllerBase)
 

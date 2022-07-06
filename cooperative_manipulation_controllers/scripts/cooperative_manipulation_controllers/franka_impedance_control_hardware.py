@@ -43,7 +43,7 @@ from matplotlib.cbook import flatten
 import rospy
 import tf
 import tf2_ros
-from geometry_msgs.msg import Twist, Vector3Stamped, WrenchStamped, TransformStamped
+from geometry_msgs.msg import Twist, TransformStamped
 from std_msgs.msg import Float64MultiArray
 from franka_msgs.msg import FrankaState
 import moveit_commander
@@ -55,30 +55,30 @@ class franka_impedance_controller():
 
     def config(self):
         # Stiffness gains
-        self.P_trans_x = 400.
-        self.P_trans_y = 400.
-        self.P_trans_z = 400.
-        self.P_rot_x = 10.
-        self.P_rot_y = 10.
-        self.P_rot_z = 10.
-        # Damping gains
-        self.D_trans_x = 10.
-        self.D_trans_y = 10.
-        self.D_trans_z = 10.
-        self.D_rot_x = 1.
-        self.D_rot_y = 1.
-        self.D_rot_z = 1.
-        # Wrench compliance gains
-        self.wrench_force_x = 0.1
-        self.wrench_force_y = 0.1
-        self.wrench_force_z = 0.1
-        self.wrench_torque_x = 0.1
-        self.wrench_torque_y = 0.1
-        self.wrench_torque_z = 0.1
-        # Wrench filter force treshold (1.0 when robot stands still)
-        self.wrench_filter_force = 1.0
-        # Wrench filter torque treshold (0.14 when robot stands still)
-        self.wrench_filter_torque = 0.14
+        # self.P_trans_x = 400.
+        # self.P_trans_y = 400.
+        # self.P_trans_z = 400.
+        # self.P_rot_x = 10.
+        # self.P_rot_y = 10.
+        # self.P_rot_z = 10.
+        # # Damping gains
+        # self.D_trans_x = 10.
+        # self.D_trans_y = 10.
+        # self.D_trans_z = 10.
+        # self.D_rot_x = 1.
+        # self.D_rot_y = 1.
+        # self.D_rot_z = 1.
+        # # Wrench compliance gains
+        # self.wrench_force_x = 0.1
+        # self.wrench_force_y = 0.1
+        # self.wrench_force_z = 0.1
+        # self.wrench_torque_x = 0.1
+        # self.wrench_torque_y = 0.1
+        # self.wrench_torque_z = 0.1
+        # # Wrench filter force treshold (1.0 when robot stands still)
+        # self.wrench_filter_force = 1.0
+        # # Wrench filter torque treshold (0.14 when robot stands still)
+        # self.wrench_filter_torque = 0.14
         # Min and max limits for the cartesian velocity (trans/rot) (unit: [m/s],[rad/s])
         self.cartesian_velocity_trans_min_limit = 0.001
         self.cartesian_velocity_trans_max_limit = 0.1
@@ -87,25 +87,25 @@ class franka_impedance_controller():
         # Control thread publish rate
         self.publish_rate = 100 # [Hz]
         # Declare librarys for jacobian matrix, cartesian pose and velocity
-        self.JACOBIAN   = None
-        self.CARTESIAN_POSE = None
-        self.CARTESIAN_VEL = None
+        # self.JACOBIAN   = None
+        # self.CARTESIAN_POSE = None
+        # self.CARTESIAN_VEL = None
         # Create joint command message 
         self.command_msg = Float64MultiArray()
         # Initialize position and orientation difference
-        self.delta_pos = numpy.array([0.0,0.0,0.0]).reshape([3,1])
-        self.delta_ori = numpy.array([0.0,0.0,0.0]).reshape([3,1])
-        # Initialize linear and angular velocity difference
-        self.delta_linear = numpy.array([0.0,0.0,0.0]).reshape([3,1])
-        self.delta_angular = numpy.array([0.0,0.0,0.0]).reshape([3,1])
+        # self.delta_pos = numpy.array([0.0,0.0,0.0]).reshape([3,1])
+        # self.delta_ori = numpy.array([0.0,0.0,0.0]).reshape([3,1])
+        # # Initialize linear and angular velocity difference
+        # self.delta_linear = numpy.array([0.0,0.0,0.0]).reshape([3,1])
+        # self.delta_angular = numpy.array([0.0,0.0,0.0]).reshape([3,1])
         # Initialize desired translational and rotation velocity
         self.desired_velocity_trans_transformed  = numpy.array([0.0,0.0,0.0])
         self.desired_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
         # Initialize external wrench
-        self.wrench_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        self.wrench_force_transformed = numpy.array([0.0,0.0,0.0,])
-        self.wrench_torque_transformed = numpy.array([0.0,0.0,0.0,])
-        # Initialize trajectory velocity for object rotation
+        # self.wrench_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        # self.wrench_force_transformed = numpy.array([0.0,0.0,0.0,])
+        # self.wrench_torque_transformed = numpy.array([0.0,0.0,0.0,])
+        # # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
         # The gripper offset
         self.panda_gripper_offset = 0.10655
@@ -143,25 +143,25 @@ class franka_impedance_controller():
         # ! If not using franka_ros_interface, you have to subscribe to the right topics to obtain the current end-effector state and robot jacobian for computing commands
         # * Initialize move_it
         # You have to launch roslaunch panda_moveit_config move_group.launch
-        moveit_commander.roscpp_initialize(sys.argv)
+        # moveit_commander.roscpp_initialize(sys.argv)
 
-        try:
-            group_name = 'panda_arm'
-            print("Initialize movit_commander. Group name: ",group_name)
-            self.group = moveit_commander.MoveGroupCommander(group_name, wait_for_servers=5.0)
-        except Exception as e:
-            print(e)
+        # try:
+        #     group_name = 'panda_arm'
+        #     print("Initialize movit_commander. Group name: ",group_name)
+        #     self.group = moveit_commander.MoveGroupCommander(group_name, wait_for_servers=5.0)
+        # except Exception as e:
+        #     print(e)
 
         # * Initialize subscriber:
-        self.cartesian_state_sub = rospy.Subscriber(
-            '/franka_state_controller/franka_states',
-            FrankaState,
-            self._get_franka_state,
-            queue_size=1,
-            tcp_nodelay=True)
+        # self.cartesian_state_sub = rospy.Subscriber(
+        #     '/franka_state_controller/franka_states',
+        #     FrankaState,
+        #     self._get_franka_state,
+        #     queue_size=1,
+        #     tcp_nodelay=True)
 
         # Wait for messages to be populated before proceeding
-        rospy.wait_for_message("/franka_state_controller/franka_states",FrankaState,timeout=5.0)
+        # rospy.wait_for_message("/franka_state_controller/franka_states",FrankaState,timeout=5.0)
 
         self.cartesian_msg_sub = rospy.Subscriber(
             '/cooperative_manipulation/cartesian_velocity_command',
@@ -185,20 +185,20 @@ class franka_impedance_controller():
                 tcp_nodelay=True,
                 queue_size=1)
 
-        # * Get the current joint states
-        self.current_joint_states_array = self.group.get_current_joint_values()
+        # # * Get the current joint states
+        # self.current_joint_states_array = self.group.get_current_joint_values()
 
-        # * Calculate the jacobian-matrix
-        self.JACOBIAN   = self.group.get_jacobian_matrix(self.current_joint_states_array)
+        # # * Calculate the jacobian-matrix
+        # self.JACOBIAN   = self.group.get_jacobian_matrix(self.current_joint_states_array)
 
 
-        # Wait for messages to be populated before proceeding
-        rospy.loginfo("Subscribing to robot state topics...")
-        while (True):
-            if not (self.JACOBIAN   is None or self.CARTESIAN_POSE is None):
-                print(self.JACOBIAN  ,self.CARTESIAN_POSE)
-                break
-        rospy.loginfo("Recieved messages; Launch Franka Impedance Control.")
+        # # Wait for messages to be populated before proceeding
+        # rospy.loginfo("Subscribing to robot state topics...")
+        # while (True):
+        #     if not (self.JACOBIAN   is None or self.CARTESIAN_POSE is None):
+        #         print(self.JACOBIAN  ,self.CARTESIAN_POSE)
+        #         break
+        # rospy.loginfo("Recieved messages; Launch Franka Impedance Control.")
 
 
 
@@ -206,18 +206,18 @@ class franka_impedance_controller():
         rospy.on_shutdown(self._on_shutdown)
 
         # * Get start position and orientation
-        start_pose = copy.deepcopy(self.CARTESIAN_POSE)
-        start_pos, start_ori = start_pose['position'],start_pose['orientation']
+        # start_pose = copy.deepcopy(self.CARTESIAN_POSE)
+        # start_pos, start_ori = start_pose['position'],start_pose['orientation']
 
         # * Initialize self.goal_pos and self.goal_ori
-        self.goal_pos = numpy.asarray(start_pos.reshape([1,3]))
-        self.goal_ori = start_ori
+        # self.goal_pos = numpy.asarray(start_pos.reshape([1,3]))
+        # self.goal_ori = start_ori
 
         # * Initialize P_trans/P_rot and D_trans/D_rot numpy.array
-        self.P_trans = numpy.array([self.P_trans_x,self.P_trans_y,self.P_trans_z]).reshape([3,1])
-        self.P_rot = numpy.array([self.P_rot_x,self.P_rot_y,self.P_rot_z]).reshape([3,1])
-        self.D_trans = numpy.array([self.D_trans_x,self.D_trans_y,self.D_trans_z]).reshape([3,1])
-        self.D_rot = numpy.array([self.D_rot_x,self.D_rot_y,self.D_rot_z]).reshape([3,1])
+        # self.P_trans = numpy.array([self.P_trans_x,self.P_trans_y,self.P_trans_z]).reshape([3,1])
+        # self.P_rot = numpy.array([self.P_rot_x,self.P_rot_y,self.P_rot_z]).reshape([3,1])
+        # self.D_trans = numpy.array([self.D_trans_x,self.D_trans_y,self.D_trans_z]).reshape([3,1])
+        # self.D_rot = numpy.array([self.D_rot_x,self.D_rot_y,self.D_rot_z]).reshape([3,1])
 
 
         # # * Run controller thread
@@ -235,19 +235,19 @@ class franka_impedance_controller():
         # Set rospy.rate
         rate = rospy.Rate(self.publish_rate)
         # Declare movement_trans and movement_ori
-        movement_trans = numpy.array([None])
-        movement_ori = numpy.array([None])
+        # movement_trans = numpy.array([None])
+        # movement_ori = numpy.array([None])
         
         # time_old = rospy.Time.now()
         # time_old = time_old.to_sec() - 0.01
 
         while not rospy.is_shutdown():
             # Get current position and orientation
-            curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
-            curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
-            # Get current linear and angular velocity
-            current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
-            current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
+            # curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
+            # curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
+            # # Get current linear and angular velocity
+            # current_vel_trans = (self.CARTESIAN_VEL['linear']).reshape([3,1])
+            # current_vel_rot = (self.CARTESIAN_VEL['angular']).reshape([3,1])
 
             # print("current_vel_rot ")
             # print(current_vel_rot )
@@ -351,35 +351,35 @@ class franka_impedance_controller():
 
 
 
-    def _get_franka_state(self,msg):
-        """
-            Callback function to get current end-point state.
+    # def _get_franka_state(self,msg):
+    #     """
+    #         Callback function to get current end-point state.
 
-        Args:
-            msg (franka_core_msgs.msg.EndPointState): Current tip-state state
-        """
-        # pose message received is a vectorised column major transformation matrix
-        cart_pose_trans_mat = numpy.asarray(msg.O_T_EE).reshape(4,4,order='F')
+    #     Args:
+    #         msg (franka_core_msgs.msg.EndPointState): Current tip-state state
+    #     """
+    #     # pose message received is a vectorised column major transformation matrix
+    #     cart_pose_trans_mat = numpy.asarray(msg.O_T_EE).reshape(4,4,order='F')
 
-        # print("cart_pose_trans_mat")
-        # print(cart_pose_trans_mat)
+    #     # print("cart_pose_trans_mat")
+    #     # print(cart_pose_trans_mat)
         
-        self.CARTESIAN_POSE = {
-            'position': cart_pose_trans_mat[:3,3],
-            'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
+    #     self.CARTESIAN_POSE = {
+    #         'position': cart_pose_trans_mat[:3,3],
+    #         'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
         
-        # * Get the current joint states
-        self.current_joint_states_array = self.group.get_current_joint_values()
+    #     # * Get the current joint states
+    #     self.current_joint_states_array = self.group.get_current_joint_values()
 
-        # * Calculate the jacobian-matrix
-        self.JACOBIAN   = self.group.get_jacobian_matrix(self.current_joint_states_array)
+    #     # * Calculate the jacobian-matrix
+    #     self.JACOBIAN   = self.group.get_jacobian_matrix(self.current_joint_states_array)
 
-        O_dP_EE = self.JACOBIAN  .dot(numpy.asarray(msg.dq))
+    #     O_dP_EE = self.JACOBIAN  .dot(numpy.asarray(msg.dq))
 
 
-        self.CARTESIAN_VEL = {
-            'linear': numpy.asarray([O_dP_EE[0], O_dP_EE[1], O_dP_EE[2]]),
-            'angular': numpy.asarray([O_dP_EE[3],O_dP_EE[4], O_dP_EE[5]]) }
+    #     self.CARTESIAN_VEL = {
+    #         'linear': numpy.asarray([O_dP_EE[0], O_dP_EE[1], O_dP_EE[2]]),
+    #         'angular': numpy.asarray([O_dP_EE[3],O_dP_EE[4], O_dP_EE[5]]) }
 
 
     def cartesian_msg_callback(self,desired_velocity):
@@ -514,9 +514,9 @@ class franka_impedance_controller():
 
         # Converse cartesian_velocity from vector3 to numpy.array
         self.desired_velocity_trans_transformed = [
-            desired_velocity.linear.x + self.world_trajectory_velocity[0],
-            desired_velocity.linear.y + self.world_trajectory_velocity[1],
-            desired_velocity.linear.z + self.world_trajectory_velocity[2]
+            desired_velocity.linear.x,
+            desired_velocity.linear.y,
+            desired_velocity.linear.z
             ]
 
         self.desired_velocity_rot_transformed = [
@@ -527,7 +527,7 @@ class franka_impedance_controller():
 
 
         # Set the trajectory velocity for an object rotation to zero
-        self.world_trajectory_velocity = [0.0,0.0,0.0]
+        # self.world_trajectory_velocity = [0.0,0.0,0.0]
 
 
     # def wrench_msg_callback(self,wrench_ext):
@@ -629,99 +629,99 @@ class franka_impedance_controller():
 
         self.brodacaster.sendTransform(static_gripper_offset)
 
-    def euler_to_quaternion(self,euler_array: numpy.array):
-        """
-            Convert Euler angles to a quaternion.
+    # def euler_to_quaternion(self,euler_array: numpy.array):
+    #     """
+    #         Convert Euler angles to a quaternion.
 
-            Inuput
-                :param alpha: Rotation around x-axis) angle in radians.
-                :param beta: The beta (rotation around y-axis) angle in radians.
-                :param gamma: The gamma (rotation around z-axis) angle in radians.
+    #         Inuput
+    #             :param alpha: Rotation around x-axis) angle in radians.
+    #             :param beta: The beta (rotation around y-axis) angle in radians.
+    #             :param gamma: The gamma (rotation around z-axis) angle in radians.
 
-            Output
-                :return quaternion_from_euler: The orientation in quaternion
-        """
-        alpha, beta, gamma = euler_array
+    #         Output
+    #             :return quaternion_from_euler: The orientation in quaternion
+    #     """
+    #     alpha, beta, gamma = euler_array
 
-        q_x = numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) - numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
-        q_y = numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2)
-        q_z = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2) - numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2)
-        q_w = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
-
-
-        quaternion_from_euler = numpy.quaternion(q_w,q_x,q_y,q_z)
+    #     q_x = numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) - numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+    #     q_y = numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2)
+    #     q_z = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2) - numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2)
+    #     q_w = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
 
 
-        return quaternion_from_euler
+    #     quaternion_from_euler = numpy.quaternion(q_w,q_x,q_y,q_z)
+
+
+    #     return quaternion_from_euler
     
     
-    # Calculates Rotation Matrix given euler angles.
-    def euler_to_matrix(self,euler_array: numpy.array):
+    # # Calculates Rotation Matrix given euler angles.
+    # def euler_to_matrix(self,euler_array: numpy.array):
         
-        if(numpy.linalg.norm(euler_array) != 0.0):
-            matrix_from_rotation = transformations.euler_matrix(euler_array[0],euler_array[1],euler_array[2])
-        else:
-            matrix_from_rotation = numpy.array([[0.0,0.0,0.0,0.0],
-                                    [0.0,0.0,0.0,0.0],
-                                    [0.0,0.0,0.0,0.0],
-                                    [0.0,0.0,0.0,0.0]])
-        return matrix_from_rotation
+    #     if(numpy.linalg.norm(euler_array) != 0.0):
+    #         matrix_from_rotation = transformations.euler_matrix(euler_array[0],euler_array[1],euler_array[2])
+    #     else:
+    #         matrix_from_rotation = numpy.array([[0.0,0.0,0.0,0.0],
+    #                                 [0.0,0.0,0.0,0.0],
+    #                                 [0.0,0.0,0.0,0.0],
+    #                                 [0.0,0.0,0.0,0.0]])
+    #     return matrix_from_rotation
 
     
 
 
-    def quatdiff_in_euler(self,quat_curr: numpy.quaternion, quat_des: numpy.quaternion):
-        """
-            Compute difference between quaternions and return
-            Euler angles as difference.
+    # def quatdiff_in_euler(self,quat_curr: numpy.quaternion, quat_des: numpy.quaternion):
+    #     """
+    #         Compute difference between quaternions and return
+    #         Euler angles as difference.
 
-        Args:
-            quat_curr (numpy.quaternion): Current orientation
-            quat_des (numpy.quaternion): Desired orientation
+    #     Args:
+    #         quat_curr (numpy.quaternion): Current orientation
+    #         quat_des (numpy.quaternion): Desired orientation
 
-        Returns:
-            numpy.array: Difference between quaternions
-        """
-        curr_mat = quaternion.as_rotation_matrix(quat_curr)
-        des_mat = quaternion.as_rotation_matrix(quat_des)
-        rel_mat = des_mat.T.dot(curr_mat)
-        rel_quat = quaternion.from_rotation_matrix(rel_mat)
-        vec = quaternion.as_float_array(rel_quat)[1:]
-        if rel_quat.w < 0.0:
-            vec = -vec
+    #     Returns:
+    #         numpy.array: Difference between quaternions
+    #     """
+    #     curr_mat = quaternion.as_rotation_matrix(quat_curr)
+    #     des_mat = quaternion.as_rotation_matrix(quat_des)
+    #     rel_mat = des_mat.T.dot(curr_mat)
+    #     rel_quat = quaternion.from_rotation_matrix(rel_mat)
+    #     vec = quaternion.as_float_array(rel_quat)[1:]
+    #     if rel_quat.w < 0.0:
+    #         vec = -vec
 
-        return -des_mat.dot(vec)
+    #     return -des_mat.dot(vec)
 
-    def add_quaternion(self,quat_0: numpy.quaternion,quat_1: numpy.quaternion):
-        """
-            Add two quaternions and return the sum.
+    # def add_quaternion(self,quat_0: numpy.quaternion,quat_1: numpy.quaternion):
+    #     """
+    #         Add two quaternions and return the sum.
 
-        Args:
-            quat_0 (numpy.quaternion): First quaternion
-            quat_1 (numpy.quaternion): Second quaternion
+    #     Args:
+    #         quat_0 (numpy.quaternion): First quaternion
+    #         quat_1 (numpy.quaternion): Second quaternion
 
-        Returns:
-            numpy.quaternion: Sum of both quaternions
-        """
-        # Extract the values from Q0
-        w_0 = quat_0.w
-        x_0 = quat_0.x
-        y_0 = quat_0.y
-        z_0 = quat_0.z
-        # Extract the values from Q1
-        w_1 = quat_1.w
-        x_1 = quat_1.x
-        y_1 = quat_1.y
-        z_1 = quat_1.z
-        # Compute the product of the two quaternions, term by term
-        sum_w = w_0 * w_1 - x_0 * x_1 - y_0 * y_1 - z_0 * z_1
-        sum_x = w_0 * x_1 + x_0 * w_1 + y_0 * z_1 - z_0 * y_1
-        sum_y = w_0 * y_1 - x_0 * z_1 + y_0 * w_1 + z_0 * x_1
-        sum_z = w_0 * z_1 + x_0 * y_1 - y_0 * x_1 + z_0 * w_1
+    #     Returns:
+    #         numpy.quaternion: Sum of both quaternions
+    #     """
+    #     # Extract the values from Q0
+    #     w_0 = quat_0.w
+    #     x_0 = quat_0.x
+    #     y_0 = quat_0.y
+    #     z_0 = quat_0.z
+    #     # Extract the values from Q1
+    #     w_1 = quat_1.w
+    #     x_1 = quat_1.x
+    #     y_1 = quat_1.y
+    #     z_1 = quat_1.z
+    #     # Compute the product of the two quaternions, term by term
+    #     sum_w = w_0 * w_1 - x_0 * x_1 - y_0 * y_1 - z_0 * z_1
+    #     sum_x = w_0 * x_1 + x_0 * w_1 + y_0 * z_1 - z_0 * y_1
+    #     sum_y = w_0 * y_1 - x_0 * z_1 + y_0 * w_1 + z_0 * x_1
+    #     sum_z = w_0 * z_1 + x_0 * y_1 - y_0 * x_1 + z_0 * w_1
 
-        sum_quat = numpy.quaternion(sum_w ,sum_x,sum_y,sum_z)
+    #     sum_quat = numpy.quaternion(sum_w ,sum_x,sum_y,sum_z)
 
-        return sum_quat
+    #     return sum_quat
 
     def _on_shutdown(self):
         """

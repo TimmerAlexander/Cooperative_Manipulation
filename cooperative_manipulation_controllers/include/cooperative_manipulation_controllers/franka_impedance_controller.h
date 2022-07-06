@@ -23,9 +23,9 @@
 #include <std_msgs/Float64MultiArray.h>
 #include <geometry_msgs/Twist.h>
 
-namespace franka_example_controllers {
+namespace cooperative_manipulation_controllers {
 
-class JointImpedanceExampleController : public controller_interface::MultiInterfaceController<
+class FrankaImpedanceController : public controller_interface::MultiInterfaceController<
                                             franka_hw::FrankaModelInterface,
                                             franka_hw::FrankaVelocityCartesianInterface,
                                             hardware_interface::EffortJointInterface> {
@@ -62,7 +62,7 @@ class JointImpedanceExampleController : public controller_interface::MultiInterf
 
   franka_hw::TriggerRate rate_trigger_{1.0};
   std::array<double, 7> last_tau_d_{};
-  realtime_tools::RealtimePublisher<JointTorqueComparison> torques_publisher_;
+  realtime_tools::RealtimePublisher<franka_example_controllers::JointTorqueComparison> torques_publisher_;
 };
 
-}  // namespace franka_example_controllers
+}  // namespace cooperative_manipulation_controllers
