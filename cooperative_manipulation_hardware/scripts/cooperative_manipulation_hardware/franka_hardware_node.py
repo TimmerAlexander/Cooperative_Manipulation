@@ -39,11 +39,9 @@
 """
 
 import numpy
-
 import rospy
 import tf
-import tf2_ros
-from geometry_msgs.msg import Twist, TransformStamped
+from geometry_msgs.msg import Twist 
 from std_msgs.msg import Float64MultiArray
 
 class franka_impedance_controller():
@@ -61,21 +59,20 @@ class franka_impedance_controller():
         # Initialize desired translational and rotation velocity
         self.desired_velocity_trans_transformed  = numpy.array([0.0,0.0,0.0])
         self.desired_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
-        # Initialize external wrench
-        # # Initialize trajectory velocity for object rotation
+        # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
-        # The gripper offset
-        self.panda_gripper_offset = 0.10655
+
 
     def __init__(self):
         # * Load config parameters
         self.config()
-
+        
         # * Initialize node
         rospy.init_node("franka_hardware_node")
+        
+        # * Get namespace for topics from launch file
+        self.namespace = rospy.get_param("~panda_ns")
 
-         # * Initialize tf TransformBroadcaster
-        self.brodacaster = tf2_ros.StaticTransformBroadcaster()
         # * Initialize tf TransformListener
         self.tf_listener = tf.TransformListener()
 
@@ -86,11 +83,10 @@ class franka_impedance_controller():
         self.tf_listener.waitForTransform("/panda_link0","/panda_link8", rospy.Time(), rospy.Duration(5.0))
         rospy.loginfo("Wait for transformation 'world' to '/panda_link0'.")
         self.tf_listener.waitForTransform("world","/panda_link0", rospy.Time(), rospy.Duration(5.0))
-        # Initialize the 'padna/panda_gripper' frame in tf tree
-        self.set_gripper_offset()
+
         # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
-        rospy.loginfo("Wait for transformation 'world' to '/panda_link8'.")
-        self.tf_listener.waitForTransform("world","/panda_link8", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'world' to '/panda_EE'.")
+        self.tf_listener.waitForTransform("world","/panda_EE", rospy.Time(), rospy.Duration(10.0))
         # rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
         # self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
 
@@ -105,7 +101,7 @@ class franka_impedance_controller():
         # * Initialize publisher:
         # Also create a publisher to publish joint commands
         self.velocity_command_publisher = rospy.Publisher(
-                '/franka_impedance_controller/desired_velocity',
+                '/' + self.namespace + '/franka_impedance_controller/desired_velocity',
                 Float64MultiArray,
                 tcp_nodelay=True,
                 queue_size=1)
@@ -188,9 +184,9 @@ class franka_impedance_controller():
         panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda_link8", panda_tf_time)
 
 
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda_gripper' frame in the 'world' frame
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_gripper")
-        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/panda_gripper", panda_tf_time)
+        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda_EE' frame in the 'world' frame
+        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_EE")
+        panda_EE_position, panda_EE_quaternion = self.tf_listener.lookupTransform("/world", "/panda_EE", panda_tf_time)
 
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame
         # ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
@@ -211,11 +207,11 @@ class franka_impedance_controller():
 
         #     self.robot_distance_x = numpy.array([
         #         0.0,
-        #         ur16e_gripper_position[1] - panda_gripper_position[1],
-        #         ur16e_gripper_position[2] - panda_gripper_position[2],
+        #         ur16e_gripper_position[1] - panda_EE_position[1],
+        #         ur16e_gripper_position[2] - panda_EE_position[2],
         #     ])
 
-        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_gripper_position
+        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_EE_position
         #     world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
         #     world_radius_x = panda_current_position_x - center_x
         #     self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
@@ -230,12 +226,12 @@ class franka_impedance_controller():
         #         ])
 
         #     self.robot_distance_y = numpy.array([
-        #         ur16e_gripper_position[0] - panda_gripper_position[0],
+        #         ur16e_gripper_position[0] - panda_EE_position[0],
         #         0.0,
-        #         ur16e_gripper_position[2] - panda_gripper_position[2],
+        #         ur16e_gripper_position[2] - panda_EE_position[2],
         #         ])
 
-        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_gripper_position
+        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_EE_position
         #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
         #     world_radius_y = panda_current_position_y - center_y
         #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
@@ -252,12 +248,12 @@ class franka_impedance_controller():
         #         ])
 
         #     self.robot_distance_z = numpy.array([
-        #         ur16e_gripper_position[0] - panda_gripper_position[0],
-        #         ur16e_gripper_position[1] - panda_gripper_position[1],
+        #         ur16e_gripper_position[0] - panda_EE_position[0],
+        #         ur16e_gripper_position[1] - panda_EE_position[1],
         #         0.0,
         #         ])
 
-        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_gripper_position
+        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_EE_position
         #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
         #     world_radius_z = panda_current_position_z - center_z
         #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
@@ -309,23 +305,6 @@ class franka_impedance_controller():
         # Set the trajectory velocity for an object rotation to zero
         # self.world_trajectory_velocity = [0.0,0.0,0.0]
 
-    def set_gripper_offset(self):
-        """
-            Set the gripper offset from 'panda_link8' frame.
-        """
-        static_gripper_offset = TransformStamped()
-        static_gripper_offset.header.stamp = rospy.Time.now()
-        static_gripper_offset.header.frame_id = "/panda_link8"
-        static_gripper_offset.child_frame_id = "panda_gripper"
-        static_gripper_offset.transform.translation.x = 0.0
-        static_gripper_offset.transform.translation.y = 0.0
-        static_gripper_offset.transform.translation.z = self.panda_gripper_offset
-        static_gripper_offset.transform.rotation.x = 0.0
-        static_gripper_offset.transform.rotation.y = 0.0
-        static_gripper_offset.transform.rotation.z = -0.924
-        static_gripper_offset.transform.rotation.w = 0.383
-
-        self.brodacaster.sendTransform(static_gripper_offset)
 
     def _on_shutdown(self):
         """

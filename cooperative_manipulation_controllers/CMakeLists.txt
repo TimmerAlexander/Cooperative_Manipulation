@@ -36,9 +36,7 @@ if(NOT Franka_FOUND)
   find_package(Franka 0.8.0 REQUIRED)
 endif()
 
-add_message_files(FILES
-  JointTorqueComparison.msg
-)
+
 
 
 
