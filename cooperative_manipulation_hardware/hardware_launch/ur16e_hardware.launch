@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<launch>
+
+  <arg name="ur_name" default="ur"/>
+ 
+  <group ns="$(arg ur_name)"> 
+    <include file="$(find ur_launch_hardware)/launch/ur.launch" />
+
+    <!-- Launch moveit -->
+    <include file="$(find ur_robot/ur16e_moveit_config)/launch/move_group.launch" />
+  </group>
+
+</launch>
