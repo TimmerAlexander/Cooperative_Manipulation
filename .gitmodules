@@ -1,0 +1,8 @@
+[submodule "match_mobile_robotics"]
+        path = match_mobile_robotics
+        url = https://github.com/match-ROS/match_mobile_robotics.git
+
+[submodule "robotiq"]
+        path = robotiq
+        url = https://github.com/utecrobotics/robotiq.git
+
