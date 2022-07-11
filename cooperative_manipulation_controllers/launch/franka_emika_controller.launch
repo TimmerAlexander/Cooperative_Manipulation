@@ -1,9 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
-  <arg name="arm_id" default="panda"/>
 
-  <rosparam file="$(find cooperative_manipulation_controllers)/config/franka_joint_torque_controller.yaml" />
-  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_joint_torque_controller"/>
+  <!-- these are the arguments you can pass this launch file, for example paused:=true -->
+  <arg name="load_gripper" default="true"/>
+  <arg name="gui" default="false"/>
+  <arg name="ns" default="panda_simulator"/>
+  <arg name="panda_name" default="panda"/>
+  <arg name="panda_tf_prefix" default="$(arg panda_name)"/>
+
+  <!-- Load joint controller configurations from YAML file to parameter server -->
+  <rosparam file="$(find cooperative_manipulation_controllers)/config/franka_sim_controllers.yaml" command="load" ns="/$(arg panda_name)"/>
+  <!-- load the Gripper controllers if args set -->
+  <rosparam if="$(arg load_gripper)" command="load"
+      file="$(find cooperative_manipulation_controllers)/config/franka_gripper_controller.yaml" ns="/$(arg panda_name)"/>
+
+
+
+
+  
+ <!-- 
+                                         position_joint_trajectory_controller
+ -->
+
+ <!--add namespace for the topics in every panda_simulator controller-->
+  <!--topic in position controller-->
+  <param name="/$(arg panda_name)/panda_simulator/position_joint_position_controller/topic_joint_command" 
+                                    value="/$(arg panda_name)/panda_simulator/motion_controller/arm/joint_commands"/>
+
+  <param name="/$(arg panda_name)/panda_simulator/position_joint_position_controller/topic_joint_controller_states" 
+                                    value="/$(arg panda_name)/panda_simulator/motion_controller/arm/joint_controller_states"/>
+
+  <!--topic in velocity controller-->
+  <param name="/$(arg panda_name)/panda_simulator/velocity_joint_velocity_controller/topic" 
+                                    value="/$(arg panda_name)/panda_simulator/motion_controller/arm/joint_commands"/>
+
+  <param name="/$(arg panda_name)/panda_simulator/velocity_joint_velocity_controller/topic_joint_controller_states" 
+                                    value="/$(arg panda_name)/panda_simulator/motion_controller/arm/joint_controller_states"/>
+
+  <!--topic in effort_joint_torque controller-->
+  <param name="/$(arg panda_name)/panda_simulator/effort_joint_torque_controller/topic" 
+                                    value="/$(arg panda_name)/panda_simulator/motion_controller/arm/joint_commands"/>
+
+  <!--topic in effort_joint_gravity controller-->
+  <param name="/$(arg panda_name)/panda_simulator/effort_joint_gravity_controller/topic_robot_state" 
+                                    value="/$(arg panda_name)/panda_simulator/custom_franka_state_controller/robot_state"/>
+  <!--topic in gripper_controller-->
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/joint_state_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/joint_states"/>
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/homing_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/homing"/>
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/stop_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/stop"/>                                   
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/move_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/move"/>
+  <param name="/$(arg panda_name)/panda_simulator/panda_gripper_controller/grasp_topic" 
+                                    value="/$(arg panda_name)/franka_gripper/grasp"/>
+ 
+    <node if="$(arg load_gripper)" name="panda_gripper_controller_spawner_stopped"
+        pkg="controller_manager" type="controller_manager" respawn="false" output="screen" ns="/$(arg panda_name)"
+        args="spawn panda_simulator/panda_gripper_controller"/>
+
+  <!-- load the default "ON" controllers -->
+  <node name="controller_spawner_panda" pkg="controller_manager" type="controller_manager" respawn="false" ns="/$(arg panda_name)"
+        output="screen" args="spawn
+                                         panda_simulator/position_joint_position_controller
+                                         panda_simulator/joint_state_controller
+                                         " />
+
+  <!-- load the default "OFF" controllers -->
+  <node name="controller_spawner_stopped" pkg="controller_manager" type="controller_manager" respawn="false" ns="/$(arg panda_name)"
+       output="screen" args="load
+                                         panda_simulator/velocity_joint_velocity_controller
+                                         panda_simulator/effort_joint_gravity_controller
+                                         panda_simulator/effort_joint_torque_controller  
+                                         "/>
+
+
+  <!--convert joint states to TF transforms -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"
+	respawn="false" output="screen">
+    <param name="tf_prefix" value="$(arg panda_name)"/>
+    <remap from="/joint_states" to="/$(arg panda_name)/joint_states" />
+  </node>
+
+
+  <node name="topic_remap" pkg="topic_tools" type="relay" args="/$(arg panda_name)/joint_states /$(arg ns)/custom_franka_state_controller/joint_states"/>
 
 
 </launch>
