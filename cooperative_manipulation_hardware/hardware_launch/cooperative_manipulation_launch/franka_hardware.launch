@@ -6,7 +6,7 @@
  
   <group ns="$(arg panda_name)"> 
 
-    <include file="$(find franka_control)/launch/franka_control.launch" >
+    <include file="$(find cooperative_manipulation_hardware)/hardware_launch/utils/robots/franka.launch" >
       <arg name="robot_ip" value="$(arg robot_ip)" />
       <arg name="load_gripper" value="$(arg load_gripper)" />
     </include>
