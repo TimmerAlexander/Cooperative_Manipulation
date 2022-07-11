@@ -6,3 +6,8 @@
         path = robotiq
         url = https://github.com/utecrobotics/robotiq.git
 
+
+[submodule "simulation_multirobots"]
+        path = simulation_multirobots
+        url = https://github.com/Grossbier/simulation_multirobots.git
+
