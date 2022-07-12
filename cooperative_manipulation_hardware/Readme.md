@@ -4,14 +4,23 @@
 1. roscore 
 
 ## Launch the ur16e
-1. roslaunch ur_launch_hardware ur.launch
-2. roslaunch ur16e_moveit_config move_group.launch
+Check on dashboard if robot is running
+
+1. rosrun ur_launch_hardware startup.py
+-----------------------------------------
+1. rosrun ur_launch_hardware enably.py
+2. rosrun ur_launch_hardware grip_service_interface.py
+-----------------------------------------
+
+3. roslaunch ur_launch_hardware ur.launch
 
 ## Launch the panda
 1. On Franka Desk click on "Activate FCI"
 2. roslaunch cooperative_manipulation_hardware franka_hardware.launch
-    - rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 world panda_link0
 3. roslaunch panda_moveit.config move_group.launch
+
+## Launch rviz
+roslaunch coopaerative_manipulation_hardware coopaerative_manipulation_hardware_rviz.launch
 
 ## Move to start position
 1. roslaunch ur_launch_hardware ur16e_move_to_start.launch
