@@ -41,7 +41,7 @@
 import numpy
 import rospy
 import tf
-from geometry_msgs.msg import Twist 
+from geometry_msgs.msg import Twist, Vector3Stamped
 from std_msgs.msg import Float64MultiArray
 
 class franka_impedance_controller():
@@ -261,49 +261,44 @@ class franka_impedance_controller():
 
         #------------------------------
 
-        # world_cartesian_velocity_trans  = Vector3Stamped()
-        # world_cartesian_velocity_rot  = Vector3Stamped()
-        #  # Converse cartesian_velocity translation to vector3
-        # world_cartesian_velocity_trans.header.frame_id = 'world'
-        # world_cartesian_velocity_trans.header.stamp = now
-        # world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_velocity[0]
-        # world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
-        # world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
+        world_cartesian_velocity_trans  = Vector3Stamped()
+        world_cartesian_velocity_rot  = Vector3Stamped()
+        # Converse cartesian_velocity translation to vector3
+        world_cartesian_velocity_trans.header.frame_id = 'world'
+        world_cartesian_velocity_trans.header.stamp = now
+        world_cartesian_velocity_trans.vector.x = desired_velocity.linear.x + self.world_trajectory_velocity[0]
+        world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
+        world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
 
-        # Transform cartesian_velocity translation from 'world' frame to 'panda_link0' frame and from 'panda_link0' frame to 'panda_link8
-        # base_cartesian_velocity_trans = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_trans)
+        #Transform cartesian_velocity translation from 'world' frame to 'panda_link0' frame 
+        panda_link0_cartesian_velocity_trans = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_trans)
 
-        # # Converse cartesian_velocity rotation to vector3
-        # world_cartesian_velocity_rot.header.frame_id = 'world'
-        # world_cartesian_velocity_rot.header.stamp = now
-        # world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
-        # world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
-        # world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
+        # Converse cartesian_velocity rotation to vector3
+        world_cartesian_velocity_rot.header.frame_id = 'world'
+        world_cartesian_velocity_rot.header.stamp = now
+        world_cartesian_velocity_rot.vector.x = desired_velocity.angular.x
+        world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
+        world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
 
-        # print("world_cartesian_velocity_rot")
-        # print(world_cartesian_velocity_rot)
+        #Transform cartesian_velocity rotation from 'world' frame to 'panda_link0' frame 
+        panda_link0_cartesian_velocity_rot = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_rot)
 
-        # Transform cartesian_velocity rotation from 'world' frame to 'panda_link0' frame and from 'panda_link0' frame to 'panda_link8'
-        # base_cartesian_velocity_rot = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_rot)
-
-        # print("base_cartesian_velocity_rot")
-        # print(base_cartesian_velocity_rot)
 
         # Converse cartesian_velocity from vector3 to numpy.array
         self.desired_velocity_trans_transformed = [
-            desired_velocity.linear.x,
-            desired_velocity.linear.y,
-            desired_velocity.linear.z
+            panda_link0_cartesian_velocity_trans.vector.x,
+            panda_link0_cartesian_velocity_trans.vector.y,
+            panda_link0_cartesian_velocity_trans.vector.z,
             ]
 
         self.desired_velocity_rot_transformed = [
-            desired_velocity.angular.x,
-            desired_velocity.angular.y,
-            desired_velocity.angular.z,
+            panda_link0_cartesian_velocity_rot.vector.x,
+            panda_link0_cartesian_velocity_rot.vector.y,
+            panda_link0_cartesian_velocity_rot.vector.z,
             ]
         
         # Set the trajectory velocity for an object rotation to zero
-        # self.world_trajectory_velocity = [0.0,0.0,0.0]
+        self.world_trajectory_velocity = [0.0,0.0,0.0]
 
 
     def _on_shutdown(self):
