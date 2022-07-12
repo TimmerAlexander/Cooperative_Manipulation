@@ -1,4 +1,0 @@
-<launch>
-<!-- Launch Cooperative Manipulation Rviz:_________________________________________________________________________-->
-  <node name="rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find cooperative_manipulation_simulation)/rviz/cooperative_manipulation_config.rviz"/>
-</launch>
