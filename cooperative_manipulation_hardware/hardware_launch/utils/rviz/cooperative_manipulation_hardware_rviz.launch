@@ -1,8 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
 
-  <node pkg="tf2_ros" type="static_transform_publisher" name="link_world_broadcaster" args="-1.0 0 0 0 0 0  world base_link" />
-
   <node pkg="rviz" type="rviz" output="screen" name="rviz" args="-d $(find cooperative_manipulation_hardware)/rviz/cooperative_manipulation_hardware.rviz"/>
 
 </launch>
