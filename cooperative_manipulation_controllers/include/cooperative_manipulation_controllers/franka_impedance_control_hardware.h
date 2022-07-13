@@ -48,7 +48,7 @@ class FrankaImpedanceController : public controller_interface::MultiInterfaceCon
       const std::array<double, 7>& tau_J_d);  // NOLINT (readability-identifier-naming)
 
   static constexpr double kDeltaTauMax{1.0};
-  double vel_acc_{0.001};
+  double vel_acc_{0.0005};
   std::vector<double> k_gains_;
   std::vector<double> d_gains_;
   double coriolis_factor_{1.0};
