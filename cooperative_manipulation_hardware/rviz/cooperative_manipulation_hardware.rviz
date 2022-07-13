@@ -3,7 +3,8 @@ Panels:
     Help Height: 89
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /TF1/Frames1
       Splitter Ratio: 0.5
     Tree Height: 1068
   - Class: rviz/Selection
@@ -253,9 +254,11 @@ Visualization Manager:
         tool0:
           Value: false
         tool0_controller:
-          Value: true
+          Value: false
         upper_arm_link:
           Value: false
+        ur16e_gripper:
+          Value: true
         world:
           Value: true
         wrist_1_link:
@@ -286,6 +289,8 @@ Visualization Manager:
                           flange:
                             tool0:
                               {}
+                          ur16e_gripper:
+                            {}
           panda_link0:
             panda_link0_sc:
               {}
@@ -421,7 +426,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.5050921440124512
+      Distance: 2.5470657348632812
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -429,17 +434,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.8662996888160706
-        Y: -0.0429888553917408
-        Z: 0.5638148188591003
+        X: 0.23914989829063416
+        Y: 0.5272703170776367
+        Z: 0.2559124231338501
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.1903972029685974
+      Pitch: 0.37539759278297424
       Target Frame: <Fixed Frame>
-      Yaw: 3.893592119216919
+      Yaw: 1.5085910558700562
     Saved: ~
 Window Geometry:
   Displays:
