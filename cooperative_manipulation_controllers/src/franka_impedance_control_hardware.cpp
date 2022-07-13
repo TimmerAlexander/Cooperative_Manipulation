@@ -121,7 +121,7 @@ void FrankaImpedanceController::velocityCmdCallback(const std_msgs::Float64Multi
   else{
     for (size_t i = 0; i < 6; ++i) {
     velocity_command[i] = vel_cmd->data[i];
-    ROS_INFO_STREAM(velocity_command[i]);
+    // ROS_INFO_STREAM(velocity_command[i]);
     }
   }
 }
