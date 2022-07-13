@@ -87,8 +87,8 @@ class franka_impedance_controller():
         # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
         rospy.loginfo("Wait for transformation 'world' to '/panda_EE'.")
         self.tf_listener.waitForTransform("world","/panda_EE", rospy.Time(), rospy.Duration(10.0))
-        # rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
-        # self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
+        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
 
         # * Initialize subscriber:
         self.cartesian_msg_sub = rospy.Subscriber(
@@ -177,7 +177,7 @@ class franka_impedance_controller():
         """
         # Get current time stamp
         now = rospy.Time()
-        #------------------------------
+        # Calculate the trajectory velocity of the manipulator for a rotation of the object-----------------------------
         # Calculate the trajectory velocity of the manipulator for a rotation of the object
         # Get self.panda_current_position, self.panda_current_quaternion of the '/panda_link8' frame in the 'world' frame
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_link8")
@@ -189,8 +189,8 @@ class franka_impedance_controller():
         panda_EE_position, panda_EE_quaternion = self.tf_listener.lookupTransform("/world", "/panda_EE", panda_tf_time)
 
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame
-        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-        # ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
+        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
 
         # print("self.ur16e_current_position, self.ur16e_current_quaternion")
         # print(self.ur16e_current_position, self.ur16e_current_quaternion)
@@ -198,68 +198,68 @@ class franka_impedance_controller():
         # print(self.panda_position, self.panda_current_quaternion)
 
         # Object rotation around x axis
-        # if desired_velocity.angular.x != 0.0:
-        #     panda_current_position_x = numpy.array([
-        #         0.0,
-        #         panda_current_position[1],
-        #         panda_current_position[2]
-        #         ])
+        if desired_velocity.angular.x != 0.0:
+            panda_current_position_x = numpy.array([
+                0.0,
+                panda_current_position[1],
+                panda_current_position[2]
+                ])
 
-        #     self.robot_distance_x = numpy.array([
-        #         0.0,
-        #         ur16e_gripper_position[1] - panda_EE_position[1],
-        #         ur16e_gripper_position[2] - panda_EE_position[2],
-        #     ])
+            self.robot_distance_x = numpy.array([
+                    0.0,
+                    ur16e_gripper_position[1] - panda_EE_position[1],
+                    ur16e_gripper_position[2] - panda_EE_position[2],
+                ])
 
-        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_EE_position
-        #     world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-        #     world_radius_x = panda_current_position_x - center_x
-        #     self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
-        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
+            center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_EE_position
+            world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
+            world_radius_x = panda_current_position_x - center_x
+            self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
 
-        # # Object rotation around y axis
-        # if desired_velocity.angular.y != 0.0:
-        #     panda_current_position_y = numpy.array([
-        #         panda_current_position[0],
-        #         0.0,
-        #         panda_current_position[2]
-        #         ])
+        # Object rotation around y axis
+        if desired_velocity.angular.y != 0.0:
+            panda_current_position_y = numpy.array([
+                panda_current_position[0],
+                0.0,
+                panda_current_position[2]
+                ])
 
-        #     self.robot_distance_y = numpy.array([
-        #         ur16e_gripper_position[0] - panda_EE_position[0],
-        #         0.0,
-        #         ur16e_gripper_position[2] - panda_EE_position[2],
-        #         ])
+            self.robot_distance_y = numpy.array([
+                ur16e_gripper_position[0] - panda_EE_position[0],
+                0.0,
+                ur16e_gripper_position[2] - panda_EE_position[2],
+                ])
 
-        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_EE_position
-        #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-        #     world_radius_y = panda_current_position_y - center_y
-        #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
-        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
+            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_EE_position
+            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+            world_radius_y = panda_current_position_y - center_y
+            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
 
 
 
-        # # Object rotation around z axis
-        # if desired_velocity.angular.z != 0.0:
-        #     panda_current_position_z = numpy.array([
-        #         panda_current_position[0],
-        #         panda_current_position[1],
-        #         0.0,
-        #         ])
+        # Object rotation around z axis
+        if desired_velocity.angular.z != 0.0:
+            panda_current_position_z = numpy.array([
+                panda_current_position[0],
+                panda_current_position[1],
+                0.0,
+                ])
 
-        #     self.robot_distance_z = numpy.array([
-        #         ur16e_gripper_position[0] - panda_EE_position[0],
-        #         ur16e_gripper_position[1] - panda_EE_position[1],
-        #         0.0,
-        #         ])
+            self.robot_distance_z = numpy.array([
+                ur16e_gripper_position[0] - panda_EE_position[0],
+                ur16e_gripper_position[1] - panda_EE_position[1],
+                0.0,
+                ])
 
-        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_EE_position
-        #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-        #     world_radius_z = panda_current_position_z - center_z
-        #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
-        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
+            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_EE_position
+            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+            world_radius_z = panda_current_position_z - center_z
+            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
 
-        #------------------------------
+        # Transform the velocity from 'world' frame to 'panda_link0' frame----------------------------------------------
 
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
