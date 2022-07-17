@@ -14,7 +14,7 @@
   <xacro:include filename="$(find cooperative_manipulation_robot_description)/custom_ur_description/ur16e_urdf/custom_ur16e.urdf.xacro" />
 
   <!-- arm -->
-  <xacro:arg name="kinematics_config" default="$(find ur_e_description)/config/ur16e_default.yaml"/>
+  <xacro:arg name="kinematics_config" default="$(find cooperative_manipulation_robot_description)/config/custom_ur16e_default_singularity.yaml"/>
   <xacro:ur16e_robot prefix="" joint_limited="true"
     shoulder_pan_lower_limit="${-pi}" shoulder_pan_upper_limit="${pi}"
     shoulder_lift_lower_limit="${-pi}" shoulder_lift_upper_limit="${pi}"
