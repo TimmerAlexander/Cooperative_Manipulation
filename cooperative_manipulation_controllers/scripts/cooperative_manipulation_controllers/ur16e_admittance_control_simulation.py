@@ -121,14 +121,10 @@ class ur_admittance_controller():
         self.wrench_difference = WrenchStamped()        
         self.wrench_ext_filtered_trans_array = numpy.array([])
         self.wrench_ext_filtered_rot_array = numpy.array([])
-        # DLS
-        self.I = [[1.0,0.0,0.0,0.0,0.0,0.0], 
-                  [0.0,1.0,0.0,0.0,0.0,0.0],
-                  [0.0,0.0,1.0,0.0,0.0,0.0],
-                  [0.0,0.0,0.0,1.0,0.0,0.0],
-                  [0.0,0.0,0.0,0.0,1.0,0.0],
-                  [0.0,0.0,0.0,0.0,0.0,1.0],]
+        # Singulariy avoidance: OLMM
         self.sigma_limit = 0.05
+        self.adjusting_scalar = 0.0
+        self.singular_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         
     def __init__(self):
         # * Load config parameters
@@ -221,6 +217,7 @@ class ur_admittance_controller():
         self.control_thread()
         
         rospy.spin()
+        
     def set_gripper_offset(self):
         """
             Set the gripper offset from 'wirst_3_link' frame.
@@ -237,7 +234,26 @@ class ur_admittance_controller():
         static_gripper_offset.transform.rotation.z = 0.0
         static_gripper_offset.transform.rotation.w = 1.0
 
-        self.brodacaster.sendTransform(static_gripper_offset)   
+        self.brodacaster.sendTransform(static_gripper_offset)
+        
+    def scalar_adjusting_function(self,current_sigma):
+        """Compute the adjusting scalar for the OLMM. 3 varaitions to calculate the adjusting scalar are presented.
+
+        Args:
+            current_sigma (float): The current singular value
+
+        Returns:
+            float: The adjusting_scalar
+        """
+        # 1.
+        # adjusting_scalar = (1-(current_sigma/self.sigma_limit))
+        # # 2.
+        # adjusting_scalar = (1-(current_sigma/self.sigma_limit)**(1/2))
+        # 3.
+        adjusting_scalar = (1-(current_sigma/self.sigma_limit)**(3/2))
+        
+        return adjusting_scalar
+           
     def cartesian_velocity_command_callback(self,desired_velocity):
         """
             Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' and 'wrist_link_3' frame.
@@ -697,38 +713,19 @@ class ur_admittance_controller():
             self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
             
             
-            # # DL
-            # print(numpy.dot(self.sigma_limit,self.I))
-            # self.jacobian_dls =  numpy.dot(self.jacobian.transpose(),numpy.dot(self.jacobian,self.jacobian.transpose()) + numpy.dot(self.sigma_limit,self.I))
-
-            # OLMM
+            # * Singulariy avoidance: OLMM
             u,s,v = numpy.linalg.svd(self.jacobian,full_matrices=True)
             
-
-            # print("s")
-            # print(s)
-            
-
-            
-            
             for sigma in range(len(s)):
-                
                 if s[sigma] < self.sigma_limit:
-                    # self.target_cartesian_velocity = self.target_cartesian_velocity - numpy.cross((1-(s[sigma]/self.sigma_limit)),numpy.cross(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                    self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
                     
-                    # test =  numpy.dot((1-(s[sigma]/self.sigma_limit)),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                    self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
                     
-                    
-                    self.target_cartesian_velocity = self.target_cartesian_velocity - numpy.dot((1-(s[sigma]/self.sigma_limit)),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
-                    
-                    print("sigma")
-                    print(s[sigma])
-                    print("self.target_cartesian_velocity")
-                    print(self.target_cartesian_velocity)
-                    
-                    
-                    
-                    
+                    # print("sigma")
+                    # print(s[sigma])
+                    # print("self.singular_velocity")
+                    # print(self.singular_velocity)
                     
             # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
