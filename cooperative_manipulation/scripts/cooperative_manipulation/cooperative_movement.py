@@ -32,7 +32,7 @@ class cooperative_movement():
         
         rospy.loginfo("Cooperative movement starts now!")
         
-        self.stage_1(rate,6.0)
+        self.stage_1(rate,4.0)
         self.stage_2(rate,6.0)
         self.stage_3(rate,8.0)
         self.stage_4(rate,2.0)

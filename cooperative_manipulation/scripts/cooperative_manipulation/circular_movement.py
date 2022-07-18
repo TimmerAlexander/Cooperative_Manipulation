@@ -18,7 +18,7 @@ class ur16e_singularity_test():
     def config(self):
         # Set the radius and the trajectory velocity of the circular movement
         self.set_trajectory_velocity = 0.05
-        self.radius = 0.14
+        self.radius = 0.13
         # ! Do not change under here------------------------------------------------------------------------------------
         self.trajectory_velocity_limit = 0.1 # [rad/s]
         self.alpha = 0.0 # [rad]
@@ -50,8 +50,25 @@ class ur16e_singularity_test():
 
         rospy.loginfo("Start ciruclar movement ...")
         while not rospy.is_shutdown():
-            self.circular_movement()
+            
+            if round(self.alpha,2) >= 6.28:
+                self.joint_velocity_msg.linear.x = 0.0
+                self.joint_velocity_msg.linear.y = 0.0
+                self.joint_velocity_msg.linear.z = 0.0
+                self.joint_velocity_msg.angular.x = 0.0
+                self.joint_velocity_msg.angular.y = 0.0
+                self.joint_velocity_msg.angular.z = 0.0
+                
+                # * Publish the target_joint_velocity
+                self.pub_joint_velocity.publish(self.joint_velocity_msg)
+                
+                break
+            else:
+                self.circular_movement()
+            
             self.alpha = self.alpha + (self.angular_velocity_vector[2]/self.publish_rate)
+            print(self.alpha)
+            
             rate.sleep()
             
     def circular_movement(self):
@@ -60,8 +77,8 @@ class ur16e_singularity_test():
             (v = omega x raius)
         """
         radius_vector = np.array([
-            np.sin(self.alpha) * self.radius,
-            np.cos(self.alpha) * self.radius,
+            -np.cos(self.alpha) * self.radius,
+            -np.sin(self.alpha) * self.radius,
             0.0
         ])
         cartesian_velocity = np.asarray(np.cross(self.angular_velocity_vector,radius_vector))
