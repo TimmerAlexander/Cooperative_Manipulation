@@ -18,7 +18,7 @@ class ur16e_singularity_test():
     def config(self):
         # Set the radius and the trajectory velocity of the circular movement
         self.set_trajectory_velocity = 0.05
-        self.radius = 0.13
+        self.radius = 0.14
         # ! Do not change under here------------------------------------------------------------------------------------
         self.trajectory_velocity_limit = 0.1 # [rad/s]
         self.alpha = 0.0 # [rad]
@@ -67,7 +67,6 @@ class ur16e_singularity_test():
                 self.circular_movement()
             
             self.alpha = self.alpha + (self.angular_velocity_vector[2]/self.publish_rate)
-            print(self.alpha)
             
             rate.sleep()
             

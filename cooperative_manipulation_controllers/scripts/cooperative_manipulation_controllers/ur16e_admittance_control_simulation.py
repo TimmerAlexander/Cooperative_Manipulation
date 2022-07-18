@@ -125,6 +125,7 @@ class ur_admittance_controller():
         self.sigma_limit = 0.05
         self.adjusting_scalar = 0.0
         self.singular_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.singular_velocity_msg = Float64MultiArray()
         
     def __init__(self):
         # * Load config parameters
@@ -162,7 +163,7 @@ class ur_admittance_controller():
         
         # * Initialize move_it
         moveit_commander.roscpp_initialize(sys.argv)
-           
+        
         try:
             group_name = 'manipulator'
             print("Initialize movit_commander. Group name: ",group_name)
@@ -174,6 +175,12 @@ class ur_admittance_controller():
         # Publish final joint velocity to "/ur/ur_admittance_controller/command"
         self.joint_velocity_pub = rospy.Publisher(
             "/" + self.namespace + "/ur_admittance_controller/command",
+            Float64MultiArray,
+            queue_size=1)
+        
+        # Publish singularity velocity
+        self.singularity_velocity_pub = rospy.Publisher(
+            "/cooperative_manipulation/singularity_velocity",
             Float64MultiArray,
             queue_size=1)
         
@@ -713,20 +720,28 @@ class ur_admittance_controller():
             self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
             
             
-            # * Singulariy avoidance: OLMM
+            # * Singulartiy avoidance: OLMM
             u,s,v = numpy.linalg.svd(self.jacobian,full_matrices=True)
             
             for sigma in range(len(s)):
                 if s[sigma] < self.sigma_limit:
                     self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
-                    
-                    self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
+                    self.singular_velocity += self.singular_velocity
                     
                     # print("sigma")
                     # print(s[sigma])
                     # print("self.singular_velocity")
                     # print(self.singular_velocity)
-                    
+                self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
+                
+                # Publish the calculated singular_velocity, in 'ur/base_link' frame
+                self.singular_velocity_msg.data = self.singular_velocity
+                self.singularity_velocity_pub.publish(self.singular_velocity_msg)
+                self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
+                
+                
+                
+                
             # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
             

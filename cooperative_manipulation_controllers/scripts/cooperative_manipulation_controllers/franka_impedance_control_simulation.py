@@ -1,29 +1,6 @@
 #!/usr/bin/env python3
 
 # /***************************************************************************
-
-# 
-# @package: panda_siimulator_examples
-# @metapackage: panda_simulator
-# @author: Saif Sidhik <sxs1412@bham.ac.uk>
-# 
-
-# **************************************************************************/
-
-# /***************************************************************************
-# Copyright (c) 2019-2021, Saif Sidhik
- 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 # **************************************************************************/
 
 """
@@ -112,6 +89,9 @@ class franka_impedance_controller():
         # 
         self.wrench_force_filtered = Vector3Stamped()
         self.wrench_torque_filtered = Vector3Stamped()
+        # Singularity avoidance
+        self.singularity_velocity_trans_transformed  = numpy.array([0.0,0.0,0.0])
+        self.singularity_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
 
         
         
@@ -168,6 +148,13 @@ class franka_impedance_controller():
             '/gazebo/robot/wrist/ft', 
             WrenchStamped, 
             self.wrench_msg_callback,
+            queue_size=1,
+            tcp_nodelay=True)
+        
+        self.cartesian_msg_sub = rospy.Subscriber(
+            '/cooperative_manipulation/singularity_velocity', 
+            Twist, 
+            self.singularity_velocity_callback,
             queue_size=1,
             tcp_nodelay=True)
         
@@ -261,11 +248,19 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = 0.0
                     
-            test = numpy.array([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+            # test = numpy.array([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+
+
+            # * Add singular_velocity to self.desired_velocity_trans_transformed and self.desired_velocity_rot_transformed ---------------------------------------------------------------------------
+            self.desired_velocity_trans_transformed = self.desired_velocity_trans_transformed + self.singularity_velocity_trans_transformed
+            self.desired_velocity_rot_transformed = self.desired_velocity_rot_transformed + self.singularity_velocity_rot_transformed
+            #-----------------------------------------------------------------------------------------------------------
+
 
             # Calculate the translational and rotation movement
             movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
             movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
+
 
             # Add the movement to current pose and orientation
             self.goal_pos = (self.goal_pos + movement_trans)
@@ -322,6 +317,61 @@ class franka_impedance_controller():
             'position': cart_pose_trans_mat[:3,3],
             'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
     
+    def singularity_velocity_callback(self,singularity_velocity):
+        """
+            Get the cartesian velocity command and transform it from the 'world' frame to the 'panda/panda_link8' (EE-frame)frame and from the 'panda/panda_link8' frame to the 'panda/base' (0-frame)frame.
+            
+            rostopic pub -r 10 /cooperative_manipulation/cartesian_velocity_command geometry_msgs/Twist "linear:
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            angular:
+            x: 0.0
+            y: 0.0
+            z: 0.0"
+            
+        Args:
+            desired_velocity (geometry_msgs.msg.Twist): Desired cartesian velocity
+        """
+        # Get current time stamp
+        now = rospy.Time()
+        
+        # Transform the cartesian velocity in the 'panda/base' frame--------------------------------------
+        world_cartesian_velocity_trans  = Vector3Stamped()
+        world_cartesian_velocity_rot  = Vector3Stamped()
+        # Converse cartesian_velocity translation to vector3
+        world_cartesian_velocity_trans.header.frame_id = 'ur/base_link'
+        world_cartesian_velocity_trans.header.stamp = now
+        world_cartesian_velocity_trans.vector.x = singularity_velocity.linear.x
+        world_cartesian_velocity_trans.vector.y = singularity_velocity.linear.y 
+        world_cartesian_velocity_trans.vector.z = singularity_velocity.linear.z
+            
+        # Transform cartesian_velocity translation from 'ur/base_link' frame to 'panda/base' frame 
+        base_singularity_velocity_trans = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_trans)
+            
+        # Converse cartesian_velocity rotation to vector3
+        world_cartesian_velocity_rot.header.frame_id = 'ur/base_link'
+        world_cartesian_velocity_rot.header.stamp = now
+        world_cartesian_velocity_rot.vector.x = singularity_velocity.angular.x
+        world_cartesian_velocity_rot.vector.y = singularity_velocity.angular.y
+        world_cartesian_velocity_rot.vector.z = singularity_velocity.angular.z
+        
+        # Transform cartesian_velocity rotation from 'ur/base_link' frame to 'panda/base' frame
+        base_singularity_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
+        
+        self.singularity_velocity_trans_transformed = [
+            base_singularity_velocity_trans.vector.x,
+            base_singularity_velocity_trans.vector.y,
+            base_singularity_velocity_trans.vector.z,
+            ]
+            
+        self.singularity_velocity_rot_transformed = [
+            base_singularity_velocity_rot.vector.x,
+            -1 * base_singularity_velocity_rot.vector.y,
+            -1 * base_singularity_velocity_rot.vector.z,
+            ] 
+        
+        
         
     def cartesian_msg_callback(self,desired_velocity):
         """
