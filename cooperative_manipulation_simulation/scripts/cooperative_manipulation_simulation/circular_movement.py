@@ -16,15 +16,25 @@ import sys
 class ur16e_singularity_test():
     
     def config(self):
-        self.radius = 1.0
-        self.alpha = 0.0
-        self.angular_velocity_vector = np.array([0.0,0.0,1.57]) # [HZ]
-        self.cartesian_rotation_velocity = np.array([0.0,0.0,0.0])
+        # Set the radius and the trajectory velocity of the circular movement
+        self.set_trajectory_velocity = 0.05
+        self.radius = 0.14
+        # ! Do not change under here------------------------------------------------------------------------------------
+        self.trajectory_velocity_limit = 0.1 # [rad/s]
+        self.alpha = 0.0 # [rad]
         self.publish_rate = 100 # [HZ] 
-       
+        self.angular_velocity_vector = np.array([0.0,0.0,0.0])
+        # ! Do not change under here------------------------------------------------------------------------------------
+        
     def __init__(self):
+        
         self.config()
         
+        if self.set_trajectory_velocity < self.trajectory_velocity_limit:
+            self.angular_velocity_vector[2]= self.set_trajectory_velocity/self.radius
+        else:
+            print("self.set_trajectory_velocity is bigger than self.trajectory_velocity_limit!")
+            
         self.joint_velocity_msg = Twist()
         
         # * Initialize move_it
@@ -37,20 +47,18 @@ class ur16e_singularity_test():
         
         rate = rospy.Rate(self.publish_rate)
 
-        start_time = rospy.Time().now()
-        
-        rospy.loginfo("Start ur16e_singularity_test ...")
+
+        rospy.loginfo("Start ciruclar movement ...")
         while not rospy.is_shutdown():
             self.circular_movement()
-            now = rospy.Time().now()
-            self.alpha = self.alpha + (self.angular_velocity_vector[2] * (now.to_sec() - start_time.to_sec()))
-            print(now.to_sec())
-            print(start_time.to_sec())
-            print(now.to_sec() - start_time.to_sec())
+            self.alpha = self.alpha + (self.angular_velocity_vector[2]/self.publish_rate)
             rate.sleep()
             
     def circular_movement(self):
-        
+        """ Compute the cartesian trajectory velocity from the radius_vector and angular_velocity_vector.
+            cartesian_velocity = self.angular_velocity_vector x radius_vector
+            (v = omega x raius)
+        """
         radius_vector = np.array([
             np.sin(self.alpha) * self.radius,
             np.cos(self.alpha) * self.radius,
