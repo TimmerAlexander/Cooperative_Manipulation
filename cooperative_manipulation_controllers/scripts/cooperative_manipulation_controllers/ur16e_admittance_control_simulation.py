@@ -121,6 +121,14 @@ class ur_admittance_controller():
         self.wrench_difference = WrenchStamped()        
         self.wrench_ext_filtered_trans_array = numpy.array([])
         self.wrench_ext_filtered_rot_array = numpy.array([])
+        # DLS
+        self.I = [[1.0,0.0,0.0,0.0,0.0,0.0], 
+                  [0.0,1.0,0.0,0.0,0.0,0.0],
+                  [0.0,0.0,1.0,0.0,0.0,0.0],
+                  [0.0,0.0,0.0,1.0,0.0,0.0],
+                  [0.0,0.0,0.0,0.0,1.0,0.0],
+                  [0.0,0.0,0.0,0.0,0.0,1.0],]
+        self.sigma_limit = 0.05
         
     def __init__(self):
         # * Load config parameters
@@ -244,8 +252,8 @@ class ur_admittance_controller():
             y: 0.0
             z: 0.0" 
         """
-        print("desired_velocity")
-        print(desired_velocity)
+        # print("desired_velocity")
+        # print(desired_velocity)
         
         # ToDo ------------------------------------------------------------------
         
@@ -682,11 +690,46 @@ class ur_admittance_controller():
             #print(self.current_joint_states_array)
             
             # * Calculate the jacobian-matrix
-            self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array) 
+            self.jacobian = self.group.get_jacobian_matrix(self.current_joint_states_array)
+            
             
             # * Calculate the inverse of the jacobian-matrix
             self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
+            
+            
+            # # DL
+            # print(numpy.dot(self.sigma_limit,self.I))
+            # self.jacobian_dls =  numpy.dot(self.jacobian.transpose(),numpy.dot(self.jacobian,self.jacobian.transpose()) + numpy.dot(self.sigma_limit,self.I))
 
+            # OLMM
+            u,s,v = numpy.linalg.svd(self.jacobian,full_matrices=True)
+            
+
+            # print("s")
+            # print(s)
+            
+
+            
+            
+            for sigma in range(len(s)):
+                
+                if s[sigma] < self.sigma_limit:
+                    # self.target_cartesian_velocity = self.target_cartesian_velocity - numpy.cross((1-(s[sigma]/self.sigma_limit)),numpy.cross(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                    
+                    # test =  numpy.dot((1-(s[sigma]/self.sigma_limit)),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                    
+                    
+                    self.target_cartesian_velocity = self.target_cartesian_velocity - numpy.dot((1-(s[sigma]/self.sigma_limit)),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                    
+                    print("sigma")
+                    print(s[sigma])
+                    print("self.target_cartesian_velocity")
+                    print(self.target_cartesian_velocity)
+                    
+                    
+                    
+                    
+                    
             # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
             
