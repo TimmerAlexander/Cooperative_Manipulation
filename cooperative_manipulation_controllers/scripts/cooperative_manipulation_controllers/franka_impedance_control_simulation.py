@@ -19,6 +19,7 @@ import rospy
 import tf
 import tf2_ros
 from geometry_msgs.msg import Twist, Vector3Stamped, WrenchStamped, TransformStamped
+from std_msgs.msg import Float64MultiArray
 from franka_core_msgs.msg import EndPointState, JointCommand, RobotState
 
 
@@ -153,7 +154,7 @@ class franka_impedance_controller():
         
         self.cartesian_msg_sub = rospy.Subscriber(
             '/cooperative_manipulation/singularity_velocity', 
-            Twist, 
+            Float64MultiArray, 
             self.singularity_velocity_callback,
             queue_size=1,
             tcp_nodelay=True)
@@ -252,8 +253,18 @@ class franka_impedance_controller():
 
 
             # * Add singular_velocity to self.desired_velocity_trans_transformed and self.desired_velocity_rot_transformed ---------------------------------------------------------------------------
-            self.desired_velocity_trans_transformed = self.desired_velocity_trans_transformed + self.singularity_velocity_trans_transformed
-            self.desired_velocity_rot_transformed = self.desired_velocity_rot_transformed + self.singularity_velocity_rot_transformed
+            print("self.singularity_velocity_trans_transformed")
+            print(self.singularity_velocity_trans_transformed)
+            # print("self.singularity_velocity_rot_transformed")
+            # print(self.singularity_velocity_rot_transformed)
+            print("self.desired_velocity_trans_transformed")
+            print(self.desired_velocity_trans_transformed)
+            
+            self.desired_velocity_trans_transformed = numpy.subtract(self.desired_velocity_trans_transformed,self.singularity_velocity_trans_transformed)
+            self.desired_velocity_rot_transformed = numpy.subtract(self.desired_velocity_rot_transformed,self.singularity_velocity_rot_transformed)
+            
+            print("self.desired_velocity_trans_transformed")
+            print(self.desired_velocity_trans_transformed)
             #-----------------------------------------------------------------------------------------------------------
 
 
@@ -340,21 +351,21 @@ class franka_impedance_controller():
         world_cartesian_velocity_trans  = Vector3Stamped()
         world_cartesian_velocity_rot  = Vector3Stamped()
         # Converse cartesian_velocity translation to vector3
-        world_cartesian_velocity_trans.header.frame_id = 'ur/base_link'
+        world_cartesian_velocity_trans.header.frame_id = 'base_link'
         world_cartesian_velocity_trans.header.stamp = now
-        world_cartesian_velocity_trans.vector.x = singularity_velocity.linear.x
-        world_cartesian_velocity_trans.vector.y = singularity_velocity.linear.y 
-        world_cartesian_velocity_trans.vector.z = singularity_velocity.linear.z
+        world_cartesian_velocity_trans.vector.x = singularity_velocity.data[0]
+        world_cartesian_velocity_trans.vector.y = singularity_velocity.data[1]
+        world_cartesian_velocity_trans.vector.z = singularity_velocity.data[2]
             
         # Transform cartesian_velocity translation from 'ur/base_link' frame to 'panda/base' frame 
         base_singularity_velocity_trans = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_trans)
             
         # Converse cartesian_velocity rotation to vector3
-        world_cartesian_velocity_rot.header.frame_id = 'ur/base_link'
+        world_cartesian_velocity_rot.header.frame_id = 'base_link'
         world_cartesian_velocity_rot.header.stamp = now
-        world_cartesian_velocity_rot.vector.x = singularity_velocity.angular.x
-        world_cartesian_velocity_rot.vector.y = singularity_velocity.angular.y
-        world_cartesian_velocity_rot.vector.z = singularity_velocity.angular.z
+        world_cartesian_velocity_rot.vector.x = singularity_velocity.data[3]
+        world_cartesian_velocity_rot.vector.y = singularity_velocity.data[4]
+        world_cartesian_velocity_rot.vector.z = singularity_velocity.data[5]
         
         # Transform cartesian_velocity rotation from 'ur/base_link' frame to 'panda/base' frame
         base_singularity_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
@@ -548,7 +559,7 @@ class franka_impedance_controller():
         # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
         base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
         
-        print(type(base_wrench_force))
+        # print(type(base_wrench_force))
 
         # Bandpassfilter 
         self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
@@ -578,7 +589,7 @@ class franka_impedance_controller():
         Returns:
             Vector3Stamped,Vector3Stamped: The filtered forces and torques
         """
-        print(force_unfiltered)
+        #print(force_unfiltered)
         force_filtered = Vector3Stamped()
         force_filtered.header.frame_id = force_unfiltered.header.frame_id
         force_filtered.header.stamp  = force_unfiltered.header.stamp 
