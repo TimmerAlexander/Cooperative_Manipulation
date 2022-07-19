@@ -57,6 +57,9 @@ class cooperative_movement():
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
+        rospy.loginfo("Stage 1")
+        rospy.loginfo("linear.x = 0.05 [m/s], duration: %f [s]",duration)
+        
         self.joint_velocity_msg.linear.x = 0.05
         self.joint_velocity_msg.linear.y = 0.0
         self.joint_velocity_msg.linear.z = 0.0
@@ -66,23 +69,26 @@ class cooperative_movement():
         
         self.compute_path(self.joint_velocity_msg,duration)
         
-        start_time = rospy.Time().to_sec()
+        start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
-            self.now = self.now + (1/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
             rate.sleep()
             
             
     def stage_2(self,rate,duration):
         """Send velocity command linear.x = -0.2
-                                 linear.y = 0.05 
+                                 linear.y = 0.03
 
         Args:
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
+        rospy.loginfo("Stage 2")
+        rospy.loginfo("linear.x = -0.02 [m/s] and linear.y = 0.03 [m/s], duration: %f [s]",duration)
+        
         self.joint_velocity_msg.linear.x = -0.02
         self.joint_velocity_msg.linear.y = 0.03
         self.joint_velocity_msg.linear.z = 0.0
@@ -91,12 +97,12 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.z = 0.0
         
         self.compute_path(self.joint_velocity_msg,duration)
-
-        start_time = rospy.Time().to_sec()
+        
+        start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
-            self.now = self.now + (1/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
             rate.sleep()
             
@@ -107,6 +113,9 @@ class cooperative_movement():
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
+        rospy.loginfo("Stage 3")
+        rospy.loginfo("linear.z = -0.01 [m/s], duration: %f [s]",duration)
+        
         self.joint_velocity_msg.linear.x = 0.0
         self.joint_velocity_msg.linear.y = 0.0
         self.joint_velocity_msg.linear.z = -0.01
@@ -116,11 +125,11 @@ class cooperative_movement():
         
         self.compute_path(self.joint_velocity_msg,duration)
 
-        start_time = rospy.Time().to_sec()
+        start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
-            self.now = self.now + (1/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
             rate.sleep()
             
@@ -132,6 +141,9 @@ class cooperative_movement():
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
+        rospy.loginfo("Stage 4")
+        rospy.loginfo("linear.y = -0.01 [m/s] and linear.z = 0.01 [m/s], duration: %f [s]",duration)
+        
         self.joint_velocity_msg.linear.x = -0.01
         self.joint_velocity_msg.linear.y = 0.0
         self.joint_velocity_msg.linear.z = 0.0
@@ -141,11 +153,11 @@ class cooperative_movement():
         
         self.compute_path(self.joint_velocity_msg,duration)
 
-        start_time = rospy.Time().to_sec()
+        start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
-            self.now = self.now + (1/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
             rate.sleep()
             
@@ -160,6 +172,9 @@ class cooperative_movement():
                 rate (Rate): Publish rate
                 duration (float): Publishing time
             """
+            rospy.loginfo("Stage 5")
+            rospy.loginfo("Write velocity command to log... e.g. linear.x = 0.05 [m/s], duration: %f [s]",duration)
+            
             self.joint_velocity_msg.linear.x = 0.0
             self.joint_velocity_msg.linear.y = 0.0
             self.joint_velocity_msg.linear.z = 0.0
@@ -168,11 +183,11 @@ class cooperative_movement():
             self.joint_velocity_msg.angular.z = 0.0
             
 
-            start_time = rospy.Time().to_sec()
+            start_time = rospy.get_rostime().to_sec()
             self.now = start_time 
             # * Publish the target_joint_velocity
             while(self.now - start_time <=  duration):
-                self.now = self.now + (1/self.publish_rate)
+                self.now = rospy.get_rostime().to_sec()
                 self.pub_joint_velocity.publish(self.joint_velocity_msg)
                 rate.sleep()
 # ToDo:-----------------------------------------------------------------------------------------------------------------
@@ -188,6 +203,7 @@ class cooperative_movement():
             velocity_cmd (_type_): _Current velocity command
             duration (float): Current publishing time
         """
+        
         self.path_sum[0] += velocity_cmd.linear.x * duration
         self.path_sum[1] += velocity_cmd.linear.y * duration
         self.path_sum[2] += velocity_cmd.linear.z * duration
@@ -203,6 +219,8 @@ class cooperative_movement():
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
+        rospy.loginfo("The robots moves to start position. Duration: %f [s]",duration)
+        
         self.joint_velocity_msg.linear.x = -self.path_sum[0]/duration
         self.joint_velocity_msg.linear.y = -self.path_sum[1]/duration
         self.joint_velocity_msg.linear.z = -self.path_sum[2]/duration
@@ -210,11 +228,11 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = -self.path_sum[4]/duration
         self.joint_velocity_msg.angular.z = -self.path_sum[5]/duration
         
-        start_time = rospy.Time().to_sec()
+        start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
-            self.now = self.now + (1/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
             rate.sleep()
 
@@ -227,6 +245,8 @@ class cooperative_movement():
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
+        rospy.loginfo("Robots stop. Wait until program finished! Duration: %f [s]",duration)
+                
         self.joint_velocity_msg.linear.x = 0.0
         self.joint_velocity_msg.linear.y = 0.0
         self.joint_velocity_msg.linear.z = 0.0
@@ -234,11 +254,11 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
-        start_time = rospy.Time().to_sec()
+        start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
-            self.now = self.now + (1/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
             rate.sleep()
 # ! --------------------------------------------------------------------------------------------------------------------

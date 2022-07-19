@@ -10,6 +10,7 @@ import numpy as np
 from geometry_msgs.msg import Twist
 import moveit_commander
 import sys
+from math import pi 
 
 
 
@@ -47,8 +48,13 @@ class ur16e_singularity_test():
         
         rate = rospy.Rate(self.publish_rate)
 
-
+        rospy.loginfo("Radius: %f [m]",self.radius)
+        rospy.loginfo("Trajectory velocity: %f [m/s]",self.set_trajectory_velocity)
+        rospy.loginfo("Angular velocity: %f [rad/s]",self.angular_velocity_vector[2])
         rospy.loginfo("Start ciruclar movement ...")
+
+        self.now_old = rospy.get_rostime().to_sec()
+
         while not rospy.is_shutdown():
             
             if round(self.alpha,2) >= 6.28:
@@ -66,7 +72,12 @@ class ur16e_singularity_test():
             else:
                 self.circular_movement()
             
-            self.alpha = self.alpha + (self.angular_velocity_vector[2]/self.publish_rate)
+            self.now = rospy.get_rostime().to_sec()
+            
+            self.alpha = self.alpha + (self.angular_velocity_vector[2] * np.round(self.now - self.now_old,4))
+            
+            self.now_old = rospy.get_rostime().to_sec()
+            
             
             rate.sleep()
             
