@@ -26,7 +26,7 @@ class cooperative_movement():
         # * Initialize node
         rospy.init_node('ur16e_singularity_test', anonymous=True)
         
-        self.pub_joint_velocity = rospy.Publisher("/cooperative_manipulation/cartesian_velocity_command", Twist, queue_size=1)
+        self.pub_cartesian_velocity_command = rospy.Publisher("/cooperative_manipulation/cartesian_velocity_command", Twist, queue_size=1)
         
         rate = rospy.Rate(self.publish_rate)
         
@@ -36,11 +36,13 @@ class cooperative_movement():
         self.stage_2(rate,6.0)
         self.stage_3(rate,8.0)
         self.stage_4(rate,2.0)
+        self.stage_5(rate,4.0)
+        self.stage_6(rate,4.0)
         
         
 # ToDo: Use this template to add a stage!-------------------------------------------------------------------------------
 # Template for stage.
-        #self.stage_5(rate,8.0)
+        #self.stage_7(rate,8.0)
 # ToDo:-----------------------------------------------------------------------------------------------------------------
 
 # ! Do not changes this!------------------------------------------------------------------------------------------------
@@ -74,7 +76,7 @@ class cooperative_movement():
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
-            self.pub_joint_velocity.publish(self.joint_velocity_msg)
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             rate.sleep()
             
             
@@ -103,7 +105,7 @@ class cooperative_movement():
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
-            self.pub_joint_velocity.publish(self.joint_velocity_msg)
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             rate.sleep()
             
     def stage_3(self,rate,duration):
@@ -130,7 +132,7 @@ class cooperative_movement():
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
-            self.pub_joint_velocity.publish(self.joint_velocity_msg)
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             rate.sleep()
             
     def stage_4(self,rate,duration):
@@ -158,13 +160,67 @@ class cooperative_movement():
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
-            self.pub_joint_velocity.publish(self.joint_velocity_msg)
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            rate.sleep()
+            
+    def stage_5(self,rate,duration):
+        """Send velocity command 
+                                
+
+        Args:
+            rate (Rate): Publish rate
+            duration (float): Publishing time
+        """
+        rospy.loginfo("Stage 5")
+        rospy.loginfo("angular.z = 0.02 [m/s], duration: %f [s]",duration)
+        
+        self.joint_velocity_msg.linear.x = 0.0
+        self.joint_velocity_msg.linear.y = 0.0
+        self.joint_velocity_msg.linear.z = 0.02
+        self.joint_velocity_msg.angular.x = 0.0
+        self.joint_velocity_msg.angular.y = 0.0
+        self.joint_velocity_msg.angular.z = 0.0
+        
+
+        start_time = rospy.get_rostime().to_sec()
+        self.now = start_time 
+        # * Publish the target_joint_velocity
+        while(self.now - start_time <=  duration):
+            self.now = rospy.get_rostime().to_sec()
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            rate.sleep()
+            
+    def stage_6(self,rate,duration):
+        """Send velocity command 
+                                
+
+        Args:
+            rate (Rate): Publish rate
+            duration (float): Publishing time
+        """
+        rospy.loginfo("Stage 6")
+        rospy.loginfo("angular.z = -0.02 [m/s], duration: %f [s]",duration)
+        
+        self.joint_velocity_msg.linear.x = 0.0
+        self.joint_velocity_msg.linear.y = 0.0
+        self.joint_velocity_msg.linear.z = -0.02
+        self.joint_velocity_msg.angular.x = 0.0
+        self.joint_velocity_msg.angular.y = 0.0
+        self.joint_velocity_msg.angular.z = 0.0
+        
+
+        start_time = rospy.get_rostime().to_sec()
+        self.now = start_time 
+        # * Publish the target_joint_velocity
+        while(self.now - start_time <=  duration):
+            self.now = rospy.get_rostime().to_sec()
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             rate.sleep()
             
 # ToDo: Use this template to add a stage!-------------------------------------------------------------------------------
 # Template for stage.
 
-        def stage_5(self,rate,duration):
+        def stage_7(self,rate,duration):
             """Send velocity command 
                                     
 
@@ -172,7 +228,7 @@ class cooperative_movement():
                 rate (Rate): Publish rate
                 duration (float): Publishing time
             """
-            rospy.loginfo("Stage 5")
+            rospy.loginfo("Stage 7")
             rospy.loginfo("Write velocity command to log... e.g. linear.x = 0.05 [m/s], duration: %f [s]",duration)
             
             self.joint_velocity_msg.linear.x = 0.0
@@ -188,7 +244,7 @@ class cooperative_movement():
             # * Publish the target_joint_velocity
             while(self.now - start_time <=  duration):
                 self.now = rospy.get_rostime().to_sec()
-                self.pub_joint_velocity.publish(self.joint_velocity_msg)
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
                 rate.sleep()
 # ToDo:-----------------------------------------------------------------------------------------------------------------
     
@@ -233,7 +289,7 @@ class cooperative_movement():
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
-            self.pub_joint_velocity.publish(self.joint_velocity_msg)
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             rate.sleep()
 
 
@@ -259,7 +315,7 @@ class cooperative_movement():
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
-            self.pub_joint_velocity.publish(self.joint_velocity_msg)
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             rate.sleep()
 # ! --------------------------------------------------------------------------------------------------------------------
 

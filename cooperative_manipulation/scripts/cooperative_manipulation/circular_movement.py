@@ -10,7 +10,6 @@ import numpy as np
 from geometry_msgs.msg import Twist
 import moveit_commander
 import sys
-from math import pi 
 
 
 
@@ -44,17 +43,13 @@ class ur16e_singularity_test():
         # * Initialize node
         rospy.init_node('ur16e_singularity_test', anonymous=True)
         
-        self.pub_joint_velocity = rospy.Publisher("/cooperative_manipulation/cartesian_velocity_command", Twist, queue_size=100)
+        self.pub_cartesian_velocity_command = rospy.Publisher("/cooperative_manipulation/cartesian_velocity_command", Twist, queue_size=100)
         
         rate = rospy.Rate(self.publish_rate)
 
-        rospy.loginfo("Radius: %f [m]",self.radius)
-        rospy.loginfo("Trajectory velocity: %f [m/s]",self.set_trajectory_velocity)
-        rospy.loginfo("Angular velocity: %f [rad/s]",self.angular_velocity_vector[2])
-        rospy.loginfo("Start ciruclar movement ...")
-
         self.now_old = rospy.get_rostime().to_sec()
 
+        rospy.loginfo("Start ciruclar movement ...")
         while not rospy.is_shutdown():
             
             if round(self.alpha,2) >= 6.28:
@@ -66,18 +61,19 @@ class ur16e_singularity_test():
                 self.joint_velocity_msg.angular.z = 0.0
                 
                 # * Publish the target_joint_velocity
-                self.pub_joint_velocity.publish(self.joint_velocity_msg)
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
                 
                 break
             else:
                 self.circular_movement()
             
-            self.now = rospy.get_rostime().to_sec()
-            
-            self.alpha = self.alpha + (self.angular_velocity_vector[2] * np.round(self.now - self.now_old,4))
-            
-            self.now_old = rospy.get_rostime().to_sec()
-            
+                self.now = rospy.get_rostime().to_sec()
+                
+                self.alpha = self.alpha + (self.angular_velocity_vector[2] * (self.now - self.now_old))
+                
+                self.now_old = self.now
+                
+                print(self.alpha)
             
             rate.sleep()
             
@@ -100,7 +96,7 @@ class ur16e_singularity_test():
         self.joint_velocity_msg.angular.z = 0.0
         
         # * Publish the target_joint_velocity
-        self.pub_joint_velocity.publish(self.joint_velocity_msg)
+        self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
     
 if __name__ == '__main__':
     ur16e_singularity_test()
