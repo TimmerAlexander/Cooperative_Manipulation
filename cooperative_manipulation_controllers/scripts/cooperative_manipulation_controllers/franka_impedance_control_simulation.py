@@ -145,12 +145,12 @@ class franka_impedance_controller():
             queue_size=1,
             tcp_nodelay=True)
         
-        self.wrench_msg_sub = rospy.Subscriber(
-            '/gazebo/robot/wrist/ft', 
-            WrenchStamped, 
-            self.wrench_msg_callback,
-            queue_size=1,
-            tcp_nodelay=True)
+        # self.wrench_msg_sub = rospy.Subscriber(
+        #     '/gazebo/robot/wrist/ft', 
+        #     WrenchStamped, 
+        #     self.wrench_msg_callback,
+        #     queue_size=1,
+        #     tcp_nodelay=True)
         
         self.cartesian_msg_sub = rospy.Subscriber(
             '/cooperative_manipulation/singularity_velocity', 
@@ -253,18 +253,18 @@ class franka_impedance_controller():
 
 
             # * Add singular_velocity to self.desired_velocity_trans_transformed and self.desired_velocity_rot_transformed ---------------------------------------------------------------------------
-            print("self.singularity_velocity_trans_transformed")
-            print(self.singularity_velocity_trans_transformed)
+            # print("self.singularity_velocity_trans_transformed")
+            # print(self.singularity_velocity_trans_transformed)
             # print("self.singularity_velocity_rot_transformed")
             # print(self.singularity_velocity_rot_transformed)
-            print("self.desired_velocity_trans_transformed")
-            print(self.desired_velocity_trans_transformed)
+            # print("self.desired_velocity_trans_transformed")
+            # print(self.desired_velocity_trans_transformed)
             
             self.desired_velocity_trans_transformed = numpy.subtract(self.desired_velocity_trans_transformed,self.singularity_velocity_trans_transformed)
             self.desired_velocity_rot_transformed = numpy.subtract(self.desired_velocity_rot_transformed,self.singularity_velocity_rot_transformed)
             
-            print("self.desired_velocity_trans_transformed")
-            print(self.desired_velocity_trans_transformed)
+            # print("self.desired_velocity_trans_transformed")
+            # print(self.desired_velocity_trans_transformed)
             #-----------------------------------------------------------------------------------------------------------
 
 
@@ -283,8 +283,11 @@ class franka_impedance_controller():
             # print("self.wrench_force_transformed")
             # print(self.wrench_force_transformed)
             # Calculate linear and angular velocity difference
-            self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans + numpy.array(self.wrench_force_transformed).reshape([3,1])
-            self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot + numpy.array(self.wrench_torque_transformed).reshape([3,1])
+            self.delta_linear = numpy.array(self.desired_velocity_trans_transformed).reshape([3,1]) - current_vel_trans
+            
+            # + numpy.array(self.wrench_force_transformed).reshape([3,1])
+            self.delta_angular = numpy.array(self.desired_velocity_rot_transformed).reshape([3,1]) - current_vel_rot 
+            # + numpy.array(self.wrench_torque_transformed).reshape([3,1])
             
             # print("self.delta_linear")
             # print(self.delta_linear)
@@ -527,107 +530,107 @@ class franka_impedance_controller():
         self.world_trajectory_velocity = [0.0,0.0,0.0]
         
 
-    def wrench_msg_callback(self,wrench_ext):
-        """ 
-            Get external wrench in 'panda/panda_link7' frame.
-        """
-        # print("wrench_ext")
-        # print(wrench_ext)
+    # def wrench_msg_callback(self,wrench_ext):
+    #     """ 
+    #         Get external wrench in 'panda/panda_link7' frame.
+    #     """
+    #     # print("wrench_ext")
+    #     # print(wrench_ext)
         
-        # Get current time stamp
-        now = rospy.Time()
+    #     # Get current time stamp
+    #     now = rospy.Time()
             
-        panda_link7_wrench_force  = Vector3Stamped()
-        panda_link7_wrench_torque  = Vector3Stamped()
-        # Converse cartesian_velocity translation to vector3
-        panda_link7_wrench_force.header.frame_id = 'panda/panda_link7'
-        panda_link7_wrench_force.header.stamp = now
-        panda_link7_wrench_force.vector.x = wrench_ext.wrench.force.x
-        panda_link7_wrench_force.vector.y = wrench_ext.wrench.force.y
-        panda_link7_wrench_force.vector.z = wrench_ext.wrench.force.z
+    #     panda_link7_wrench_force  = Vector3Stamped()
+    #     panda_link7_wrench_torque  = Vector3Stamped()
+    #     # Converse cartesian_velocity translation to vector3
+    #     panda_link7_wrench_force.header.frame_id = 'panda/panda_link7'
+    #     panda_link7_wrench_force.header.stamp = now
+    #     panda_link7_wrench_force.vector.x = wrench_ext.wrench.force.x
+    #     panda_link7_wrench_force.vector.y = wrench_ext.wrench.force.y
+    #     panda_link7_wrench_force.vector.z = wrench_ext.wrench.force.z
             
-        # Transform cartesian_velocity translation from 'panda/panda_link7' frame to 'panda/panda_link8'
-        base_wrench_force = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_force)
+    #     # Transform cartesian_velocity translation from 'panda/panda_link7' frame to 'panda/panda_link8'
+    #     base_wrench_force = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_force)
             
-        # Converse cartesian_velocity rotation to vector3
-        panda_link7_wrench_torque.header.frame_id = 'panda/panda_link7'
-        panda_link7_wrench_torque.header.stamp = now
-        panda_link7_wrench_torque.vector.x = wrench_ext.wrench.torque.x
-        panda_link7_wrench_torque.vector.y = wrench_ext.wrench.torque.y
-        panda_link7_wrench_torque.vector.z = wrench_ext.wrench.torque.z
+    #     # Converse cartesian_velocity rotation to vector3
+    #     panda_link7_wrench_torque.header.frame_id = 'panda/panda_link7'
+    #     panda_link7_wrench_torque.header.stamp = now
+    #     panda_link7_wrench_torque.vector.x = wrench_ext.wrench.torque.x
+    #     panda_link7_wrench_torque.vector.y = wrench_ext.wrench.torque.y
+    #     panda_link7_wrench_torque.vector.z = wrench_ext.wrench.torque.z
             
-        # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
-        base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
+    #     # Transform cartesian_velocity rotation from 'panda/panda_link7' frame to 'panda/panda_link8'
+    #     base_wrench_torque = self.tf_listener.transformVector3('panda/base',panda_link7_wrench_torque)
         
-        # print(type(base_wrench_force))
+    #     # print(type(base_wrench_force))
 
-        # Bandpassfilter 
-        self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
+    #     # Bandpassfilter 
+    #     self.wrench_force_filtered, self.wrench_torque_filtered = self.band_pass_filter(base_wrench_force, base_wrench_torque, self.wrench_filter_force,self.wrench_filter_torque)
            
-        self.wrench_force_transformed = [
-            self.wrench_force_filtered.vector.x * self.wrench_force_x,
-            self.wrench_force_filtered.vector.y * self.wrench_force_y,
-            self.wrench_force_filtered.vector.z * self.wrench_force_z,
-            ]
+    #     self.wrench_force_transformed = [
+    #         self.wrench_force_filtered.vector.x * self.wrench_force_x,
+    #         self.wrench_force_filtered.vector.y * self.wrench_force_y,
+    #         self.wrench_force_filtered.vector.z * self.wrench_force_z,
+    #         ]
         
-        self.wrench_torque_transformed = [
-            self.wrench_torque_filtered.vector.x * self.wrench_torque_x,
-            self.wrench_torque_filtered.vector.y * self.wrench_torque_y,
-            self.wrench_torque_filtered.vector.z * self.wrench_torque_z,
-            ]
+    #     self.wrench_torque_transformed = [
+    #         self.wrench_torque_filtered.vector.x * self.wrench_torque_x,
+    #         self.wrench_torque_filtered.vector.y * self.wrench_torque_y,
+    #         self.wrench_torque_filtered.vector.z * self.wrench_torque_z,
+    #         ]
 
-    def band_pass_filter(self,force_unfiltered: Vector3Stamped, torque_unfiltered: Vector3Stamped, force_filter_threshold: float, torque_filter_threshold: float):
-        """            
-            Bandpass-filter for the measured wrench.
+    # def band_pass_filter(self,force_unfiltered: Vector3Stamped, torque_unfiltered: Vector3Stamped, force_filter_threshold: float, torque_filter_threshold: float):
+    #     """            
+    #         Bandpass-filter for the measured wrench.
 
-        Args:
-            force_unfiltered (Vector3Stamped): Unfiltered forces
-            torque_unfiltered (Vector3Stamped): Unfiltered torqus
-            force_unfiltered (float): Force threshold
-            torque_unfiltered (flaot): Torque threshold
+    #     Args:
+    #         force_unfiltered (Vector3Stamped): Unfiltered forces
+    #         torque_unfiltered (Vector3Stamped): Unfiltered torqus
+    #         force_unfiltered (float): Force threshold
+    #         torque_unfiltered (flaot): Torque threshold
 
-        Returns:
-            Vector3Stamped,Vector3Stamped: The filtered forces and torques
-        """
-        #print(force_unfiltered)
-        force_filtered = Vector3Stamped()
-        force_filtered.header.frame_id = force_unfiltered.header.frame_id
-        force_filtered.header.stamp  = force_unfiltered.header.stamp 
+    #     Returns:
+    #         Vector3Stamped,Vector3Stamped: The filtered forces and torques
+    #     """
+    #     #print(force_unfiltered)
+    #     force_filtered = Vector3Stamped()
+    #     force_filtered.header.frame_id = force_unfiltered.header.frame_id
+    #     force_filtered.header.stamp  = force_unfiltered.header.stamp 
 
-        torque_filtered = Vector3Stamped()
-        torque_filtered.header.frame_id = torque_unfiltered.header.frame_id
-        torque_filtered.header.stamp  = torque_unfiltered.header.stamp 
+    #     torque_filtered = Vector3Stamped()
+    #     torque_filtered.header.frame_id = torque_unfiltered.header.frame_id
+    #     torque_filtered.header.stamp  = torque_unfiltered.header.stamp 
 
-        # * Band-passfilter
-        if numpy.abs(force_unfiltered.vector.x) < force_filter_threshold:
-            force_filtered.vector.x = 0.0
-        else: 
-            force_filtered.vector.x = force_unfiltered.vector.x - numpy.sign(force_unfiltered.vector.x) * force_filter_threshold
+    #     # * Band-passfilter
+    #     if numpy.abs(force_unfiltered.vector.x) < force_filter_threshold:
+    #         force_filtered.vector.x = 0.0
+    #     else: 
+    #         force_filtered.vector.x = force_unfiltered.vector.x - numpy.sign(force_unfiltered.vector.x) * force_filter_threshold
             
-        if(numpy.abs(force_unfiltered.vector.y) < force_filter_threshold):
-            force_filtered.vector.y = 0.0
-        else: 
-            force_filtered.vector.y = force_unfiltered.vector.y - numpy.sign(force_unfiltered.vector.y) * force_filter_threshold
+    #     if(numpy.abs(force_unfiltered.vector.y) < force_filter_threshold):
+    #         force_filtered.vector.y = 0.0
+    #     else: 
+    #         force_filtered.vector.y = force_unfiltered.vector.y - numpy.sign(force_unfiltered.vector.y) * force_filter_threshold
 
-        if(numpy.abs(force_unfiltered.vector.z) < force_filter_threshold):
-            force_filtered.vector.z = 0.0
-        else: 
-            force_filtered.vector.z = force_unfiltered.vector.z - numpy.sign(force_unfiltered.vector.z) * force_filter_threshold
+    #     if(numpy.abs(force_unfiltered.vector.z) < force_filter_threshold):
+    #         force_filtered.vector.z = 0.0
+    #     else: 
+    #         force_filtered.vector.z = force_unfiltered.vector.z - numpy.sign(force_unfiltered.vector.z) * force_filter_threshold
 
-        if(numpy.abs(torque_unfiltered.vector.x) < torque_filter_threshold):
-            torque_filtered.vector.x = 0.0
-        else: 
-            torque_filtered.vector.x = torque_unfiltered.vector.x - numpy.sign(torque_unfiltered.vector.x) * torque_filter_threshold
-        if(numpy.abs(torque_unfiltered.vector.y) < torque_filter_threshold):
-            torque_filtered.vector.y = 0.0
-        else: 
-            torque_filtered.vector.y = torque_unfiltered.vector.y - numpy.sign(torque_unfiltered.vector.y) * torque_filter_threshold
-        if(numpy.abs(torque_unfiltered.vector.z) < torque_filter_threshold):
-            torque_filtered.vector.z = 0.0
-        else: 
-            torque_filtered.vector.z = torque_unfiltered.vector.z - numpy.sign(torque_unfiltered.vector.z) * torque_filter_threshold 
+    #     if(numpy.abs(torque_unfiltered.vector.x) < torque_filter_threshold):
+    #         torque_filtered.vector.x = 0.0
+    #     else: 
+    #         torque_filtered.vector.x = torque_unfiltered.vector.x - numpy.sign(torque_unfiltered.vector.x) * torque_filter_threshold
+    #     if(numpy.abs(torque_unfiltered.vector.y) < torque_filter_threshold):
+    #         torque_filtered.vector.y = 0.0
+    #     else: 
+    #         torque_filtered.vector.y = torque_unfiltered.vector.y - numpy.sign(torque_unfiltered.vector.y) * torque_filter_threshold
+    #     if(numpy.abs(torque_unfiltered.vector.z) < torque_filter_threshold):
+    #         torque_filtered.vector.z = 0.0
+    #     else: 
+    #         torque_filtered.vector.z = torque_unfiltered.vector.z - numpy.sign(torque_unfiltered.vector.z) * torque_filter_threshold 
         
-        return force_filtered, torque_filtered
+    #     return force_filtered, torque_filtered
         
     def set_gripper_offset(self):
         """
