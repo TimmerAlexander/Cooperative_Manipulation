@@ -122,24 +122,19 @@ class ur_admittance_controller():
         self.wrench_ext_filtered_trans_array = numpy.array([])
         self.wrench_ext_filtered_rot_array = numpy.array([])
         # Singulariy avoidance: OLMM
-        self.sigma_limit = 0.05
+        self.singularity_entry_threshold = 0.05
+        self.singularity_min_threshold = 0.001
         self.adjusting_scalar = 0.0
         self.singular_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.singular_velocity_msg = Float64MultiArray()
-        self.singularity_counter = 0
-        self.bool_singularity = False
-        self.bool_reduce_singularity_offset = False
-        self.singularity_Kp_gain = 5
-        self.singualrity_offset_accuracy = 0.001
-        self.singularity_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        self.current_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        
+        
+
         
         
     def __init__(self):
         # * Load config parameters
         self.config()
-        
-        
         
         # * Initialize node
         rospy.init_node('admittance_controller_node', anonymous=True)
@@ -227,10 +222,6 @@ class ur_admittance_controller():
         
         rospy.loginfo("Recieved messages; Launch ur16e Admittance control.")
         
-        self.current_EE_pose = self.group.get_current_pose('wrist_3_link')
-        print(self.current_EE_pose)
-        
-        
         # * Run control_thread
         self.control_thread()
         
@@ -254,8 +245,10 @@ class ur_admittance_controller():
 
         self.brodacaster.sendTransform(static_gripper_offset)
         
-    def scalar_adjusting_function(self,current_sigma):
+    def scalar_adjusting_function(self,current_sigma,):
         """Compute the adjusting scalar for the OLMM. 3 varaitions to calculate the adjusting scalar are presented.
+
+            Source: QIU, Changwu; CAO, Qixin; MIAO, Shouhong. An on-line task modification method for singularity avoidance of robot manipulators. Robotica, 2009, 27. Jg., Nr. 4, S. 539-546.
 
         Args:
             current_sigma (float): The current singular value
@@ -263,12 +256,16 @@ class ur_admittance_controller():
         Returns:
             float: The adjusting_scalar
         """
+        
+        
+        # 0.
+        # adjusting_scalar = (1-current_sigma)
         # 1.
-        # adjusting_scalar = (1-(current_sigma/self.sigma_limit))
-        # # 2.
-        # adjusting_scalar = (1-(current_sigma/self.sigma_limit)**(1/2))
+        # adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold))
+        # 2.
+        # adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(1/2))
         # 3.
-        adjusting_scalar = (1-(current_sigma/self.sigma_limit)**(3/2))
+        adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(3/2))
         
         return adjusting_scalar
            
@@ -730,116 +727,32 @@ class ur_admittance_controller():
             # * Calculate the inverse of the jacobian-matrix
             self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
             
-            
+#-----------------------------------------------------------------------------------------------------------------------
             # * Singulartiy avoidance: OLMM
+            # QIU, Changwu; CAO, Qixin; MIAO, Shouhong. An on-line task modification method for singularity avoidance of robot manipulators. Robotica, 2009, 27. Jg., Nr. 4, S. 539-546.
             u,s,v = numpy.linalg.svd(self.jacobian,full_matrices=True)
             
             for sigma in range(len(s)):
                 
-                if s[sigma] < self.sigma_limit:
-                    
-                    if self.bool_singularity == False:
-                        
-                        self.bool_singularity = True
-                        print("Activate OLMM")
-                        self.singularity_EE_pose = self.group.get_current_pose('wrist_3_link')
-                        self.singularity_EE_pose_array = [self.singularity_EE_pose.pose.position.x,
-                                                          self.singularity_EE_pose.pose.position.y,
-                                                          self.singularity_EE_pose.pose.position.z,
-                                                          self.singularity_EE_pose.pose.orientation.x,
-                                                          self.singularity_EE_pose.pose.orientation.y,
-                                                          self.singularity_EE_pose.pose.orientation.z]
-                    
+                if s[sigma] < self.singularity_entry_threshold:
+                    print("OLMM activated!")
                     self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
-                    self.singular_velocity += self.singular_velocity
                     
-                    self.singularity_counter += 1
-                    # print("sigma")
-                    # print(s[sigma])
-                    # print("self.singular_velocity")
-                    # print(self.singular_velocity)
-                self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
-                
-                # Publish the calculated singular_velocity, in 'ur/base_link' frame
+                    self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
+                    
+                elif s[sigma] < self.singularity_min_threshold:
+                    self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
+                    rospy.loginfo("The robot is trapped in the singularity. Move the robot out of the singularity manually.")
+                    
+                # Publish the calculated singular_velocity, in 'base_link' frame
                 self.singular_velocity_msg.data = self.singular_velocity
                 self.singularity_velocity_pub.publish(self.singular_velocity_msg)
                 self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
             
-            if self.singularity_counter == 0 and self.bool_singularity == True:
-                self.bool_singularity = False
-                self.bool_reduce_singularity_offset = True
-                print("Dectivate OLMM")
-                print("Reduce Endeffector offset")
-                
-            elif self.singularity_counter != 0 and self.bool_singularity == True:
-                self.singularity_EE_pose_array = self.singularity_EE_pose_array + (self.target_cartesian_velocity/self.publish_rate)
-                self.current_EE_pose = self.group.get_current_pose('wrist_3_link')
-                self.current_EE_pose_array = [self.current_EE_pose.pose.position.x,
-                                            self.current_EE_pose.pose.position.y,
-                                            self.current_EE_pose.pose.position.z,
-                                            self.current_EE_pose.pose.orientation.x,
-                                            self.current_EE_pose.pose.orientation.y,
-                                            self.current_EE_pose.pose.orientation.z]
-                
-                # print(self.singularity_EE_pose_array)
-                # print("numpy.linalg.norm(self.singularity_EE_pose_array - self.current_EE_pose_array)")
-                # print(numpy.linalg.norm(self.singularity_EE_pose_array - self.current_EE_pose_array))
-                
-            # print(self.singularity_counter)
-                
-            self.singularity_counter = 0    
-            
-            if self.bool_reduce_singularity_offset == True:
-                
-                self.current_EE_pose = self.group.get_current_pose('wrist_3_link')
-                self.current_EE_pose_array = [self.current_EE_pose.pose.position.x,
-                                            self.current_EE_pose.pose.position.y,
-                                            self.current_EE_pose.pose.position.z,
-                                            self.current_EE_pose.pose.orientation.x,
-                                            self.current_EE_pose.pose.orientation.y,
-                                            self.current_EE_pose.pose.orientation.z]
-                
-                
-                singularity_offset_vector = (self.singularity_EE_pose_array - self.current_EE_pose_array)
-                
-                if numpy.linalg.norm(singularity_offset_vector) > self.singualrity_offset_accuracy:
-                    
-                    self.singularity_EE_pose_array = self.singularity_EE_pose_array + (self.target_cartesian_velocity/self.publish_rate)
+#-----------------------------------------------------------------------------------------------------------------------
 
-                    singularity_offset_vector = (self.singularity_EE_pose_array - self.current_EE_pose_array)
 
-                    self.singular_velocity = ((singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector))/100)
-                    
-                    print("self.singular_velocity + self.current_EE_pose_array")
-                    print(self.singular_velocity + self.current_EE_pose_array)
-                    print("self.singularity_EE_pose_array")
-                    print(self.singularity_EE_pose_array)
-                    
-                    # self.singular_velocity = 50 * (((singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector)) * numpy.linalg.norm(self.target_cartesian_velocity))/self.publish_rate)
-                    # print("self.singularity_EE_pose_array - self.current_EE_pose_array")
-                    # print(self.singularity_EE_pose_array - self.current_EE_pose_array)
-                    
-                    
-                    # print("self.singular_velocity")
-                    # print(self.singular_velocity)
-                    
-                    # print("numpy.linalg.norm(singularity_offset_vector)")
-                    # print(numpy.linalg.norm(singularity_offset_vector))
-                    
-                    
-                    self.target_cartesian_velocity = self.singular_velocity
-                    # self.target_cartesian_velocity = self.target_cartesian_velocity + self.singular_velocity
-                    # Publish the calculated singular_velocity, in 'ur/base_link' frame
-                    self.singular_velocity_msg.data = self.singular_velocity
-                    self.singularity_velocity_pub.publish(self.singular_velocity_msg)
-                    self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
-                    
-                    
-                else:
-                    self.bool_reduce_singularity_offset = False
-                    print("Endeffector offset is samller then %f",self.singualrity_offset_accuracy)
-                    
-                    
+
             # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
             
