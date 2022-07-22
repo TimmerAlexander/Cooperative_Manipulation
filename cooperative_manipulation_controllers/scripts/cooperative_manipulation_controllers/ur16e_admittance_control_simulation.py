@@ -132,12 +132,12 @@ class ur_admittance_controller():
         self.bool_singularity = False
         self.bool_reduce_singularity_offset = False
         self.singularity_Kp_gain = 5
-        self.singualrity_offset_accuracy = 0.001
+        self.singualrity_offset_accuracy = 0.002
         self.singularity_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.current_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.target_cartesian_velocity_old = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         # Trajectory
-        self.base_link_trajectory_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.world_trajectory_pose_array  = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
                
         self.target_cartesian_velocity_new = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.target_cartesian_velocity_old  = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -245,9 +245,14 @@ class ur_admittance_controller():
         
         
         self.start_EE_pose = numpy.array([self.start_EE_pose_wrist_3_link.pose.position.x,
-                                            self.start_EE_pose_wrist_3_link.pose.position.y,
-                                            self.start_EE_pose_wrist_3_link.pose.position.z,])
+                                        self.start_EE_pose_wrist_3_link.pose.position.y,
+                                        self.start_EE_pose_wrist_3_link.pose.position.z,
+                                        0.0,
+                                        0.0,
+                                        0.0])  
+                                            
         self.current_EE_pose = self.start_EE_pose
+        print(self.start_EE_pose)
 
             
         
@@ -301,33 +306,16 @@ class ur_admittance_controller():
     def world_trajectory_callback(self,world_trajectory_msg):
         """_summary_
         """
-        now = rospy.Time()
-        
-        
-        # world_trajectory_pose = PoseStamped()
-        
-        # world_trajectory_pose.header.frame_id = 'world'
-        # world_trajectory_pose.header.stamp = now
-        
-        # world_trajectory_pose.pose.position.x = world_trajectory_msg.data[0]
-        # world_trajectory_pose.pose.position.y = world_trajectory_msg.data[1]
-        # world_trajectory_pose.pose.position.z = world_trajectory_msg.data[2]
-        
-        # #tf.transformations.euler_from_quaternion()
-        
-        # world_trajectory_pose.pose.orientation.x = world_trajectory_msg.data[0]
-        # world_trajectory_pose.pose.orientation.y = world_trajectory_msg.data[0]
-        # world_trajectory_pose.pose.orientation.z = world_trajectory_msg.data[0]
-        # world_trajectory_pose.pose.orientation.w = world_trajectory_msg.data[0]
-        
-        # base_link_trajectory_pose = self.listener.transformPose('wrist_3_link',world_trajectory_pose)
 
-        self.base_link_trajectory_pose_array = numpy.array([world_trajectory_msg.data[0],
-                                                            world_trajectory_msg.data[1],
-                                                            world_trajectory_msg.data[2],])
+        self.world_trajectory_pose_array = numpy.array([world_trajectory_msg.data[0],
+                                                        world_trajectory_msg.data[1],
+                                                        world_trajectory_msg.data[2],
+                                                        0.0,
+                                                        0.0,
+                                                        0.0])  
                                             
         
-        self.current_EE_pose = self.start_EE_pose + self.base_link_trajectory_pose_array
+        self.current_EE_pose = self.start_EE_pose + self.world_trajectory_pose_array
         
     
     def cartesian_velocity_command_callback(self,desired_velocity):
@@ -800,55 +788,33 @@ class ur_admittance_controller():
             
             
             sigma_min = min(s)
-            print("sigma_min")
-            print(sigma_min)
+            
             if sigma_min > 0.001:
                 for sigma in range(len(s)):
                     # If a singularity is detected
-                    if s[sigma] < 0.05:
+                    if s[sigma] < self.singularity_entry_threshold:
                         if self.bool_singularity == False:
                             self.bool_singularity = True
-                            print("Activate OLMM")
-                            # Get the EE singularity entrancy pose 
-                            self.singularity_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
+                            rospy.loginfo("Activate OLMM")
                             
-                            # 
-                            self.singularity_EE_pose_base_link = self.listener.transformPose('base_link',self.singularity_EE_pose_wrist_3_link)
-                            
-                            
-                            self.singularity_EE_pose_array = [self.singularity_EE_pose_base_link.pose.position.x,
-                                                              self.singularity_EE_pose_base_link.pose.position.y,
-                                                              self.singularity_EE_pose_base_link.pose.position.z,
-                                                              self.singularity_EE_pose_base_link.pose.orientation.x,
-                                                              self.singularity_EE_pose_base_link.pose.orientation.y,
-                                                              self.singularity_EE_pose_base_link.pose.orientation.z,
-                                                              ]
-                            # print("self.singularity_EE_pose singularity entracy")
-                            # print(self.singularity_EE_pose_base_link)
+                                            
                             
                         
                         # print("u[:,sigma]")
                         # print(u[:,sigma])
-                        # Get the EE singularity entrancy pose 
-                        self.singularity_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
-
-                        # 
-                        self.singularity_EE_pose_base_link = self.listener.transformPose('base_link',self.singularity_EE_pose_wrist_3_link)
-                        # print("self.singularity_EE_pose_base_link")
-                        # print(self.singularity_EE_pose_base_link)
-                        # Compute singularity avoidance velocity
                         self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
                         # Subract the target cartesian velocity with the singularity avoidance velocity
                         self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
                         # Increase the counter 
-                        self.singularity_counter += 1
+                        # self.singularity_counter += 1
                     
             else:
-
-                    
+                
                 if numpy.dot(-u[:,len(s)-1],self.target_cartesian_velocity) <= 0.0:
+                    # print("sigma_min")
+                    # print(sigma_min)
                     print("scalar product")
-                    print(numpy.dot(u[:,len(s)-1],self.target_cartesian_velocity))
+                    print(numpy.dot(-u[:,len(s)-1],self.target_cartesian_velocity))
                     
                     self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[len(s)-1]),numpy.dot(numpy.dot(u[:,len(s)-1],self.target_cartesian_velocity),u[:,len(s)-1]))
                     # Subract the target cartesian velocity with the singularity avoidance velocity
@@ -857,46 +823,60 @@ class ur_admittance_controller():
                     self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
                 
                     
+            # print("sigma_min")
+            # print(sigma_min)
+                
+            # If a singularity was detected but the singularity_counter is null, 
+            if sigma_min > 0.08 and self.bool_singularity == True:
+                # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
+                self.bool_singularity = False
+                self.bool_reduce_singularity_offset = True
+                rospy.loginfo("Deactivate OLMM")
+                
+            
+            if self.bool_reduce_singularity_offset == True:
+                
+                EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
+                
+                EE_pose_array = numpy.array([EE_pose_wrist_3_link.pose.position.x,
+                                            EE_pose_wrist_3_link.pose.position.y,
+                                            EE_pose_wrist_3_link.pose.position.z,
+                                            0.0,
+                                            0.0,
+                                            0.0])  
+                singularity_offset_vector = self.current_EE_pose - EE_pose_array
+                    
+                print("numpy.linalg.norm(singularity_offset_vector)")
+                print(numpy.linalg.norm(singularity_offset_vector))
+                
+                    
+                if numpy.linalg.norm(singularity_offset_vector) > self.singualrity_offset_accuracy:
+                        rospy.loginfo("Reduce Endeffector offset")
+                        
+                        
+                        # if numpy.dot(-u[:,len(s)-1],singularity_offset_vector) <= 0.0:
+
+                        #     print("scalar product 2")
+                        #     print(numpy.dot(-u[:,len(s)-1],singularity_offset_vector))
+                        #     # self.singular_velocity = ((singularity_offset_vector)/numpy.linalg.norm(singularity_offset_vector)) * (numpy.linalg.norm(self.target_cartesian_velocity) + numpy.linalg.norm(singularity_offset_vector))
+                        
+                        #     self.target_cartesian_velocity = self.singular_velocity   
+                            
+                        #     print(EE_pose_array)
+                        #     print(self.current_EE_pose)
+                        # else:
+                        #     self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0] 
+                        
+                        
+                    
+                elif numpy.linalg.norm(singularity_offset_vector) < self.singualrity_offset_accuracy:
+                        self.bool_reduce_singularity_offset = False
+                        rospy.loginfo("Endeffector offset is samller then %f",self.singualrity_offset_accuracy)
+                    
             # Publish the calculated singular_velocity, in 'base_link' frame
             self.singular_velocity_msg.data = self.singular_velocity
             self.singularity_velocity_pub.publish(self.singular_velocity_msg)
             self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
-            
-            # If a singularity was detected but the singularity_counter is null, 
-            # if self.singularity_counter == 0 and self.bool_singularity == True:
-            #     # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
-            #     self.bool_singularity = False
-            #     self.bool_reduce_singularity_offset = True
-            #     print("Dectivate OLMM")
-            #     print("Reduce Endeffector offset")
-                
-                
-            #     self.current_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
-            #     self.current_EE_pose_base_link = self.listener.transformPose('base_link',self.current_EE_pose_wrist_3_link)
-                
-                
-            #     self.current_EE_pose_array = [self.current_EE_pose_base_link.pose.position.x,
-            #                                               self.current_EE_pose_base_link.pose.position.y,
-            #                                               self.current_EE_pose_base_link.pose.position.z,
-            #                                               ]
-                
-            #     singularity_offset_vector = (self.singularity_EE_pose_array[:3] - self.current_EE_pose_array)
-            #     print("numpy.linalg.norm(singularity_offset_vector)")
-            #     print(numpy.linalg.norm(singularity_offset_vector))
-                
-            #     print("Current_EE_pose")
-            #     print(self.current_EE_pose_base_link)
-                
-            #     print("Estimated EE pose ")
-            #     print(self.singularity_EE_pose_array)
-                
-                
-            # # If a singularity is still detected
-            # elif self.singularity_counter != 0 and self.bool_singularity == True:
-            #     # Add the current target velocity to the EE singularity entrancy pose
-            #     self.singularity_EE_pose_array = self.singularity_EE_pose_array + (self.target_cartesian_velocity_old/self.publish_rate)
-                
-            
 #-----------------------------------------------------------------------------------------------------------------------
             # EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
             
