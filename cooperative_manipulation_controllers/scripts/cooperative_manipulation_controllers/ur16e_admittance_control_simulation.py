@@ -139,6 +139,9 @@ class ur_admittance_controller():
         # Trajectory
         self.base_link_trajectory_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
                
+        self.target_cartesian_velocity_new = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.target_cartesian_velocity_old  = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+
         
 
         
@@ -795,38 +798,64 @@ class ur_admittance_controller():
             # Do a singular value decomposition of the jacobian
             u,s,v = numpy.linalg.svd(self.jacobian,full_matrices=True)
             
-            for sigma in range(len(s)):
-                # If a singularity is detected
-                if s[sigma] < self.singularity_entry_threshold:
-                    if self.bool_singularity == False:
-                        self.bool_singularity = True
-                        print("Activate OLMM")
+            
+            sigma_min = min(s)
+            print("sigma_min")
+            print(sigma_min)
+            if sigma_min > 0.001:
+                for sigma in range(len(s)):
+                    # If a singularity is detected
+                    if s[sigma] < 0.05:
+                        if self.bool_singularity == False:
+                            self.bool_singularity = True
+                            print("Activate OLMM")
+                            # Get the EE singularity entrancy pose 
+                            self.singularity_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
+                            
+                            # 
+                            self.singularity_EE_pose_base_link = self.listener.transformPose('base_link',self.singularity_EE_pose_wrist_3_link)
+                            
+                            
+                            self.singularity_EE_pose_array = [self.singularity_EE_pose_base_link.pose.position.x,
+                                                              self.singularity_EE_pose_base_link.pose.position.y,
+                                                              self.singularity_EE_pose_base_link.pose.position.z,
+                                                              self.singularity_EE_pose_base_link.pose.orientation.x,
+                                                              self.singularity_EE_pose_base_link.pose.orientation.y,
+                                                              self.singularity_EE_pose_base_link.pose.orientation.z,
+                                                              ]
+                            # print("self.singularity_EE_pose singularity entracy")
+                            # print(self.singularity_EE_pose_base_link)
+                            
+                        
+                        # print("u[:,sigma]")
+                        # print(u[:,sigma])
                         # Get the EE singularity entrancy pose 
                         self.singularity_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
-                        
+
                         # 
                         self.singularity_EE_pose_base_link = self.listener.transformPose('base_link',self.singularity_EE_pose_wrist_3_link)
-                        
-                        
-                        self.singularity_EE_pose_array = [self.singularity_EE_pose_base_link.pose.position.x,
-                                                          self.singularity_EE_pose_base_link.pose.position.y,
-                                                          self.singularity_EE_pose_base_link.pose.position.z,
-                                                          self.singularity_EE_pose_base_link.pose.orientation.x,
-                                                          self.singularity_EE_pose_base_link.pose.orientation.y,
-                                                          self.singularity_EE_pose_base_link.pose.orientation.z,
-                                                          ]
-                        print("self.singularity_EE_pose singularity entracy")
-                        print(self.singularity_EE_pose_base_link)
-                    # Compute singularity avoidance velocity
-                    self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                        # print("self.singularity_EE_pose_base_link")
+                        # print(self.singularity_EE_pose_base_link)
+                        # Compute singularity avoidance velocity
+                        self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                        # Subract the target cartesian velocity with the singularity avoidance velocity
+                        self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
+                        # Increase the counter 
+                        self.singularity_counter += 1
+                    
+            else:
+
+                    
+                if numpy.dot(-u[:,len(s)-1],self.target_cartesian_velocity) <= 0.0:
+                    print("scalar product")
+                    print(numpy.dot(u[:,len(s)-1],self.target_cartesian_velocity))
+                    
+                    self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[len(s)-1]),numpy.dot(numpy.dot(u[:,len(s)-1],self.target_cartesian_velocity),u[:,len(s)-1]))
                     # Subract the target cartesian velocity with the singularity avoidance velocity
                     self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
-                    # Increase the counter 
-                    self.singularity_counter += 1
-                # If sigma is beyond the mi threshold stop the robot!
-                elif s[sigma] < self.singularity_min_threshold:
+                else:
                     self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
-                    rospy.loginfo("The robot is trapped in the singularity. Move the robot out of the singularity manually.")
+                
                     
             # Publish the calculated singular_velocity, in 'base_link' frame
             self.singular_velocity_msg.data = self.singular_velocity
@@ -834,59 +863,59 @@ class ur_admittance_controller():
             self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
             
             # If a singularity was detected but the singularity_counter is null, 
-            if self.singularity_counter == 0 and self.bool_singularity == True:
-                # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
-                self.bool_singularity = False
-                self.bool_reduce_singularity_offset = True
-                print("Dectivate OLMM")
-                print("Reduce Endeffector offset")
+            # if self.singularity_counter == 0 and self.bool_singularity == True:
+            #     # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
+            #     self.bool_singularity = False
+            #     self.bool_reduce_singularity_offset = True
+            #     print("Dectivate OLMM")
+            #     print("Reduce Endeffector offset")
                 
                 
-                self.current_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
-                self.current_EE_pose_base_link = self.listener.transformPose('base_link',self.current_EE_pose_wrist_3_link)
+            #     self.current_EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
+            #     self.current_EE_pose_base_link = self.listener.transformPose('base_link',self.current_EE_pose_wrist_3_link)
                 
                 
-                self.current_EE_pose_array = [self.current_EE_pose_base_link.pose.position.x,
-                                                          self.current_EE_pose_base_link.pose.position.y,
-                                                          self.current_EE_pose_base_link.pose.position.z,
-                                                          ]
+            #     self.current_EE_pose_array = [self.current_EE_pose_base_link.pose.position.x,
+            #                                               self.current_EE_pose_base_link.pose.position.y,
+            #                                               self.current_EE_pose_base_link.pose.position.z,
+            #                                               ]
                 
-                singularity_offset_vector = (self.singularity_EE_pose_array[:3] - self.current_EE_pose_array)
-                print("numpy.linalg.norm(singularity_offset_vector)")
-                print(numpy.linalg.norm(singularity_offset_vector))
+            #     singularity_offset_vector = (self.singularity_EE_pose_array[:3] - self.current_EE_pose_array)
+            #     print("numpy.linalg.norm(singularity_offset_vector)")
+            #     print(numpy.linalg.norm(singularity_offset_vector))
                 
-                print("Current_EE_pose")
-                print(self.current_EE_pose_base_link)
+            #     print("Current_EE_pose")
+            #     print(self.current_EE_pose_base_link)
                 
-                print("Estimated EE pose ")
-                print(self.singularity_EE_pose_array)
+            #     print("Estimated EE pose ")
+            #     print(self.singularity_EE_pose_array)
                 
                 
-            # If a singularity is still detected
-            elif self.singularity_counter != 0 and self.bool_singularity == True:
-                # Add the current target velocity to the EE singularity entrancy pose
-                self.singularity_EE_pose_array = self.singularity_EE_pose_array + (self.target_cartesian_velocity_old/self.publish_rate)
+            # # If a singularity is still detected
+            # elif self.singularity_counter != 0 and self.bool_singularity == True:
+            #     # Add the current target velocity to the EE singularity entrancy pose
+            #     self.singularity_EE_pose_array = self.singularity_EE_pose_array + (self.target_cartesian_velocity_old/self.publish_rate)
                 
             
 #-----------------------------------------------------------------------------------------------------------------------
-            EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
+            # EE_pose_wrist_3_link = self.group.get_current_pose('wrist_3_link')
             
-            # print("self.current_EE_pose_start_wrist_3_link world")       
-            # print(self.current_EE_pose_start_wrist_3_link)
+            # # print("self.current_EE_pose_start_wrist_3_link world")       
+            # # print(self.current_EE_pose_start_wrist_3_link)
             
-            EE_pose_array = numpy.array([EE_pose_wrist_3_link.pose.position.x,
-                                        EE_pose_wrist_3_link.pose.position.y,
-                                        EE_pose_wrist_3_link.pose.position.z,])
-            print("from move it self.current_EE_pose_array")
-            print(EE_pose_array)
-            print("calculated ee pose in baselink")
-            print(self.current_EE_pose) 
+            # EE_pose_array = numpy.array([EE_pose_wrist_3_link.pose.position.x,
+            #                             EE_pose_wrist_3_link.pose.position.y,
+            #                             EE_pose_wrist_3_link.pose.position.z,])
+            # print("from move it self.current_EE_pose_array")
+            # print(EE_pose_array)
+            # print("calculated ee pose in baselink")
+            # print(self.current_EE_pose) 
             
-            self.diff = numpy.linalg.norm(((EE_pose_array- self.current_EE_pose)))
+            # self.diff = numpy.linalg.norm(((EE_pose_array- self.current_EE_pose)))
             
-            print("diff length ")
-            print(self.diff)
-            # self.diff = numpy.linalg.norm(((self.current_EE_pose_start_array - self.current_EE_pose_array)))
+            # print("diff length ")
+            # print(self.diff)
+            # # self.diff = numpy.linalg.norm(((self.current_EE_pose_start_array - self.current_EE_pose_array)))
             
             # # self.current_EE_pose_start_array_old = self.current_EE_pose_start_array
             
