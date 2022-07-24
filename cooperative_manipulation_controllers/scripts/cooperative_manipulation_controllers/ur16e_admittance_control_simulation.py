@@ -134,7 +134,7 @@ class ur_admittance_controller():
         self.bool_singularity = False
         self.bool_reduce_singularity_offset = False
         self.singularity_Kp_gain = 5
-        self.singualrity_offset_accuracy = 0.002
+        self.singularity_offset_accuracy = 0.001
         self.singularity_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.current_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.target_cartesian_velocity_old = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -145,6 +145,8 @@ class ur_admittance_controller():
         self.target_cartesian_velocity_old  = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
 
         self.bool_test = False
+        
+        self.last_target_cartesian_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0]) 
         
 
         
@@ -885,7 +887,7 @@ class ur_admittance_controller():
                     self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
                 
             # If a singularity was detected but the singularity_counter is null, 
-            if sigma_min > 0.08 and self.bool_singularity == True:
+            if sigma_min > 0.05 and self.bool_singularity == True:
                 # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
                 self.bool_singularity = False
                 self.bool_reduce_singularity_offset = True
@@ -918,15 +920,54 @@ class ur_admittance_controller():
                 # In 'base_link' frame
                 singularity_offset_vector = self.current_EE_pose - base_link_EE_pose_array
                     
+                singularity_offset_vector[3] = 0.0
+                singularity_offset_vector[4] = 0.0
+                singularity_offset_vector[5] = 0.0 
                 # u is in 'base_link' frame
-                # if numpy.linalg.norm(singularity_offset_vector) > self.singualrity_offset_accuracy:
-                #         rospy.loginfo("Reduce Endeffector offset")
+                print("self.singularity_offset_accuracy")
+                print(self.singularity_offset_accuracy)
+                print("numpy.linalg.norm(singularity_offset_vector 1")
+                print(numpy.linalg.norm(singularity_offset_vector))
+                
+                if numpy.linalg.norm(singularity_offset_vector) > self.singularity_offset_accuracy:
+                        # rospy.loginfo("Reduce Endeffector offset")
+                        print("numpy.linalg.norm(singularity_offset_vector 2")
+                        print(numpy.linalg.norm(singularity_offset_vector))
                         
-                #         #self.target_cartesian_velocity = singularity_offset_vector/um
+                        # Save the last target cartesian velocity command
+                        if (self.last_target_cartesian_velocity != self.target_cartesian_velocity).any() and numpy.linalg.norm(self.target_cartesian_velocity) != 0.0:
+                            self.last_target_cartesian_velocity = self.target_cartesian_velocity
+                        
+                        # When target cartesian velocity command is not null
+                        if numpy.linalg.norm(self.target_cartesian_velocity) != 0.0:
 
-                # elif numpy.linalg.norm(singularity_offset_vector) < self.singualrity_offset_accuracy:
-                #         self.bool_reduce_singularity_offset = False
-                #         rospy.loginfo("Endeffector offset is samller then ",self.singualrity_offset_accuracy)
+                            singularity_offset_velocity = (singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector)) * (numpy.linalg.norm(self.target_cartesian_velocity) + numpy.linalg.norm(singularity_offset_vector)) 
+                            
+                            if numpy.linalg.norm(singularity_offset_velocity) > (numpy.linalg.norm(self.target_cartesian_velocity) * 1.5 ):
+                           
+                                singularity_offset_velocity = (singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector)) * (numpy.linalg.norm(self.target_cartesian_velocity) * 1.5)
+                            
+                        else:
+                            singularity_offset_velocity = (singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector)) * (numpy.linalg.norm(self.last_target_cartesian_velocity) + numpy.linalg.norm(singularity_offset_vector)) 
+                            
+                            if numpy.linalg.norm(singularity_offset_velocity) > (numpy.linalg.norm(self.last_target_cartesian_velocity) * 1.5 ):
+                           
+                                singularity_offset_velocity = (singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector)) * (numpy.linalg.norm(self.last_target_cartesian_velocity) * 1.5)
+                                
+                            if numpy.linalg.norm(singularity_offset_velocity) < numpy.linalg.norm(self.last_target_cartesian_velocity):
+                                singularity_offset_velocity = singularity_offset_vector
+                        
+                        # print("singularity_offset_velocity")
+                        # print(singularity_offset_velocity)
+                        self.target_cartesian_velocity = singularity_offset_velocity
+                        
+                        
+
+                elif numpy.linalg.norm(singularity_offset_vector) < self.singularity_offset_accuracy:
+                        print("numpy.linalg.norm(singularity_offset_vector 3")
+                        print(numpy.linalg.norm(singularity_offset_vector))
+                        self.bool_reduce_singularity_offset = False
+                        rospy.loginfo("Endeffector offset is samller then %f",self.singularity_offset_accuracy)
                     
             # Publish the calculated singular_velocity, in 'base_link' frame
             self.singular_velocity_msg.data = self.singular_velocity
