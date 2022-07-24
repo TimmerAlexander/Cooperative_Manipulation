@@ -8,6 +8,7 @@
 import rospy    
 import numpy as np
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Float64MultiArray
 import moveit_commander
 import sys
 
@@ -25,6 +26,9 @@ class ur16e_singularity_test():
         self.publish_rate = 100 # [HZ] 
         self.angular_velocity_vector = np.array([0.0,0.0,0.0])
         # ! Do not change under here------------------------------------------------------------------------------------
+        self.trajectory_msg = Float64MultiArray()
+        self.pub_trajectory = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        
         
     def __init__(self):
         
@@ -44,6 +48,8 @@ class ur16e_singularity_test():
         rospy.init_node('ur16e_singularity_test', anonymous=True)
         
         self.pub_cartesian_velocity_command = rospy.Publisher("/cooperative_manipulation/cartesian_velocity_command", Twist, queue_size=100)
+        
+        self.pub_world_trajectory = rospy.Publisher("/cooperative_manipulation/world_trajectory", Float64MultiArray, queue_size=1)
         
         rate = rospy.Rate(self.publish_rate)
 
@@ -65,15 +71,16 @@ class ur16e_singularity_test():
                 
                 break
             else:
+                
                 self.circular_movement()
             
                 self.now = rospy.get_rostime().to_sec()
                 
-                self.alpha = self.alpha + (self.angular_velocity_vector[2] * (self.now - self.now_old))
+                self.alpha = self.alpha + (self.angular_velocity_vector[2]/self.publish_rate)
                 
                 self.now_old = self.now
-                
                 print(self.alpha)
+                
             
             rate.sleep()
             
@@ -94,6 +101,18 @@ class ur16e_singularity_test():
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
+        
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
+        # Publish the trajectory in 'world' frame
+        self.pub_trajectory += joint_velocity_array/self.publish_rate
+        self.trajectory_msg.data = self.pub_trajectory
+        self.pub_world_trajectory.publish(self.trajectory_msg)
         
         # * Publish the target_joint_velocity
         self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
