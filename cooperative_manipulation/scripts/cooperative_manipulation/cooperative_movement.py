@@ -35,10 +35,10 @@ class cooperative_movement():
         rate = rospy.Rate(self.publish_rate)
         
         rospy.loginfo("Cooperative movement starts now!")
-        
-        self.stage_0(rate,5.0)
-        self.stage_1(rate,5.0)
-        self.stage_2(rate,5.0)
+    
+        self.stage_0(rate,1.0)
+        self.stage_1(rate,9.0)
+        self.stage_2(rate,9.0)
         # self.stage_3(rate,5.0)
         # self.stage_4(rate,5.0)
         
@@ -58,7 +58,7 @@ class cooperative_movement():
 # This stage moves the robot back to the initposition.
         # self.stage_back_to_init(rate,10.0)
 # Last stage which stops the robot. 
-        self.stage_end(rate,5.0)
+        self.stage_end(rate,1.0)
 # ! --------------------------------------------------------------------------------------------------------------------
     
     def stage_0(self,rate,duration):
@@ -78,6 +78,13 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
         self.compute_path(self.joint_velocity_msg,duration)
         
         start_time = rospy.get_rostime().to_sec()
@@ -87,7 +94,13 @@ class cooperative_movement():
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
+            
             
     def stage_1(self,rate,duration):
         """Send velocity command linear.x = 0.05
@@ -99,8 +112,8 @@ class cooperative_movement():
         rospy.loginfo("Stage 1")
         rospy.loginfo("linear.x = 0.05 [m/s], duration: %f [s]",duration)
         
-        self.joint_velocity_msg.linear.x = 0.0
-        self.joint_velocity_msg.linear.y = 0.05
+        self.joint_velocity_msg.linear.x = 0.05
+        self.joint_velocity_msg.linear.y = 0.0
         self.joint_velocity_msg.linear.z = 0.0
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
@@ -130,7 +143,7 @@ class cooperative_movement():
             
             rate.sleep()
             
-        print(self.pub_trajectory)
+
             
     def stage_2(self,rate,duration):
         """Send velocity command linear.x = -0.05
@@ -142,24 +155,22 @@ class cooperative_movement():
         rospy.loginfo("Stage 2")
         rospy.loginfo("linear.x = -0.05 [m/s], duration: %f [s]",duration)
         
-        self.joint_velocity_msg.linear.x = 0.0
-        self.joint_velocity_msg.linear.y = -0.05
+        self.joint_velocity_msg.linear.x = -0.05
+        self.joint_velocity_msg.linear.y = 0.0
         self.joint_velocity_msg.linear.z = 0.0
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
+        
         joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
-                                              self.joint_velocity_msg.linear.y,
-                                              self.joint_velocity_msg.linear.z,
-                                              self.joint_velocity_msg.angular.x,
-                                              self.joint_velocity_msg.angular.y,
-                                              self.joint_velocity_msg.angular.z])
-        
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
         self.compute_path(self.joint_velocity_msg,duration)
-        
-        print("path_sum")
-        print(self.path_sum)
         
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
@@ -174,8 +185,7 @@ class cooperative_movement():
             self.pub_world_trajectory.publish(self.trajectory_msg)
             
             rate.sleep()
-        
-        print(self.pub_trajectory)
+            
         
     def stage_3(self,rate,duration):
         """Send velocity command linear.z =  0.05
@@ -194,14 +204,27 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
         self.compute_path(self.joint_velocity_msg,duration)
-
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
             
     def stage_4(self,rate,duration):
@@ -221,15 +244,27 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
         self.compute_path(self.joint_velocity_msg,duration)
-
-        print()
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
             
     def stage_5(self,rate,duration):
@@ -251,12 +286,27 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.z = 0.0
         
 
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
+        self.compute_path(self.joint_velocity_msg,duration)
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
             
     def stage_6(self,rate,duration):
@@ -278,12 +328,27 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.z = 0.0
         
 
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
+        self.compute_path(self.joint_velocity_msg,duration)
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
             
 # ToDo: Use this template to add a stage!-------------------------------------------------------------------------------
@@ -308,13 +373,28 @@ class cooperative_movement():
             self.joint_velocity_msg.angular.z = 0.0
             
 
-            start_time = rospy.get_rostime().to_sec()
-            self.now = start_time 
-            # * Publish the target_joint_velocity
-            while(self.now - start_time <=  duration):
-                self.now = rospy.get_rostime().to_sec()
-                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
-                rate.sleep()
+            joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
+        self.compute_path(self.joint_velocity_msg,duration)
+        
+        start_time = rospy.get_rostime().to_sec()
+        self.now = start_time 
+        # * Publish the target_joint_velocity
+        while(self.now - start_time <=  duration):
+            self.now = rospy.get_rostime().to_sec()
+            self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
+            rate.sleep()
 # ToDo:-----------------------------------------------------------------------------------------------------------------
     
 
@@ -372,14 +452,28 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = -self.path_sum[4]/duration
         self.joint_velocity_msg.angular.z = -self.path_sum[5]/duration
         
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
+        self.compute_path(self.joint_velocity_msg,duration)
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
-
 
 # Last stage which stops the robot.
     def stage_end(self,rate,duration):
@@ -398,12 +492,27 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+                
+        self.compute_path(self.joint_velocity_msg,duration)
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+            # Publish the trajectory in 'world' frame
+            self.pub_trajectory += joint_velocity_array/self.publish_rate
+            self.trajectory_msg.data = self.pub_trajectory
+            self.pub_world_trajectory.publish(self.trajectory_msg)
+            
             rate.sleep()
 # ! --------------------------------------------------------------------------------------------------------------------
 
