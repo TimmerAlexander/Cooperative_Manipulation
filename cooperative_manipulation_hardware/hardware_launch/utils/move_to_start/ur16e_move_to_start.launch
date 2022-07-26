@@ -4,6 +4,7 @@
     <arg name="ur_name" default="ur"/>
     <!-- 
     UR/ROS joint names:
+    
     base/shoulder_pan_joint
     shoulder/shoulder_lift_joint
     elbow/elbow_joint
@@ -12,25 +13,13 @@
     wrist3/wrist_3_joint
     -->
     <!-- the joints move one after the other in this sequence -->
-    <arg name="shoulder_pan_joint" default="0.7986"/>
+    <arg name="shoulder_pan_joint" default="0.0"/>
     <arg name="shoulder_lift_joint" default="-1.57079"/>
-    <arg name="elbow_joint" default="1.57079"/>
+    <arg name="elbow_joint" default="-1.57079"/>
     <arg name="wrist_1_joint" default="-1.57079"/>
-    <arg name="wrist_2_joint" default="-1.57079"/>
-    <arg name="wrist_3_joint" default="0.063"/>
+    <arg name="wrist_2_joint" default="1.57079"/>
+    <arg name="wrist_3_joint" default="0.0"/>
 
-
-
-
-    <!-- 
-    <arg name="elbow_joint" default="1.57079"/>
-    <arg name="shoulder_lift_joint" default="-1.57079"/>
-    <arg name="shoulder_pan_joint" default="0.7986"/>
-    <arg name="wrist_1_joint" default="-1.57079"/>
-    <arg name="wrist_2_joint" default="-1.57079"/>
-    <arg name="wrist_3_joint" default="0.063"/>
-      -->
-    
 
     <group ns="$(arg ur_name)">
         <node pkg="cooperative_manipulation_hardware" type="ur16e_move_to_start.py" name="ur16e_move_to_start_node" output="screen">
