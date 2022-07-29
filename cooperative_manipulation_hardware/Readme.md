@@ -23,8 +23,8 @@ and  pass that calibration to the launch file
 roslaunch coopaerative_manipulation_hardware coopaerative_manipulation_hardware_rviz.launch
 
 ## Move to start position
-1. roslaunch ur_launch_hardware ur16e_move_to_start.launch
-1. roslaunch ur_launch_hardware franka_move_to_start.launch
+1. roslaunch cooperative_manipulation_hardware ur16e_move_to_start.launch
+1. roslaunch cooperative_manipulation_hardware franka_move_to_start.launch
 
 ## Launch the controllers
 1. roslaunch cooperative_manipulation_controllers ur16e_control_hardware.launch
