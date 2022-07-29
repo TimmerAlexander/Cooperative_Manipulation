@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import rospy    
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
@@ -9,8 +10,8 @@ class ur16e_move_to_start():
     def config(self):
         
         self.Kp  = 0.1
-        self.max_vel = 0.08726646259972 #[rad/s] = 5 [°/s]
-        self.min_vel = 0.008726646259972 #[rad/s] = 0.5 [°/s]
+        self.max_vel = 0.1745329251994 #[rad/s] = 10 [°/s]
+        self.min_vel = 0.01745329251994 #[rad/s] = 1 [°/s]
         self.joint_velocity_msg = Float64MultiArray()
         self.shutdown_joint_velocity_msg = Float64MultiArray()
         self.publish_rate = 100
@@ -89,9 +90,10 @@ class ur16e_move_to_start():
 
             self.joint_velocity_msg.data = [0.0,0.0,0.0,0.0,0.0,0.0]
             self.pub_joint_velocity.publish(self.joint_velocity_msg)
-
+            
+        rospy.loginfo("Robot is in start position!")
         self.pub_joint_velocity.publish(self.shutdown_joint_velocity_msg)
-
+        exit()
     def joint_state_callback(self,current_joint_states):
         """
             Get current joint state.
