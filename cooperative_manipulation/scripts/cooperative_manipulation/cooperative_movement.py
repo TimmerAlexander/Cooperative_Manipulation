@@ -20,7 +20,8 @@ class cooperative_movement():
         self.trajectory_msg = Float64MultiArray()
         self.joint_acc_msg = Float64MultiArray()
         self.acc_vel= np.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        self.acceleration_duration = 25 #[Hz] = 0.04 [s]
+        self.current_vel = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.acceleration_duration = 25 #[Hz] = 0.02 [s]
         self.deceleration_duration = 10 #[Hz] = 0.01 [s]
 
         
@@ -42,9 +43,11 @@ class cooperative_movement():
         rospy.loginfo("Cooperative movement starts now!")
         
         self.stage_0(rate,1.0)
-        self.stage_1(rate,5.0)
-        self.stage_2(rate,10.0)
-        self.stage_3(rate,5.0)
+        self.stage_1(rate,8.0)
+        self.stage_2(rate,4.0)
+        self.stage_3(rate,4.0)
+        self.stage_4(rate,4.0)
+        self.stage_5(rate,4.0)
         
         
 # ToDo: Use this template to add a stage!-------------------------------------------------------------------------------
@@ -98,7 +101,7 @@ class cooperative_movement():
         rospy.loginfo("linear.y = 0.05 [m/s], duration: %f [s]",duration)
         
         self.joint_velocity_msg.linear.x = 0.0
-        self.joint_velocity_msg.linear.y = 0.05
+        self.joint_velocity_msg.linear.y = 0.04
         self.joint_velocity_msg.linear.z = 0.0
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
@@ -115,6 +118,9 @@ class cooperative_movement():
         
         self.compute_path(self.joint_velocity_msg,duration)
         
+        
+        acc_vel_diff = joint_velocity_array - self.current_vel
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
@@ -124,9 +130,23 @@ class cooperative_movement():
             # Acceleration to desired velocity
             if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
                 for acc in range(len(joint_velocity_array)):
-                    if self.acc_vel[acc] != joint_velocity_array[acc]:
-                        self.acc_vel[acc] += joint_velocity_array[acc]/self.acceleration_duration
-                
+                    # Acceleration
+                    if acc_vel_diff[acc] > 0.0:
+                    
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] >= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                    # Deceleration
+                    if acc_vel_diff[acc] < 0.0:
+                        
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] <= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                        
                 self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
                 self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
                 self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
@@ -139,6 +159,8 @@ class cooperative_movement():
                 self.pub_trajectory += self.acc_vel/self.publish_rate
                 self.trajectory_msg.data = self.pub_trajectory
                 self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = self.acc_vel
             
             else:
                 self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
@@ -147,6 +169,8 @@ class cooperative_movement():
                 self.pub_trajectory += joint_velocity_array/self.publish_rate
                 self.trajectory_msg.data = self.pub_trajectory
                 self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = joint_velocity_array
             
             
             rate.sleep()
@@ -160,24 +184,27 @@ class cooperative_movement():
             duration (float): Publishing time
         """
         rospy.loginfo("Stage 2")
-        rospy.loginfo("linear.y = -0.05 [m/s], duration: %f [s]",duration)
+        rospy.loginfo("linear.y = -0.02,linear.y = 0.02 [m/s], duration: %f [s]",duration)
         
         self.joint_velocity_msg.linear.x = 0.0
-        self.joint_velocity_msg.linear.y = -0.05
-        self.joint_velocity_msg.linear.z = 0.0
+        self.joint_velocity_msg.linear.y = -0.02
+        self.joint_velocity_msg.linear.z = 0.02
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
         
         joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
-                                              self.joint_velocity_msg.linear.y,
-                                              self.joint_velocity_msg.linear.z,
-                                              self.joint_velocity_msg.angular.x,
-                                              self.joint_velocity_msg.angular.y,
-                                              self.joint_velocity_msg.angular.z])
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
         
         
         self.compute_path(self.joint_velocity_msg,duration)
+        
+        
+        acc_vel_diff = joint_velocity_array - self.current_vel
         
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
@@ -185,13 +212,26 @@ class cooperative_movement():
         while(self.now - start_time <=  duration):
             self.now = rospy.get_rostime().to_sec()
             
-            
             # Acceleration to desired velocity
             if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
                 for acc in range(len(joint_velocity_array)):
-                    if self.acc_vel[acc] != joint_velocity_array[acc]:
-                        self.acc_vel[acc] += joint_velocity_array[acc]/self.acceleration_duration
-                
+                    # Acceleration
+                    if acc_vel_diff[acc] > 0.0:
+                    
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] >= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                    # Deceleration
+                    if acc_vel_diff[acc] < 0.0:
+                        
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] <= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                        
                 self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
                 self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
                 self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
@@ -204,7 +244,9 @@ class cooperative_movement():
                 self.pub_trajectory += self.acc_vel/self.publish_rate
                 self.trajectory_msg.data = self.pub_trajectory
                 self.pub_world_trajectory.publish(self.trajectory_msg)
-      
+                
+                self.current_vel = self.acc_vel
+            
             else:
                 self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
             
@@ -212,6 +254,8 @@ class cooperative_movement():
                 self.pub_trajectory += joint_velocity_array/self.publish_rate
                 self.trajectory_msg.data = self.pub_trajectory
                 self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = joint_velocity_array
             
             
             rate.sleep()
@@ -224,10 +268,94 @@ class cooperative_movement():
             duration (float): Publishing time
         """
         rospy.loginfo("Stage 3")
-        rospy.loginfo("linear.y = 0.05 [m/s], duration: %f [s]",duration)
+        rospy.loginfo("linear.x = 0.02, linear.z = -0.02 [m/s], duration: %f [s]",duration)
         
         self.joint_velocity_msg.linear.x = 0.0
-        self.joint_velocity_msg.linear.y = 0.05
+        self.joint_velocity_msg.linear.y = -0.02
+        self.joint_velocity_msg.linear.z = -0.02
+        self.joint_velocity_msg.angular.x = 0.0
+        self.joint_velocity_msg.angular.y = 0.0
+        self.joint_velocity_msg.angular.z = 0.0
+        
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+        
+        
+        self.compute_path(self.joint_velocity_msg,duration)
+        
+        
+        acc_vel_diff = joint_velocity_array - self.current_vel
+        
+        start_time = rospy.get_rostime().to_sec()
+        self.now = start_time 
+        # * Publish the target_joint_velocity
+        while(self.now - start_time <=  duration):
+            self.now = rospy.get_rostime().to_sec()
+            
+            # Acceleration to desired velocity
+            if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
+                for acc in range(len(joint_velocity_array)):
+                    # Acceleration
+                    if acc_vel_diff[acc] > 0.0:
+                    
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] >= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                    # Deceleration
+                    if acc_vel_diff[acc] < 0.0:
+                        
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] <= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                        
+                self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
+                self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
+                self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
+                self.joint_velocity_msg.angular.x = np.round(self.acc_vel[3],3)
+                self.joint_velocity_msg.angular.y = np.round(self.acc_vel[4],3)
+                self.joint_velocity_msg.angular.z = np.round(self.acc_vel[5],3)
+                
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+                # Publish the trajectory in 'world' frame
+                self.pub_trajectory += self.acc_vel/self.publish_rate
+                self.trajectory_msg.data = self.pub_trajectory
+                self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = self.acc_vel
+            
+            else:
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+                # Publish the trajectory in 'world' frame
+                self.pub_trajectory += joint_velocity_array/self.publish_rate
+                self.trajectory_msg.data = self.pub_trajectory
+                self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = joint_velocity_array
+            
+            
+            rate.sleep()
+            
+    def stage_4(self,rate,duration):
+        """Send velocity command linear.z =  0.05
+
+        Args:
+            rate (Rate): Publish rate
+            duration (float): Publishing time
+        """
+        rospy.loginfo("Stage 3")
+        rospy.loginfo("linear.x = 0.02, linear.z = -0.02 [m/s], duration: %f [s]",duration)
+        
+        self.joint_velocity_msg.linear.x = -0.02
+        self.joint_velocity_msg.linear.y = -0.02
         self.joint_velocity_msg.linear.z = 0.0
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
@@ -243,6 +371,9 @@ class cooperative_movement():
         
         self.compute_path(self.joint_velocity_msg,duration)
         
+        
+        acc_vel_diff = joint_velocity_array - self.current_vel
+        
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
@@ -252,9 +383,23 @@ class cooperative_movement():
             # Acceleration to desired velocity
             if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
                 for acc in range(len(joint_velocity_array)):
-                    if self.acc_vel[acc] != joint_velocity_array[acc]:
-                        self.acc_vel[acc] += joint_velocity_array[acc]/self.acceleration_duration
-                
+                    # Acceleration
+                    if acc_vel_diff[acc] > 0.0:
+                    
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] >= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                    # Deceleration
+                    if acc_vel_diff[acc] < 0.0:
+                        
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] <= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                        
                 self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
                 self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
                 self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
@@ -267,6 +412,8 @@ class cooperative_movement():
                 self.pub_trajectory += self.acc_vel/self.publish_rate
                 self.trajectory_msg.data = self.pub_trajectory
                 self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = self.acc_vel
             
             else:
                 self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
@@ -275,74 +422,180 @@ class cooperative_movement():
                 self.pub_trajectory += joint_velocity_array/self.publish_rate
                 self.trajectory_msg.data = self.pub_trajectory
                 self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = joint_velocity_array
             
             
             rate.sleep()
-   
+            
+    def stage_5(self,rate,duration):
+        """Send velocity command linear.z =  0.05
+
+        Args:
+            rate (Rate): Publish rate
+            duration (float): Publishing time
+        """
+        rospy.loginfo("Stage 3")
+        rospy.loginfo("linear.x = 0.02, linear.z = -0.02 [m/s], duration: %f [s]",duration)
+        
+        self.joint_velocity_msg.linear.x = 0.02
+        self.joint_velocity_msg.linear.y = -0.02
+        self.joint_velocity_msg.linear.z = 0.0
+        self.joint_velocity_msg.angular.x = 0.0
+        self.joint_velocity_msg.angular.y = 0.0
+        self.joint_velocity_msg.angular.z = 0.0
+        
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+        
+        
+        self.compute_path(self.joint_velocity_msg,duration)
+        
+        
+        acc_vel_diff = joint_velocity_array - self.current_vel
+        
+        start_time = rospy.get_rostime().to_sec()
+        self.now = start_time 
+        # * Publish the target_joint_velocity
+        while(self.now - start_time <=  duration):
+            self.now = rospy.get_rostime().to_sec()
+            
+            # Acceleration to desired velocity
+            if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
+                for acc in range(len(joint_velocity_array)):
+                    # Acceleration
+                    if acc_vel_diff[acc] > 0.0:
+                    
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] >= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                    # Deceleration
+                    if acc_vel_diff[acc] < 0.0:
+                        
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] <= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                        
+                self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
+                self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
+                self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
+                self.joint_velocity_msg.angular.x = np.round(self.acc_vel[3],3)
+                self.joint_velocity_msg.angular.y = np.round(self.acc_vel[4],3)
+                self.joint_velocity_msg.angular.z = np.round(self.acc_vel[5],3)
+                
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+                # Publish the trajectory in 'world' frame
+                self.pub_trajectory += self.acc_vel/self.publish_rate
+                self.trajectory_msg.data = self.pub_trajectory
+                self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = self.acc_vel
+            
+            else:
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+                # Publish the trajectory in 'world' frame
+                self.pub_trajectory += joint_velocity_array/self.publish_rate
+                self.trajectory_msg.data = self.pub_trajectory
+                self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = joint_velocity_array
+            
+            
+            rate.sleep()
+            
             
 # ToDo: Use this template to add a stage!-------------------------------------------------------------------------------
 # Template for stage.
 
-        def stage_7(self,rate,duration):
-            """Send velocity command 
-                                    
+    def stage_6(self,rate,duration):
+        """Send velocity command linear.z =  0.05
 
-            Args:
-                rate (Rate): Publish rate
-                duration (float): Publishing time
-            """
-            rospy.loginfo("Stage 7")
-            rospy.loginfo("Write velocity command to log... e.g. linear.x = 0.05 [m/s], duration: %f [s]",duration)
+        Args:
+            rate (Rate): Publish rate
+            duration (float): Publishing time
+        """
+        rospy.loginfo("Stage 3")
+        rospy.loginfo("linear.x = 0.02, linear.z = -0.02 [m/s], duration: %f [s]",duration)
+        
+        self.joint_velocity_msg.linear.x = 0.0
+        self.joint_velocity_msg.linear.y = -0.035
+        self.joint_velocity_msg.linear.z = 0.0
+        self.joint_velocity_msg.angular.x = 0.0
+        self.joint_velocity_msg.angular.y = 0.0
+        self.joint_velocity_msg.angular.z = 0.0
+        
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+        
+        
+        self.compute_path(self.joint_velocity_msg,duration)
+        
+        
+        acc_vel_diff = joint_velocity_array - self.current_vel
+        
+        start_time = rospy.get_rostime().to_sec()
+        self.now = start_time 
+        # * Publish the target_joint_velocity
+        while(self.now - start_time <=  duration):
+            self.now = rospy.get_rostime().to_sec()
             
-            self.joint_velocity_msg.linear.x = 0.0
-            self.joint_velocity_msg.linear.y = 0.0
-            self.joint_velocity_msg.linear.z = 0.0
-            self.joint_velocity_msg.angular.x = 0.0
-            self.joint_velocity_msg.angular.y = 0.0
-            self.joint_velocity_msg.angular.z = 0.0
-            
-            joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
-                                            self.joint_velocity_msg.linear.y,
-                                            self.joint_velocity_msg.linear.z,
-                                            self.joint_velocity_msg.angular.x,
-                                            self.joint_velocity_msg.angular.y,
-                                            self.joint_velocity_msg.angular.z])
-            
-            
-            self.compute_path(self.joint_velocity_msg,duration)
-            
-            start_time = rospy.get_rostime().to_sec()
-            self.now = start_time 
-            # * Publish the target_joint_velocity
-            while(self.now - start_time <=  duration):
-                self.now = rospy.get_rostime().to_sec()
-                
-                # Acceleration to desired velocity
-                if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
-                    for acc in range(len(joint_velocity_array)):
+            # Acceleration to desired velocity
+            if np.any((np.round(self.acc_vel,3))!= (np.round(joint_velocity_array,3))):
+                for acc in range(len(joint_velocity_array)):
+                    # Acceleration
+                    if acc_vel_diff[acc] > 0.0:
+                    
                         if self.acc_vel[acc] != joint_velocity_array[acc]:
-                            self.acc_vel[acc] += joint_velocity_array[acc]/self.acceleration_duration
-                    
-                    self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
-                    self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
-                    self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
-                    self.joint_velocity_msg.angular.x = np.round(self.acc_vel[3],3)
-                    self.joint_velocity_msg.angular.y = np.round(self.acc_vel[4],3)
-                    self.joint_velocity_msg.angular.z = np.round(self.acc_vel[5],3)
-                    
-                    self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
-                    # Publish the trajectory in 'world' frame
-                    self.pub_trajectory += self.acc_vel/self.publish_rate
-                    self.trajectory_msg.data = self.pub_trajectory
-                    self.pub_world_trajectory.publish(self.trajectory_msg)
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] >= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                    # Deceleration
+                    if acc_vel_diff[acc] < 0.0:
+                        
+                        if self.acc_vel[acc] != joint_velocity_array[acc]:
+                            self.acc_vel[acc] += acc_vel_diff[acc]/self.acceleration_duration
+                        
+                        if self.acc_vel[acc] <= joint_velocity_array[acc]:
+                            self.acc_vel[acc] = joint_velocity_array[acc]
+                        
+                self.joint_velocity_msg.linear.x = np.round(self.acc_vel[0],3)
+                self.joint_velocity_msg.linear.y = np.round(self.acc_vel[1],3)
+                self.joint_velocity_msg.linear.z = np.round(self.acc_vel[2],3)
+                self.joint_velocity_msg.angular.x = np.round(self.acc_vel[3],3)
+                self.joint_velocity_msg.angular.y = np.round(self.acc_vel[4],3)
+                self.joint_velocity_msg.angular.z = np.round(self.acc_vel[5],3)
                 
-                else:
-                    self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+                # Publish the trajectory in 'world' frame
+                self.pub_trajectory += self.acc_vel/self.publish_rate
+                self.trajectory_msg.data = self.pub_trajectory
+                self.pub_world_trajectory.publish(self.trajectory_msg)
                 
-                    # Publish the trajectory in 'world' frame
-                    self.pub_trajectory += joint_velocity_array/self.publish_rate
-                    self.trajectory_msg.data = self.pub_trajectory
-                    self.pub_world_trajectory.publish(self.trajectory_msg)
+                self.current_vel = self.acc_vel
+            
+            else:
+                self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
+            
+                # Publish the trajectory in 'world' frame
+                self.pub_trajectory += joint_velocity_array/self.publish_rate
+                self.trajectory_msg.data = self.pub_trajectory
+                self.pub_world_trajectory.publish(self.trajectory_msg)
+                
+                self.current_vel = joint_velocity_array
             
             
             rate.sleep()
@@ -402,7 +655,8 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.x = -self.path_sum[3]/duration
         self.joint_velocity_msg.angular.y = -self.path_sum[4]/duration
         self.joint_velocity_msg.angular.z = -self.path_sum[5]/duration
-        
+         
+
         start_time = rospy.get_rostime().to_sec()
         self.now = start_time 
         # * Publish the target_joint_velocity
