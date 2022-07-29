@@ -19,10 +19,9 @@ class cooperative_movement():
         self.joint_velocity_msg = Twist()
         self.trajectory_msg = Float64MultiArray()
         self.joint_acc_msg = Float64MultiArray()
-        self.acc_vel= np.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.acc_vel = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.current_vel = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.acceleration_duration = 25 #[Hz] = 0.02 [s]
-        self.deceleration_duration = 10 #[Hz] = 0.01 [s]
 
         
     def __init__(self):
@@ -52,7 +51,7 @@ class cooperative_movement():
         
 # ToDo: Use this template to add a stage!-------------------------------------------------------------------------------
 # Template for stage.
-        #self.stage_7(rate,8.0)
+        #self.stage_6(rate,8.0)
 # ToDo:-----------------------------------------------------------------------------------------------------------------
 
 # ! Do not changes this!------------------------------------------------------------------------------------------------
@@ -91,14 +90,14 @@ class cooperative_movement():
             rate.sleep()
         
     def stage_1(self,rate,duration):
-        """Send velocity command linear.x = 0.05
+        """Send velocity command linear.y = 0.04
 
         Args:
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
         rospy.loginfo("Stage 1")
-        rospy.loginfo("linear.y = 0.05 [m/s], duration: %f [s]",duration)
+        rospy.loginfo("linear.y = 0.04 [m/s], duration: %f [s]",duration)
         
         self.joint_velocity_msg.linear.x = 0.0
         self.joint_velocity_msg.linear.y = 0.04
@@ -177,7 +176,7 @@ class cooperative_movement():
             
             
     def stage_2(self,rate,duration):
-        """Send velocity command linear.x = -0.05
+        """Send velocity command linear.x = -0.02, linear.x = 0.02
 
         Args:
             rate (Rate): Publish rate
@@ -261,7 +260,7 @@ class cooperative_movement():
             rate.sleep()
         
     def stage_3(self,rate,duration):
-        """Send velocity command linear.z =  0.05
+        """Send velocity command linear.x = 0.02, linear.z = -0.02
 
         Args:
             rate (Rate): Publish rate
@@ -345,7 +344,7 @@ class cooperative_movement():
             rate.sleep()
             
     def stage_4(self,rate,duration):
-        """Send velocity command linear.z =  0.05
+        """Send velocity command linear.x = 0.02, linear.z = -0.02 
 
         Args:
             rate (Rate): Publish rate
@@ -429,7 +428,7 @@ class cooperative_movement():
             rate.sleep()
             
     def stage_5(self,rate,duration):
-        """Send velocity command linear.z =  0.05
+        """Send velocity command linear.x = 0.02, linear.z = -0.02
 
         Args:
             rate (Rate): Publish rate
@@ -517,17 +516,17 @@ class cooperative_movement():
 # Template for stage.
 
     def stage_6(self,rate,duration):
-        """Send velocity command linear.z =  0.05
+        """Send velocity command l...
 
         Args:
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
         rospy.loginfo("Stage 3")
-        rospy.loginfo("linear.x = 0.02, linear.z = -0.02 [m/s], duration: %f [s]",duration)
+        rospy.loginfo("linear.x = ... [m/s], duration: %f [s]",duration)
         
-        self.joint_velocity_msg.linear.x = 0.0
-        self.joint_velocity_msg.linear.y = -0.035
+        self.joint_velocity_msg.linear.x = 0.02
+        self.joint_velocity_msg.linear.y = -0.02
         self.joint_velocity_msg.linear.z = 0.0
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
@@ -603,30 +602,11 @@ class cooperative_movement():
     
 
 # ! Do not changes this!------------------------------------------------------------------------------------------------
-
-    def publish_trajectory(self,rate):
-        """
-        
-        
-        
-        """
-        pub_trajectory = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        
-        # * Publish the target_joint_velocity
-        while np.linalg.norm(pub_trajectory) <= np.linalg.norm(self.path_sum):
-            
-            pub_trajectory += self.path_sum/self.publish_rate
-            self.trajectory_msg.data = pub_trajectory
-            self.pub_world_trajectory.publish(self.trajectory_msg)
-            rate.sleep()
-        
-            
-        
     def compute_path(self,velocity_cmd,duration):
         """Compute the path the robot does.
 
         Args:
-            velocity_cmd (_type_): _Current velocity command
+            velocity_cmd (_type_): Current velocity command
             duration (float): Current publishing time
         """
         
