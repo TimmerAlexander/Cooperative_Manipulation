@@ -37,20 +37,20 @@ class ur_admittance_controller():
         self.wrench_contact = numpy.array([0.4,0.4,0.4,0.4,0.4,0.4])
         # Array to store the wrench difference
         self.wrench_diff = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        # Stiffness gains
-        self.P_trans_x = 1000
-        self.P_trans_y = 1000
-        self.P_trans_z = 1000
-        self.P_rot_x = 1000
-        self.P_rot_y = 1000
-        self.P_rot_z = 1000
-        # Damping gains
-        self.D_trans_x = 1000
-        self.D_trans_y = 1000
-        self.D_trans_z = 1000
-        self.D_rot_x = 1000
-        self.D_rot_y = 1000
-        self.D_rot_z = 1000
+        # Admittance gains
+        self.A_trans_x = 0.0001
+        self.A_trans_y = 0.0001
+        self.A_trans_z = 0.0001
+        self.A_rot_x = 0.0001
+        self.A_rot_y = 0.0001
+        self.A_rot_z = 0.0001
+        # Kp gains
+        self.Kp_trans_x = 1.0
+        self.Kp_trans_y = 1.0
+        self.Kp_trans_z = 1.0
+        self.Kp_rot_x = 1.0
+        self.Kp_rot_y = 1.0
+        self.Kp_rot_z = 1.0
         #* Min and max limits for the cartesian velocity (trans/rot) [m/s]
         self.cartesian_velocity_trans_min_limit = 0.0009
         self.cartesian_velocity_trans_max_limit = 0.1
@@ -102,7 +102,7 @@ class ur_admittance_controller():
         # Declare target joint velocity msgs (qdot_target_base_ink) (unit: [radian/s])
         self.target_joint_velocity = Float64MultiArray()
         #* Array to store the desired endeffector pose
-        self.desired_EE_pose = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.trajectory_EE_pose = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         #* Initialize shutdown joint velocity, called on shutdown 
         self.shutdown_joint_velocity = Float64MultiArray()
         self.shutdown_joint_velocity.data = [0.0,0.0,0.0,0.0,0.0,0.0]
@@ -136,8 +136,8 @@ class ur_admittance_controller():
         # Wait for transformations from 'world' to 'ur16e_gripper' and 'world' to 'panda_EE'
         rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
         self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Wait for transformation 'world' to 'panda_EE'.")
-        self.tf_listener.waitForTransform("world","panda_EE", rospy.Time(), rospy.Duration(60.0))
+        # rospy.loginfo("Wait for transformation 'world' to 'panda_EE'.")
+        # self.tf_listener.waitForTransform("world","panda_EE", rospy.Time(), rospy.Duration(60.0))
 
         # * Get namespace for topics from launch file
         self.namespace = rospy.get_param("~ur_ns")
@@ -172,24 +172,24 @@ class ur_admittance_controller():
             self.cartesian_velocity_command_callback,queue_size=1)
         
         # * Get the start EE pose
-        start_world_EE_pose = self.group.get_current_pose('wrist_3_link')
+        # Get start EE pose in 'base_link' frame
+        start_EE_pose = self.group.get_current_pose('wrist_3_link')
         
-        start_world_EE_pose_quaternion = (start_world_EE_pose.pose.orientation.x,
-                                        start_world_EE_pose.pose.orientation.y,
-                                        start_world_EE_pose.pose.orientation.z,
-                                        start_world_EE_pose.pose.orientation.w)
         
-        start_world_EE_pose_euler = euler_from_quaternion(start_world_EE_pose_quaternion)
+        start_EE_pose_quaternion = (start_EE_pose.pose.orientation.x,
+                                    start_EE_pose.pose.orientation.y,
+                                    start_EE_pose.pose.orientation.z,
+                                    start_EE_pose.pose.orientation.w)
+
+        # Transform quaternion to euler
+        start_EE_pose_euler = euler_from_quaternion(start_EE_pose_quaternion)
         
-        self.start_world_EE_pose_pose_array = numpy.array([start_world_EE_pose.pose.position.x,
-                                            start_world_EE_pose.pose.position.y,
-                                            start_world_EE_pose.pose.position.z,
-                                            start_world_EE_pose_euler[0],
-                                            start_world_EE_pose_euler[1],
-                                            start_world_EE_pose_euler[2]])
-                
-        self.desired_EE_pose = self.transform_pose_stamped('world','base_link',self.start_world_EE_pose_pose_array ) 
-        rospy.loginfo(self.desired_EE_pose)
+        self.start_EE_pose_array = numpy.array([start_EE_pose.pose.position.x,
+                                            start_EE_pose.pose.position.y,
+                                            start_EE_pose.pose.position.z,
+                                            start_EE_pose_euler[0],
+                                            start_EE_pose_euler[1],
+                                            start_EE_pose_euler[2]])
         
         # * Run control_thread
         rospy.loginfo("Recieved messages; Launch ur16e Admittance control.")
@@ -308,7 +308,7 @@ class ur_admittance_controller():
             ])
         
         return output_wrench
-    
+        
     def cartesian_velocity_command_callback(self,desired_velocity):
         """
             Get the cartesian velocity command and transform it from from the 'world' frame to the 'base_link' and 'wrist_link_3' frame.
@@ -328,120 +328,120 @@ class ur_admittance_controller():
 
         # Calculate the trajectory velocity of the manipulator for a rotation of the object-----------------------------
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "wrist_3_link")
-        ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
+        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "wrist_3_link")
+        # ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
 
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'world' frame 
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "ur16e_gripper")
-        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        # # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'world' frame 
+        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "ur16e_gripper")
+        # ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
 
-        # # Get self.panda_current_position, self.panda_current_quaternion of the 'panda_EE' frame in the 'world' frame 
-        panda_tf_time = self.tf_listener.getLatestCommonTime("world", "panda_EE")
-        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("world", "panda_EE", panda_tf_time)
+        # # # Get self.panda_current_position, self.panda_current_quaternion of the 'panda_EE' frame in the 'world' frame 
+        # panda_tf_time = self.tf_listener.getLatestCommonTime("world", "panda_EE")
+        # panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("world", "panda_EE", panda_tf_time)
 
-        # Object rotation around x axis 
-        if desired_velocity.angular.x != 0.0:
-            ur16e_current_position_x = numpy.array([
-                0.0,
-                ur16e_current_position[1],
-                ur16e_current_position[2]])
+        # # Object rotation around x axis 
+        # if desired_velocity.angular.x != 0.0:
+        #     ur16e_current_position_x = numpy.array([
+        #         0.0,
+        #         ur16e_current_position[1],
+        #         ur16e_current_position[2]])
             
-            self.robot_distance_x = numpy.array([0.0,
-                panda_gripper_position[1] - ur16e_gripper_position[1],
-                panda_gripper_position[2] - ur16e_gripper_position[2],
-            ])
-            
-            
-            center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_gripper_position
-            world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-            world_radius_x = ur16e_current_position_x - center_x
-            self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
+        #     self.robot_distance_x = numpy.array([0.0,
+        #         panda_gripper_position[1] - ur16e_gripper_position[1],
+        #         panda_gripper_position[2] - ur16e_gripper_position[2],
+        #     ])
             
             
-        # Object rotation around y axis 
-        if desired_velocity.angular.y != 0.0: 
-            ur16e_current_position_y = numpy.array([
-                ur16e_current_position[0],
-                0.0,
-                ur16e_current_position[2]
-                ]) 
+        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_gripper_position
+        #     world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
+        #     world_radius_x = ur16e_current_position_x - center_x
+        #     self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
             
-            self.robot_distance_y = numpy.array([
-                panda_gripper_position[0] - ur16e_gripper_position[0],
-                0.0,
-                panda_gripper_position[2] - ur16e_gripper_position[2],
-                ])
             
-            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
-            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-            world_radius_y = ur16e_current_position_y - center_y
-            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
+        # # Object rotation around y axis 
+        # if desired_velocity.angular.y != 0.0: 
+        #     ur16e_current_position_y = numpy.array([
+        #         ur16e_current_position[0],
+        #         0.0,
+        #         ur16e_current_position[2]
+        #         ]) 
+            
+        #     self.robot_distance_y = numpy.array([
+        #         panda_gripper_position[0] - ur16e_gripper_position[0],
+        #         0.0,
+        #         panda_gripper_position[2] - ur16e_gripper_position[2],
+        #         ])
+            
+        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
+        #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+        #     world_radius_y = ur16e_current_position_y - center_y
+        #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
 
-        # Object rotation around z axis 
-        if desired_velocity.angular.z != 0.0:
-            ur16e_current_position_z = numpy.array([
-                ur16e_current_position[0],
-                ur16e_current_position[1],
-                0.0,
-                ]) 
+        # # Object rotation around z axis 
+        # if desired_velocity.angular.z != 0.0:
+        #     ur16e_current_position_z = numpy.array([
+        #         ur16e_current_position[0],
+        #         ur16e_current_position[1],
+        #         0.0,
+        #         ]) 
                             
-            self.robot_distance_z = numpy.array([
-                panda_gripper_position[0] - ur16e_gripper_position[0],
-                panda_gripper_position[1] - ur16e_gripper_position[1],
-                0.0,
-                ])
+        #     self.robot_distance_z = numpy.array([
+        #         panda_gripper_position[0] - ur16e_gripper_position[0],
+        #         panda_gripper_position[1] - ur16e_gripper_position[1],
+        #         0.0,
+        #         ])
             
             
-            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
-            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-            world_radius_z = ur16e_current_position_z - center_z
-            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z     
+        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
+        #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+        #     world_radius_z = ur16e_current_position_z - center_z
+        #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z     
             
 
 
-        # Object rotation around y axis 
-        if desired_velocity.angular.y != 0.0: 
-            ur16e_current_position_y = numpy.array([
-                ur16e_current_position[0],
-                0.0,
-                ur16e_current_position[2]
-                ]) 
+        # # Object rotation around y axis 
+        # if desired_velocity.angular.y != 0.0: 
+        #     ur16e_current_position_y = numpy.array([
+        #         ur16e_current_position[0],
+        #         0.0,
+        #         ur16e_current_position[2]
+        #         ]) 
             
-            self.robot_distance_y = numpy.array([
-                panda_gripper_position[0] - ur16e_gripper_position[0],
-                0.0,
-                panda_gripper_position[2] - ur16e_gripper_position[2],
-                ])
+        #     self.robot_distance_y = numpy.array([
+        #         panda_gripper_position[0] - ur16e_gripper_position[0],
+        #         0.0,
+        #         panda_gripper_position[2] - ur16e_gripper_position[2],
+        #         ])
             
-            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
-            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-            world_radius_y = ur16e_current_position_y - center_y
-            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
+        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
+        #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+        #     world_radius_y = ur16e_current_position_y - center_y
+        #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
 
-        # Object rotation around z axis 
-        if desired_velocity.angular.z != 0.0:
-            ur16e_current_position_z = numpy.array([
-                ur16e_current_position[0],
-                ur16e_current_position[1],
-                0.0,
-                ]) 
+        # # Object rotation around z axis 
+        # if desired_velocity.angular.z != 0.0:
+        #     ur16e_current_position_z = numpy.array([
+        #         ur16e_current_position[0],
+        #         ur16e_current_position[1],
+        #         0.0,
+        #         ]) 
                             
-            self.robot_distance_z = numpy.array([
-                panda_gripper_position[0] - ur16e_gripper_position[0],
-                panda_gripper_position[1] - ur16e_gripper_position[1],
-                0.0,
-                ])
+        #     self.robot_distance_z = numpy.array([
+        #         panda_gripper_position[0] - ur16e_gripper_position[0],
+        #         panda_gripper_position[1] - ur16e_gripper_position[1],
+        #         0.0,
+        #         ])
             
             
-            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
-            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-            world_radius_z = ur16e_current_position_z - center_z
-            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z 
+        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
+        #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+        #     world_radius_z = ur16e_current_position_z - center_z
+        #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z 
 
 
         # Transform the velocity from 'world' frame to 'base_link' frame------------------------------------------------
@@ -579,29 +579,29 @@ class ur_admittance_controller():
         rate = rospy.Rate(self.publish_rate)
         while not rospy.is_shutdown():
             
-            # get current EE pose in 'world' frame
-            world_EE_pose = self.group.get_current_pose('wrist_3_link')
+            # Get current EE pose in 'base_link' frame
+            current_EE_pose = self.group.get_current_pose('wrist_3_link')
+
+            current_EE_quaternion = (current_EE_pose.pose.orientation.x,
+                                    current_EE_pose.pose.orientation.y,
+                                    current_EE_pose.pose.orientation.z,
+                                    current_EE_pose.pose.orientation.w)
             
-            world_EE_quaternion = (world_EE_pose.pose.orientation.x,
-                                    world_EE_pose.pose.orientation.y,
-                                    world_EE_pose.pose.orientation.z,
-                                    world_EE_pose.pose.orientation.w)
-    
-            world_EE_euler = euler_from_quaternion(world_EE_quaternion)
+            # Transform quaternion to euler
+            current_EE_euler = euler_from_quaternion(current_EE_quaternion)
             
-            world_EE_pose_array = numpy.array([world_EE_pose.pose.position.x,
-                                                world_EE_pose.pose.position.y,
-                                                world_EE_pose.pose.position.z,
-                                                world_EE_euler[0],
-                                                world_EE_euler[1],
-                                                world_EE_euler[2]])
-            # Transform EE pose into 'base_link' frame
-            current_EE_pose = self.transform_pose_stamped('world','base_link',world_EE_pose_array)
-            
-            # Compute the current desired EE pose
-            self.desired_EE_pose = self.desired_EE_pose + (self.base_link_desired_velocity/self.publish_rate)
-            # Calculate the pose difference
-            pose_diff = numpy.array(self.desired_EE_pose - current_EE_pose)
+            current_EE_pose_array = numpy.array([current_EE_pose.pose.position.x,
+                                                current_EE_pose.pose.position.y,
+                                                current_EE_pose.pose.position.z,
+                                                current_EE_euler[0],
+                                                current_EE_euler[1],
+                                                current_EE_euler[2]])
+            # Calculate desired EE pose
+            self.start_EE_pose_array = numpy.array(self.start_EE_pose_array + (self.base_link_desired_velocity/self.publish_rate))
+            # Difference from current pose and desired pose
+            pose_diff = numpy.array(self.start_EE_pose_array - current_EE_pose_array)
+            print("pose_diff")
+            print(pose_diff)
             
             #* Compute the wrench difference
             for wrench in range(len(self.average_wrench_ext_filtered_array )):
@@ -612,26 +612,39 @@ class ur_admittance_controller():
                     print()
                     self.wrench_diff[wrench] = 0.0
             
-            # Add the restoring force to 'wrench_diff'
-            for pose in range(len(pose_diff)):
-                self.wrench_diff[pose] = self.wrench_diff[pose] + (pose_diff[pose]/100) 
+            # print("self.wrench_diff")
+            # print(self.wrench_diff)
             
             # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
-            self.admittance_velocity[0] = numpy.round(numpy.sign(self.wrench_diff[0]) * (numpy.abs(self.wrench_diff[0]) * pow((self.P_trans_x * (numpy.abs(self.wrench_diff[0])/self.publish_rate) + self.D_trans_x),-1)),6)
+            self.admittance_velocity[0] = self.wrench_diff[0] * self.A_trans_x + pose_diff[0] * self.Kp_trans_x 
+            self.admittance_velocity[1] = self.wrench_diff[1] * self.A_trans_y + pose_diff[1] * self.Kp_trans_y 
+            self.admittance_velocity[2] = self.wrench_diff[2] * self.A_trans_z + pose_diff[2] * self.Kp_trans_z
+            self.admittance_velocity[3] = self.wrench_diff[3] * self.A_rot_x + pose_diff[3] * self.Kp_rot_x 
+            self.admittance_velocity[4] = self.wrench_diff[4] * self.A_rot_y + pose_diff[4] * self.Kp_rot_y 
+            self.admittance_velocity[5] = self.wrench_diff[5] * self.A_rot_z + pose_diff[5] * self.Kp_rot_z 
+   
+            # self.admittance_velocity[0] = numpy.round(numpy.sign(self.wrench_diff[0]) * (numpy.abs(self.wrench_diff[0]) * pow((self.A_trans_x * (numpy.abs(self.wrench_diff[0])/self.publish_rate) + self.Kp_trans_x),-1)),6)
             
-            self.admittance_velocity[1] = numpy.round(numpy.sign(self.wrench_diff[1]) * (numpy.abs(self.wrench_diff[1]) * pow((self.P_trans_y * (numpy.abs(self.wrench_diff[1])/self.publish_rate) + self.D_trans_y),-1)),6)         
+            # self.admittance_velocity[1] = numpy.round(numpy.sign(self.wrench_diff[1]) * (numpy.abs(self.wrench_diff[1]) * pow((self.A_trans_y * (numpy.abs(self.wrench_diff[1])/self.publish_rate) + self.Kp_trans_y),-1)),6)         
             
-            self.admittance_velocity[2] = numpy.round(numpy.sign(self.wrench_diff[2]) * (numpy.abs(self.wrench_diff[2]) * pow((self.P_trans_z * (numpy.abs(self.wrench_diff[2])/self.publish_rate) + self.D_trans_z),-1)),6)              
+            # self.admittance_velocity[2] = numpy.round(numpy.sign(self.wrench_diff[2]) * (numpy.abs(self.wrench_diff[2]) * pow((self.A_trans_z * (numpy.abs(self.wrench_diff[2])/self.publish_rate) + self.Kp_trans_z),-1)),6)              
             
-            self.admittance_velocity[3] = numpy.round(numpy.sign(self.wrench_diff[3]) * (numpy.abs(self.wrench_diff[3]) * pow((self.P_rot_x * (numpy.abs(self.wrench_diff[3])/self.publish_rate) + self.D_rot_x),-1)),6)             
+            # self.admittance_velocity[3] = numpy.round(numpy.sign(self.wrench_diff[3]) * (numpy.abs(self.wrench_diff[3]) * pow((self.A_rot_x * (numpy.abs(self.wrench_diff[3])/self.publish_rate) + self.Kp_rot_x),-1)),6)             
                                                                                 
-            self.admittance_velocity[4] = numpy.round(numpy.sign(self.wrench_diff[4]) * (numpy.abs(self.wrench_diff[4]) * pow((self.P_rot_y * (numpy.abs(self.wrench_diff[4])/self.publish_rate) + self.D_rot_y),-1)),6)         
+            # self.admittance_velocity[4] = numpy.round(numpy.sign(self.wrench_diff[4]) * (numpy.abs(self.wrench_diff[4]) * pow((self.A_rot_y * (numpy.abs(self.wrench_diff[4])/self.publish_rate) + self.Kp_rot_y),-1)),6)         
             
-            self.admittance_velocity[5] = numpy.round(numpy.sign(self.wrench_diff[5]) * (numpy.abs(self.wrench_diff[5]) * pow((self.P_rot_z * (numpy.abs(self.wrench_diff[5])/self.publish_rate) + self.D_rot_z),-1)),6)         
+            # self.admittance_velocity[5] = numpy.round(numpy.sign(self.wrench_diff[5]) * (numpy.abs(self.wrench_diff[5]) * pow((self.A_rot_z * (numpy.abs(self.wrench_diff[5])/self.publish_rate) + self.Kp_rot_z),-1)),6)         
             
 
             print("self.admittance_velocity")
             print(self.admittance_velocity)
+            
+            # self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] 
+            # self.target_cartesian_velocity[1] = self.base_link_desired_velocity[1] 
+            # self.target_cartesian_velocity[2] = self.base_link_desired_velocity[2] 
+            # self.target_cartesian_velocity[3] = self.base_link_desired_velocity[3] 
+            # self.target_cartesian_velocity[4] = self.base_link_desired_velocity[4] 
+            # self.target_cartesian_velocity[5] = self.base_link_desired_velocity[5] 
             
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
             self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity[0]
