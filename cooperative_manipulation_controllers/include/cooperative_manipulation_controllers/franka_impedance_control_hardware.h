@@ -10,7 +10,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/node_handle.h>
-
+#include <Eigen/Dense>
 
 #include <franka_hw/franka_cartesian_command_interface.h>
 #include <franka_hw/franka_model_interface.h>
@@ -27,11 +27,12 @@ class FrankaImpedanceController : public controller_interface::MultiInterfaceCon
                                             hardware_interface::EffortJointInterface> {
  public:
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
+  void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
   void velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd);
 
  private:
-   std::vector<hardware_interface::JointHandle> velocity_joint_handles_;
+  std::vector<hardware_interface::JointHandle> velocity_joint_handles_;
   franka_hw::FrankaVelocityCartesianInterface* velocity_cartesian_interface_;
   std::unique_ptr<franka_hw::FrankaCartesianVelocityHandle> velocity_cartesian_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
@@ -42,12 +43,24 @@ class FrankaImpedanceController : public controller_interface::MultiInterfaceCon
   std::array<double, 6>  vel_current_ = {0.0,0.0,0.0,0.0,0.0,0.0};
   std::array<double, 6> velocity_command = {0.0,0.0,0.0,0.0,0.0,0.0};
 
-  // Saturation
-  std::array<double, 7> saturateTorqueRate(
-      const std::array<double, 7>& tau_d_calculated,
-      const std::array<double, 7>& tau_J_d);  // NOLINT (readability-identifier-naming)
+  Eigen::Vector3d desired_position;
+  Eigen::Quaterniond desired_orientation;
 
-  static constexpr double kDeltaTauMax{1.0};
+  Eigen::MatrixXd stiffness;
+  Eigen::MatrixXd damping;
+
+  // Saturation
+  // Eigen::Matrix<double, 7, 1>saturateTorqueRate(
+  //     const std::array<double, 7>& tau_d_calculated,
+  //     const std::array<double, 7>& tau_J_d); 
+
+  Eigen::Matrix<double, 7, 1>saturateTorqueRate(
+    const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
+    const Eigen::Matrix<double, 7, 1>& tau_J_d);
+      
+       // NOLINT (readability-identifier-naming)
+
+  const double delta_tau_max_{1.0};
   double vel_acc_{0.0005};
   std::vector<double> k_gains_;
   std::vector<double> d_gains_;
