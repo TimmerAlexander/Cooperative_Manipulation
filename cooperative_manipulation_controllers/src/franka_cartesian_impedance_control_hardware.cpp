@@ -108,23 +108,43 @@ bool FrankaCartesianImpedanceController::init(hardware_interface::RobotHW* robot
   sub_velocity_command_ = node_handle.subscribe(
     "desired_velocity", 1, &FrankaCartesianImpedanceController::velocityCmdCallback,this,ros::TransportHints().reliable().tcpNoDelay());
 
-
-
+  // Set dq_filtered matrix
   Eigen::Matrix<double, 7, 1> dq_filtered;
   dq_filtered.setZero();
-  Eigen::MatrixXd stiffness(6, 6), damping(6, 6);
+
+  // Set stiffness matrix
+  Eigen::MatrixXd stiffness(6, 6);
   stiffness.setZero();
-  stiffness.topLeftCorner(3, 3) << translational_stiffness * Eigen::MatrixXd::Identity(3, 3);
-  stiffness.bottomRightCorner(3, 3) << rotational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+  stiffness(0, 0) = k_gains_[0];
+  stiffness(1, 1) = k_gains_[1];
+  stiffness(2, 2) = k_gains_[2];
+  stiffness(3, 3) = k_gains_[3];
+  stiffness(4, 4) = k_gains_[4];
+  stiffness(5, 5) = k_gains_[5];
+  // Set damping matrix
+  Eigen::MatrixXd damping(6, 6);
   damping.setZero();
-  damping.topLeftCorner(3, 3) << 2.0 * sqrt(translational_stiffness) *
-                                     Eigen::MatrixXd::Identity(3, 3);
-  damping.bottomRightCorner(3, 3) << 2.0 * sqrt(rotational_stiffness) *
-                                         Eigen::MatrixXd::Identity(3, 3);
+  damping(0, 0) = d_gains_[0];
+  damping(1, 1) = d_gains_[1];
+  damping(2, 2) = d_gains_[2];
+  damping(3, 3) = d_gains_[3];
+  damping(4, 4) = d_gains_[4];
+  damping(5, 5) = d_gains_[5];
+
 
   dq_filtered_ = dq_filtered;                                  
   stiffness_ = stiffness;
   damping_ = damping;
+
+
+  ROS_INFO_STREAM("Stiffness matrix");
+  for (size_t i = 0; i < 6; ++i) {
+    ROS_INFO_STREAM(stiffness_.row(i));
+  }
+  ROS_INFO_STREAM("Damping matrix");
+  for (size_t i = 0; i < 6; ++i) {
+    ROS_INFO_STREAM(damping_ .row(i));
+  }
 
   return true;
 }
@@ -138,7 +158,7 @@ void FrankaCartesianImpedanceController::velocityCmdCallback(const std_msgs::Flo
   else{
     for (size_t i = 0; i < 6; ++i) {
     velocity_command[i] = vel_cmd->data[i];
-    // ROS_INFO_STREAM(velocity_command[i]);
+    //ROS_INFO_STREAM(velocity_command[i]);
     }
   }
 }
@@ -247,6 +267,81 @@ void FrankaCartesianImpedanceController::update(const ros::Time& /*time*/,
   for (size_t i = 0; i < 7; ++i) {
     joint_handles_[i].setCommand(tau_d(i));
   }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Eigen::Quaterniond error_quaternion(current_orientation.inverse() * desired_orientation);
+  
+  // orientation_error_matrix.head(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
+  // // Transform to base frame
+  // orientation_error_matrix.head(3) << -current_pose.linear() * orientation_error_matrix.head(3);
+  // Store in array
+  // pose_error[3] = 0.0;
+  // pose_error[4] = 0.0;
+  // pose_error[5] = 0.0;
+
+
+
+  // // Compute to desired velocity
+  // // Filter the joint velocity
+  // double alpha = 0.99;
+  // for (size_t i = 0; i < 7; i++) {
+  //   dq_filtered_[i] = (1 - alpha) * dq_filtered_[i] + alpha * robot_state.dq[i];
+  // }
+  // Eigen::VectorXd velocity_error(6);
+  // velocity_error =  (jacobian * (dq_d - dq));
+
+  
+  // // Calculate the force with the impedance control law
+  // Eigen::Matrix<double, 6, 1> f_d_calculated;
+  // for (size_t i = 0; i < 6; ++i) {
+  //   f_d_calculated[i] = k_gains_[i] * pose_error[i] + d_gains_[i] * velocity_error[i];
+  // }
+  // // Transform the force to joint torque
+  // Eigen::Matrix<double, 7, 1>tau_d_calculated_matrix;
+  // tau_d_calculated_matrix = jacobian.transpose() * f_d_calculated;
+
+
+  // // Desired torque
+  // std::array<double, 7> tau_d_calculated;
+  // for (size_t i = 0; i < 7; i++) {
+  //   tau_d_calculated[i] = tau_d_calculated_matrix[i] + coriolis[i];
+  // }
+
+
+  // // Maximum torque difference with a sampling rate of 1 kHz. The maximum torque rate is
+  // // 1000 * (1 / sampling_time).
+  // std::array<double, 7> tau_d_saturated = saturateTorqueRate(tau_d_calculated, robot_state.tau_J_d);
+
+  // // Set the torque for each joint
+  // for (size_t i = 0; i < 7; ++i) {
+  //   joint_handles_[i].setCommand(tau_d_saturated[i]);
+  // }
+}
+
+// std::array<double, 7>FrankaCartesianImpedanceController::saturateTorqueRate(
+//     const std::array<double, 7>& tau_d_calculated,
+//     const std::array<double, 7>& tau_J_d) {  // NOLINT (readability-identifier-naming)
+//   std::array<double, 7> tau_d_saturated{};
+//   for (size_t i = 0; i < 7; i++) {
+//     double difference = tau_d_calculated[i] - tau_J_d[i];
+//     tau_d_saturated[i] = tau_J_d[i] + std::max(std::min(difference, kDeltaTauMax), -kDeltaTauMax);
+//   }
+//   return tau_d_saturated;
+// }
 
 
 Eigen::Matrix<double, 7, 1>FrankaCartesianImpedanceController::saturateTorqueRate(
