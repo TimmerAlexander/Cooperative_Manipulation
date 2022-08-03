@@ -32,47 +32,35 @@ class FrankaCartesianImpedanceController : public controller_interface::MultiInt
   void velocityCmdCallback(const std_msgs::Float64MultiArray::ConstPtr& vel_cmd);
 
  private:
+  // Franka interfaces
   std::vector<hardware_interface::JointHandle> velocity_joint_handles_;
   franka_hw::FrankaVelocityCartesianInterface* velocity_cartesian_interface_;
   std::unique_ptr<franka_hw::FrankaCartesianVelocityHandle> velocity_cartesian_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
   std::vector<hardware_interface::JointHandle> joint_handles_;
-
+  // Subscriber to velocity command
   ros::Subscriber sub_velocity_command_;
-
   std::array<double, 6>  vel_current_ = {0.0,0.0,0.0,0.0,0.0,0.0};
   std::array<double, 6> velocity_command = {0.0,0.0,0.0,0.0,0.0,0.0};
-
+  // Desired velocity
   Eigen::Vector3d desired_position;
   Eigen::Quaterniond desired_orientation;
-
   // Compliance parameters
-  const double translational_stiffness{500};
-  const double rotational_stiffness{100};
+  std::vector<double> k_gains_;
+  std::vector<double> d_gains_;
   Eigen::MatrixXd stiffness_;
   Eigen::MatrixXd damping_;
 
-  // Saturation
-  // Eigen::Matrix<double, 7, 1>saturateTorqueRate(
-  //     const std::array<double, 7>& tau_d_calculated,
-  //     const std::array<double, 7>& tau_J_d); 
-
   Eigen::Matrix<double, 7, 1>saturateTorqueRate(
     const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
-    const Eigen::Matrix<double, 7, 1>& tau_J_d);
-      
-       // NOLINT (readability-identifier-naming)
-
+    const Eigen::Matrix<double, 7, 1>& tau_J_d);// NOLINT (readability-identifier-naming)
   const double delta_tau_max_{1.0};
-  double vel_acc_{0.0005};
-  std::vector<double> k_gains_;
-  std::vector<double> d_gains_;
-  double coriolis_factor_{1.0};
-  // std::array<double, 7> dq_filtered_;
-  Eigen::Matrix<double, 7, 1> dq_filtered_;
 
+  double vel_acc_{0.0005};
+  double coriolis_factor_{1.0};
+  Eigen::Matrix<double, 7, 1> dq_filtered_;
   franka_hw::TriggerRate rate_trigger_{1.0};
-  std::array<double, 7> last_tau_d_{};
+
 };
 
 }  // namespace cooperative_manipulation_controllers
