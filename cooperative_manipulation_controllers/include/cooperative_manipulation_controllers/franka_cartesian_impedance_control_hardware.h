@@ -56,7 +56,7 @@ class FrankaCartesianImpedanceController : public controller_interface::MultiInt
     const Eigen::Matrix<double, 7, 1>& tau_J_d);// NOLINT (readability-identifier-naming)
   const double delta_tau_max_{1.0};
 
-  double vel_acc_{0.0005};
+  double vel_acc_{0.0001};
   double coriolis_factor_{1.0};
   Eigen::Matrix<double, 7, 1> dq_filtered_;
   franka_hw::TriggerRate rate_trigger_{1.0};
