@@ -48,9 +48,7 @@ class franka_impedance_controller():
 
     def config(self):
         # Min and max limits for the cartesian velocity (trans/rot) (unit: [m/s],[rad/s])
-        self.cartesian_velocity_trans_min_limit = 0.001
         self.cartesian_velocity_trans_max_limit = 0.1
-        self.cartesian_velocity_rot_min_limit = 0.001
         self.cartesian_velocity_rot_max_limit = 0.1
         # Control thread publish rate
         self.publish_rate = 100 # [Hz]
@@ -61,6 +59,9 @@ class franka_impedance_controller():
         self.desired_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
+        # Singularity avoidance
+        self.singularity_velocity_trans_transformed  = numpy.array([0.0,0.0,0.0])
+        self.singularity_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
 
 
     def __init__(self):
@@ -98,10 +99,16 @@ class franka_impedance_controller():
             queue_size=1,
             tcp_nodelay=True)
 
+        self.cartesian_msg_sub = rospy.Subscriber(
+            '/cooperative_manipulation/singularity_velocity', 
+            Float64MultiArray, 
+            self.singularity_velocity_callback,
+            queue_size=1,
+            tcp_nodelay=True)
+
         # * Initialize publisher:
-        # Also create a publisher to publish joint commands
         self.velocity_command_publisher = rospy.Publisher(
-                '/' + self.namespace + '/franka_impedance_controller/desired_velocity',
+                '/' + self.namespace + '/franka_cartesian_impedance_controller/desired_velocity',
                 Float64MultiArray,
                 tcp_nodelay=True,
                 queue_size=1)
@@ -129,9 +136,6 @@ class franka_impedance_controller():
             target_cartesian_trans_velocity_norm = numpy.linalg.norm(self.desired_velocity_trans_transformed)
             target_cartesian_rot_velocity_norm = numpy.linalg.norm(self.desired_velocity_rot_transformed)
 
-            # print("numpy.linalg.norm(self.desired_velocity_trans_transformed)")
-            # print(numpy.linalg.norm(self.desired_velocity_trans_transformed))
-
             # Check whether the trans/rot velocity  limit has been exceeded. If the trans/rot velocity max limit has been exceeded, then normalize the velocity to the length of the velocity upper limit
             if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
                 for i in range(3):
@@ -141,24 +145,66 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = (self.desired_velocity_rot_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
 
-
-            # Check whether the velocity limit has been undershot. If the velocity  has fallen below the min velocity limit, then set the velocity  to zero
-            if target_cartesian_trans_velocity_norm < self.cartesian_velocity_trans_min_limit:
-                for i in range(3):
-                    self.desired_velocity_trans_transformed[i] = 0.0
-
-            if target_cartesian_rot_velocity_norm < self.cartesian_velocity_rot_min_limit:
-                for i in range(3):
-                    self.desired_velocity_rot_transformed[i] = 0.0
-                    
+            #* Add singular_velocity to self.desired_velocity_trans_transformed and self.desired_velocity_rot_transformed 
+            self.desired_velocity_trans_transformed = numpy.subtract(self.desired_velocity_trans_transformed,self.singularity_velocity_trans_transformed)
+            self.desired_velocity_rot_transformed = numpy.subtract(self.desired_velocity_rot_transformed,self.singularity_velocity_rot_transformed)
+            
+            #* Publish the velocity command to franka impedance controller   
             self.command_msg.data = numpy.append(self.desired_velocity_trans_transformed,self.desired_velocity_rot_transformed) 
 
-            # print("self.command_msg")
-            # print(self.command_msg)
-            # Publish the velocity command
             self.velocity_command_publisher.publish(self.command_msg)
             rate.sleep()
 
+    def transform_vector(self,source_frame: str,target_frame: str,input_vector: numpy.array):
+        """ 
+            Transforms a vector from source frame to target frame.
+
+        Args:
+            source_frame (str): The frame to transform from 
+            target_frame (str): The frame to transform to
+            input_array (numpy.array): The vector in source frame as array
+
+        Returns:
+            numpy.array: The vector in target frame as array
+        """
+        source_frame_cartesian_velocity_trans = Vector3Stamped()
+        source_frame_cartesian_velocity_rot = Vector3Stamped()
+        
+        # Get current time stamp
+        now = rospy.Time()
+ 
+        # Converse input_vector translation from numpy.array to vector3
+        source_frame_cartesian_velocity_trans.header.frame_id = source_frame
+        source_frame_cartesian_velocity_trans.header.stamp = now
+        source_frame_cartesian_velocity_trans.vector.x = input_vector[0]
+        source_frame_cartesian_velocity_trans.vector.y = input_vector[1]
+        source_frame_cartesian_velocity_trans.vector.z = input_vector[2]
+        
+        # Transform input_vector translation from 'wrist_3_link' frame to 'base_link' frame
+        target_frame_cartesian_velocity_trans = self.tf_listener.transformVector3(target_frame,source_frame_cartesian_velocity_trans)
+        
+        # Converse input_vector rotation from numpy.array to vector3
+        source_frame_cartesian_velocity_rot.header.frame_id = source_frame
+        source_frame_cartesian_velocity_rot.header.stamp = now
+        source_frame_cartesian_velocity_rot.vector.x = input_vector[3]
+        source_frame_cartesian_velocity_rot.vector.y = input_vector[4]
+        source_frame_cartesian_velocity_rot.vector.z = input_vector[5]
+        
+        # Transform input_vector rotation from 'wrist_3_link' frame to 'base_link' frame
+        target_frame_cartesian_velocity_transrot = self.tf_listener.transformVector3(target_frame,source_frame_cartesian_velocity_rot)
+        
+        # Converse input_vector from vector3 to numpy.array
+        output_vector = numpy.array([
+            target_frame_cartesian_velocity_trans.vector.x,
+            target_frame_cartesian_velocity_trans.vector.y,
+            target_frame_cartesian_velocity_trans.vector.z,
+            target_frame_cartesian_velocity_transrot.vector.x,
+            target_frame_cartesian_velocity_transrot.vector.y,
+            target_frame_cartesian_velocity_transrot.vector.z
+            ])
+        
+        return output_vector
+    
     def cartesian_msg_callback(self,desired_velocity):
         """
             Get the cartesian velocity command and transform it from the 'world' frame to the 'panda_link8' (EE-frame)frame and from the 'panda_link8' frame to the 'panda_link0' (0-frame)frame.
@@ -179,7 +225,7 @@ class franka_impedance_controller():
         now = rospy.Time()
         # Calculate the trajectory velocity of the manipulator for a rotation of the object-----------------------------
         # Calculate the trajectory velocity of the manipulator for a rotation of the object
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda_link8' frame in the 'world' frame
+        #Get self.panda_current_position, self.panda_current_quaternion of the '/panda_link8' frame in the 'world' frame
         panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_link8")
         panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda_link8", panda_tf_time)
 
@@ -191,11 +237,6 @@ class franka_impedance_controller():
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame
         ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
         ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
-
-        # print("self.ur16e_current_position, self.ur16e_current_quaternion")
-        # print(self.ur16e_current_position, self.ur16e_current_quaternion)
-        # print("self.panda_current_position, self.panda_current_quaternion")
-        # print(self.panda_position, self.panda_current_quaternion)
 
         # Object rotation around x axis
         if desired_velocity.angular.x != 0.0:
@@ -236,8 +277,6 @@ class franka_impedance_controller():
             world_radius_y = panda_current_position_y - center_y
             self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
             self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
-
-
 
         # Object rotation around z axis
         if desired_velocity.angular.z != 0.0:
@@ -300,7 +339,67 @@ class franka_impedance_controller():
         # Set the trajectory velocity for an object rotation to zero
         self.world_trajectory_velocity = [0.0,0.0,0.0]
 
+    def singularity_velocity_callback(self,singularity_velocity):
+        """
+            Get the singularity velocity command and transform it into the 'panda_link0' frame.
+            
+        Args:
+            singularity_velocity (Float64MultiArray): Singularity avoidance velocity.
+        """
+        singularity_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        singularity_velocity_transformed = self.transform_vector('world','panda_link0',singularity_velocity.data)
+        
+        self.singularity_velocity_trans_transformed = [
+            singularity_velocity_transformed[0],
+            singularity_velocity_transformed[1],
+            singularity_velocity_transformed[2],
+            ]
+            
+        self.singularity_velocity_rot_transformed = [
+            singularity_velocity_transformed[3],
+            singularity_velocity_transformed[4],
+            singularity_velocity_transformed[5],
+            ] 
+        
+        # # Get current time stamp
+        # now = rospy.Time()
+    
+        # # Transform the cartesian velocity in the 'base' frame--------------------------------------
+        # world_cartesian_velocity_trans  = Vector3Stamped()
+        # world_cartesian_velocity_rot  = Vector3Stamped()
+        # # Converse cartesian_velocity translation to vector3
+        # world_cartesian_velocity_trans.header.frame_id = 'world'
+        # world_cartesian_velocity_trans.header.stamp = now
+        # world_cartesian_velocity_trans.vector.x = singularity_velocity.data[0]
+        # world_cartesian_velocity_trans.vector.y = singularity_velocity.data[1]
+        # world_cartesian_velocity_trans.vector.z = singularity_velocity.data[2]
+            
+        # # Transform cartesian_velocity translation from 'base_link' frame to 'base' frame 
+        # base_singularity_velocity_trans = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_trans)
+            
+        # # Converse cartesian_velocity rotation to vector3
+        # world_cartesian_velocity_rot.header.frame_id = 'world'
+        # world_cartesian_velocity_rot.header.stamp = now
+        # world_cartesian_velocity_rot.vector.x = singularity_velocity.data[3]
+        # world_cartesian_velocity_rot.vector.y = singularity_velocity.data[4]
+        # world_cartesian_velocity_rot.vector.z = singularity_velocity.data[5]
+        
+        # # Transform cartesian_velocity rotation from 'base_link' frame to 'base' frame
+        # base_singularity_velocity_rot = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_rot)
+        
+        # self.singularity_velocity_trans_transformed = [
+        #     base_singularity_velocity_trans.vector.x,
+        #     base_singularity_velocity_trans.vector.y,
+        #     base_singularity_velocity_trans.vector.z,
+        #     ]
+            
+        # self.singularity_velocity_rot_transformed = [
+        #     base_singularity_velocity_rot.vector.x,
+        #     base_singularity_velocity_rot.vector.y,
+        #     base_singularity_velocity_rot.vector.z,
+        #     ] 
 
+        
     def _on_shutdown(self):
         """
             Shutdown publisher and subscriber when rosnode dies.
