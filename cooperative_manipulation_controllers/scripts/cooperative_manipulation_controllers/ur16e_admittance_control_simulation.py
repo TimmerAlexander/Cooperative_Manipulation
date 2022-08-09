@@ -17,6 +17,7 @@
     * Target joint velocity: self.target_joint_velocity (In 'base_link' frame)
 """
 
+from pickle import TRUE
 import sys
 import numpy, math
 import rospy
@@ -26,6 +27,7 @@ import tf2_ros
 import moveit_commander
 from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, TransformStamped, PoseStamped
 from std_msgs.msg import Float64MultiArray
+from cooperative_manipulation_controllers.msg import SingularityAvoidance
 import copy
 
 
@@ -124,22 +126,22 @@ class ur_admittance_controller():
         self.wrench_difference = WrenchStamped()        
         self.wrench_ext_filtered_trans_array = numpy.array([])
         self.wrench_ext_filtered_rot_array = numpy.array([])
-        # Singulariy avoidance: OLMM
-        self.singularity_entry_threshold = 0.05
-        self.singularity_min_threshold = 0.001
-        self.adjusting_scalar = 0.0
-        self.singular_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        self.singular_velocity_msg = Float64MultiArray()
+        #* Singulariy avoidance: OLMM
+        self.singularity_velocity_world = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         
-        self.singularity_counter = 0
+        self.singularity_stop = False
+        self.singularity_entry_threshold = 0.05
+        self.singularity_min_threshold = 0.01
+        self.adjusting_scalar = 0.0
+        self.singularity_velocity_cmd = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.singularity_avoidance_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.singularity_velocity_msg = SingularityAvoidance()
         self.bool_singularity = False
         self.bool_reduce_singularity_offset = False
-        self.singularity_Kp_gain = 5
         self.singularity_trans_offset_accuracy = 0.001 # [m]
         self.singularity_rot_offset_accuracy = 0.0174 # [rad] ~ 1 [°]
-        self.singularity_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        self.current_EE_pose_array = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        self.target_cartesian_velocity_old = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        self.last_target_trans_cartesian_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0]) 
+        self.last_target_rot_cartesian_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0]) 
         # Trajectory
         self.base_link_trajectory_pose_array  = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
                
@@ -208,8 +210,8 @@ class ur_admittance_controller():
         
         # Publish singularity velocity
         self.singularity_velocity_pub = rospy.Publisher(
-            "/cooperative_manipulation/singularity_velocity",
-            Float64MultiArray,
+            "/cooperative_manipulation/ur16e/singularity_velocity",
+            SingularityAvoidance,
             queue_size=1)
         
         # Publish final joint velocity to "/ur/ur_admittance_controller/command"
@@ -236,15 +238,16 @@ class ur_admittance_controller():
             Float64MultiArray,
             self.world_trajectory_callback,queue_size=1)
         
-        # * Initialize tf TransformListener
-        self.listener = tf.TransformListener()
-        self.listener.waitForTransform("wrist_3_link","base_link", rospy.Time(), rospy.Duration(4.0))
-
-        self.listener.waitForTransform("world","base_link", rospy.Time(), rospy.Duration(4.0))
-
-
-        self.tf_time = self.listener.getLatestCommonTime("/world", "/wrist_3_link")
-        self.current_position, self.current_quaternion = self.listener.lookupTransform("/world", "/wrist_3_link", self.tf_time)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         # Wait for messages to be populated before proceeding
         rospy.wait_for_message("/" + self.namespace + "/ft_sensor/raw",WrenchStamped,timeout=5.0)
@@ -256,7 +259,7 @@ class ur_admittance_controller():
         
         # * Get the start EE pose
         start_world_EE_pose = self.group.get_current_pose('wrist_3_link')
-        
+        print(start_world_EE_pose)
         start_world_EE_pose_quaternion = (start_world_EE_pose.pose.orientation.x,
                                         start_world_EE_pose.pose.orientation.y,
                                         start_world_EE_pose.pose.orientation.z,
@@ -272,7 +275,6 @@ class ur_admittance_controller():
                                             start_world_EE_pose_euler[2]])
                 
         self.current_EE_pose = self.pose_stamped_transformation('world','base_link',self.start_world_EE_pose_pose_array ) 
-        rospy.loginfo(self.current_EE_pose)
         
         rospy.loginfo('world')
         rospy.loginfo(self.start_world_EE_pose_pose_array)
@@ -303,6 +305,8 @@ class ur_admittance_controller():
 
         self.brodacaster.sendTransform(static_gripper_offset)
         
+            
+            
     def scalar_adjusting_function(self,current_sigma,):
         """Compute the adjusting scalar for the OLMM. 3 varaitions to calculate the adjusting scalar are presented.
 
@@ -327,6 +331,73 @@ class ur_admittance_controller():
         
         return adjusting_scalar
     
+    def compute_rotation_trajectory_velocity(self,rotation_center: numpy.array,desired_angular_velocity: numpy.array, target_frame: str, EE_frame: str):
+        """_summary_
+
+        Args:
+            rotation_center (numpy.array): _description_
+            desired_angular_velocity (numpy.array): _description_
+            target_frame (str): _description_
+            EE_frame (str): _description_
+        """
+         # Get current time stamp
+        now = rospy.Time()
+        
+        # print("desired_angular_velocity")
+        # print(desired_angular_velocity)
+    
+        # Calculate the trajectory velocity of the manipulator for a rotation of the object
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
+        EE_tf_time = self.tf_listener.getLatestCommonTime(target_frame, EE_frame)
+        EE_current_position, EE_current_quaternion = self.tf_listener.lookupTransform(target_frame, EE_frame, EE_tf_time)
+        
+        world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
+        # Object rotation around x axis 
+        if desired_angular_velocity[0] != 0.0:
+            EE_current_position_x = numpy.array([
+                0.0,
+                EE_current_position[1],
+                EE_current_position[2]
+                ])
+            
+            rotation_center_x = numpy.array([0.0,rotation_center[1],rotation_center[2]])
+
+            world_desired_rotation_x = numpy.array([desired_angular_velocity[0],0.0,0.0])
+            world_radius_x = EE_current_position_x - rotation_center_x
+            world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+            world_trajectory_velocity = world_trajectory_velocity + world_trajectory_velocity_x
+            
+        # Object rotation around y axis 
+        if desired_angular_velocity[1] != 0.0:
+            EE_current_position_y = numpy.array([
+                EE_current_position[1],
+                0.0,
+                EE_current_position[2]
+                ])
+            
+            rotation_center_y = numpy.array([rotation_center[0],0.0,rotation_center[2]])
+
+            world_desired_rotation_y = numpy.array([0.0,desired_angular_velocity[1],0.0])
+            world_radius_y = EE_current_position_y - rotation_center_y
+            world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+            world_trajectory_velocity = world_trajectory_velocity + world_trajectory_velocity_y
+        
+         # Object rotation around z axis 
+        if desired_angular_velocity[2] != 0.0:
+            EE_current_position_z = numpy.array([
+                EE_current_position[0],
+                EE_current_position[1],
+                0.0
+                ])
+            
+            rotation_center_z = numpy.array([rotation_center[0],rotation_center[1],0.0])
+
+            world_desired_rotation_z = numpy.array([0.0,0.0,desired_angular_velocity[2]])
+            world_radius_z = EE_current_position_z - rotation_center_z
+            world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+            world_trajectory_velocity = world_trajectory_velocity + world_trajectory_velocity_z
+        
+        return world_trajectory_velocity
     
     def pose_stamped_transformation(self,source_frame: str,target_frame: str,input_array: numpy.array):
         """ Transform a PoseStamped array from the source frame to the target frame with euler angles.
@@ -378,7 +449,7 @@ class ur_admittance_controller():
         """
         worl_current_EE_pose = self.start_world_EE_pose_pose_array + world_trajectory_msg.data
         
-        self.current_EE_pose = self.pose_stamped_transformation('world','base_link',worl_current_EE_pose) 
+        # self.current_EE_pose = self.pose_stamped_transformation('world','base_link',worl_current_EE_pose) 
 
 
     def cartesian_velocity_command_callback(self,desired_velocity):
@@ -709,7 +780,6 @@ class ur_admittance_controller():
         # print(self.wrench_ext_filtered)
         self.wrench_filter_pub.publish(self.wrench_ext_filtered) 
     
-    
     def transform_velocity(self,cartesian_velocity):
         """ 
             Transform the cartesian velocity from the 'wrist_3_link' frame to the 'base_link' frame.
@@ -748,6 +818,56 @@ class ur_admittance_controller():
             ])
         
         return self.velocity_transformed
+    
+    def transform_vector(self,source_frame: str,target_frame: str,input_vector: numpy.array):
+        """ 
+            Transforms a vector from source frame to target frame.
+
+        Args:
+            source_frame (str): The frame to transform from 
+            target_frame (str): The frame to transform to
+            input_array (numpy.array): The vector in source frame as array
+
+        Returns:
+            numpy.array: The vector in target frame as array
+        """
+        source_frame_cartesian_velocity_trans = Vector3Stamped()
+        source_frame_cartesian_velocity_rot = Vector3Stamped()
+        
+        # Get current time stamp
+        now = rospy.Time()
+ 
+        # Converse input_vector translation from numpy.array to vector3
+        source_frame_cartesian_velocity_trans.header.frame_id = source_frame
+        source_frame_cartesian_velocity_trans.header.stamp = now
+        source_frame_cartesian_velocity_trans.vector.x = input_vector[0]
+        source_frame_cartesian_velocity_trans.vector.y = input_vector[1]
+        source_frame_cartesian_velocity_trans.vector.z = input_vector[2]
+        
+        # Transform input_vector translation from 'wrist_3_link' frame to 'base_link' frame
+        target_frame_cartesian_velocity_trans = self.tf_listener.transformVector3(target_frame,source_frame_cartesian_velocity_trans)
+        
+        # Converse input_vector rotation from numpy.array to vector3
+        source_frame_cartesian_velocity_rot.header.frame_id = source_frame
+        source_frame_cartesian_velocity_rot.header.stamp = now
+        source_frame_cartesian_velocity_rot.vector.x = input_vector[3]
+        source_frame_cartesian_velocity_rot.vector.y = input_vector[4]
+        source_frame_cartesian_velocity_rot.vector.z = input_vector[5]
+        
+        # Transform input_vector rotation from 'wrist_3_link' frame to 'base_link' frame
+        target_frame_cartesian_velocity_transrot = self.tf_listener.transformVector3(target_frame,source_frame_cartesian_velocity_rot)
+        
+        # Converse input_vector from vector3 to numpy.array
+        output_vector = numpy.array([
+            target_frame_cartesian_velocity_trans.vector.x,
+            target_frame_cartesian_velocity_trans.vector.y,
+            target_frame_cartesian_velocity_trans.vector.z,
+            target_frame_cartesian_velocity_transrot.vector.x,
+            target_frame_cartesian_velocity_transrot.vector.y,
+            target_frame_cartesian_velocity_transrot.vector.z
+            ])
+        
+        return output_vector
 
     def control_thread(self):
         """ 
@@ -843,6 +963,9 @@ class ur_admittance_controller():
             # * Singulartiy avoidance: OLMM
             # QIU, Changwu; CAO, Qixin; MIAO, Shouhong. An on-line task modification method for singularity avoidance of robot manipulators. Robotica, 2009, 27. Jg., Nr. 4, S. 539-546.
             
+            
+           
+            
             self.target_cartesian_velocity_old = self.target_cartesian_velocity 
             # Reset the singularity counter
             self.singularity_counter = 0
@@ -850,20 +973,57 @@ class ur_admittance_controller():
             u,s,v = numpy.linalg.svd(self.jacobian,full_matrices=True)
             
             sigma_min = min(s) 
+            s_length = len(s) - 1
+            
+            #* If a singularity is detected
+            if sigma_min < 0.05:
+                if self.bool_singularity == False:
+                    # Set bool singularity to 'True'
+                    self.bool_singularity = True
+                    rospy.loginfo("Activate OLMM")
                 
-            # if sigma_min > 0.01:
-            for sigma in range(len(s)):
-                    # If a singularity is detected
-                    if s[sigma] < 0.05:
-                        if self.bool_singularity == False:
-                            self.bool_singularity = True
-                            rospy.loginfo("Activate OLMM")
+                # Check if the manipulators movement is a rotation or sigma_min is smaller then singularity_min_threshold
+                if (numpy.asarray(self.base_link_desired_velocity[-3:]) != 0.0).any() and self.singularity_min_threshold > sigma_min and self.singularity_stop == False:
+                    # if true, set the singularity stop to 'True'
+                    self.singularity_stop = True
+        
+                if self.singularity_stop == False:
+                    # Compute singularity avoidance velocity
+                    self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(sigma_min),numpy.dot(numpy.dot(u[:,s_length],self.target_cartesian_velocity),u[:,s_length]))
+                else:
+                    self.singularity_avoidance_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
 
-                        self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
-                        # Subract the target cartesian velocity with the singularity avoidance velocity
-                        self.target_cartesian_velocity = self.target_cartesian_velocity - self.singular_velocity
-                    
-            # else:
+                        
+            # Check sigma min is between 0.05 and 0.08 and a singularity was detected, 
+            if 0.05 < sigma_min < 0.08 and self.bool_singularity == True:
+
+                self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(sigma_min),numpy.dot(numpy.dot(u[:,s_length],self.target_cartesian_velocity),u[:,s_length]))
+                
+            # If a singularity was detected but sigma_min is bigger then 0.08
+            if sigma_min > 0.08 and self.bool_singularity == True:
+
+                # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
+                self.bool_singularity = False
+                self.bool_reduce_singularity_offset = True
+                rospy.loginfo("Deactivate OLMM")
+                # Reset the singularity velocity world to zero
+                self.singularity_avoidance_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
+                
+                
+            # Transform the singularity avoidance velocity into 'world' frame
+            self.singularity_velocity_world = self.transform_vector('base_link','world',self.singularity_avoidance_velocity)
+            #
+            self.singularity_velocity_msg.singularity_stop = self.singularity_stop
+            self.singularity_velocity_msg.singularity_avoidance_velocity = self.singularity_velocity_world
+            # Publish the singularity avoidance velocity to rosmaster
+            self.singularity_velocity_pub.publish(self.singularity_velocity_msg)  
+                
+            
+            
+            
+            # if self.bool_reduce_singularity_offset == True:
+                
+            #     # World 'frame'
             #     world_EE_pose = self.group.get_current_pose('wrist_3_link')
                 
             #     world_EE_quaternion = (world_EE_pose.pose.orientation.x,
@@ -881,178 +1041,140 @@ class ur_admittance_controller():
             #                                         world_EE_euler[2]])
 
             #     base_link_EE_pose_array = self.pose_stamped_transformation('world','base_link',world_EE_pose_array)
-            
+                
+            #     # In 'base_link' frame
             #     singularity_offset_vector = self.current_EE_pose - base_link_EE_pose_array
                 
-            #     if numpy.dot(u[:,len(s)-1],singularity_offset_vector) > 0.0:
-
-            #         singularity_offset_velocity = (singularity_offset_vector/numpy.linalg.norm(singularity_offset_vector)) * numpy.linalg.norm(self.target_cartesian_velocity)
-                    
-            #         self.singular_velocity = numpy.dot(self.scalar_adjusting_function(s[len(s)-1]),numpy.dot(numpy.dot(u[:,len(s)-1],singularity_offset_velocity),u[:,len(s)-1]))
-                    
-            #         # Subract the singularity offset velocityy with the singularity avoidance velocity
-            #         self.target_cartesian_velocity = singularity_offset_velocity - self.singular_velocity
-            #     else:
-            #         self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
-                
-            # If a singularity was detected but the singularity_counter is null, 
-            if sigma_min > 0.05 and self.bool_singularity == True:
-                # Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
-                self.bool_singularity = False
-                self.bool_reduce_singularity_offset = True
-                rospy.loginfo("Deactivate OLMM")
-                
-            
-            
-            
-            if self.bool_reduce_singularity_offset == True:
-                
-                # World 'frame'
-                world_EE_pose = self.group.get_current_pose('wrist_3_link')
-                
-                world_EE_quaternion = (world_EE_pose.pose.orientation.x,
-                                        world_EE_pose.pose.orientation.y,
-                                        world_EE_pose.pose.orientation.z,
-                                        world_EE_pose.pose.orientation.w)
-        
-                world_EE_euler = euler_from_quaternion(world_EE_quaternion)
-                
-                world_EE_pose_array = numpy.array([world_EE_pose.pose.position.x,
-                                                    world_EE_pose.pose.position.y,
-                                                    world_EE_pose.pose.position.z,
-                                                    world_EE_euler[0],
-                                                    world_EE_euler[1],
-                                                    world_EE_euler[2]])
-
-                base_link_EE_pose_array = self.pose_stamped_transformation('world','base_link',world_EE_pose_array)
-                
-                # In 'base_link' frame
-                singularity_offset_vector = self.current_EE_pose - base_link_EE_pose_array
-                
 
                 
-                singularity_trans_offset_vector = copy.deepcopy(singularity_offset_vector)
-                singularity_trans_offset_vector[-3:] = 0.0
+            #     singularity_trans_offset_vector = copy.deepcopy(singularity_offset_vector)
+            #     singularity_trans_offset_vector[-3:] = 0.0
                 
-                # print("singularity_trans_offset_vector")
+            #     # print("singularity_trans_offset_vector")
               
-                # print(numpy.linalg.norm(singularity_trans_offset_vector))
+            #     # print(numpy.linalg.norm(singularity_trans_offset_vector))
                 
-                singularity_rot_offset_vector = copy.deepcopy(singularity_offset_vector)
-                singularity_rot_offset_vector[:3] = 0.0
+            #     singularity_rot_offset_vector = copy.deepcopy(singularity_offset_vector)
+            #     singularity_rot_offset_vector[:3] = 0.0
                 
-                for i in range(3):
-                    if abs(singularity_rot_offset_vector[i+3]) > 3.14: 
-                        singularity_rot_offset_vector[i+3] = abs(singularity_rot_offset_vector[i+3]) - 6.28
+            #     for i in range(3):
+            #         if abs(singularity_rot_offset_vector[i+3]) > 3.14: 
+            #             singularity_rot_offset_vector[i+3] = abs(singularity_rot_offset_vector[i+3]) - 6.28
                         
 
     
-                target_trans_cartesian_velocity = copy.deepcopy(self.target_cartesian_velocity)
-                target_trans_cartesian_velocity[-3:] = 0.0 
+            #     target_trans_cartesian_velocity = copy.deepcopy(self.target_cartesian_velocity)
+            #     target_trans_cartesian_velocity[-3:] = 0.0 
                 
-                target_rot_cartesian_velocity = copy.deepcopy(self.target_cartesian_velocity)
-                target_rot_cartesian_velocity[:3] = 0.0 
+            #     target_rot_cartesian_velocity = copy.deepcopy(self.target_cartesian_velocity)
+            #     target_rot_cartesian_velocity[:3] = 0.0 
                 
-                singularity_trans_offset_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-                singularity_rot_offset_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-                # u is in 'base_link' frame
-                # Translation velocity----------------------------------------------------------------------------------
-                if numpy.linalg.norm(singularity_trans_offset_vector) > self.singularity_trans_offset_accuracy:
-                        # rospy.loginfo("Reduce Endeffector offset")
+            #     singularity_trans_offset_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+            #     singularity_rot_offset_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+            #     # u is in 'base_link' frame
+            #     # Translation velocity----------------------------------------------------------------------------------
+            #     if numpy.linalg.norm(singularity_trans_offset_vector) > self.singularity_trans_offset_accuracy:
+            #             # rospy.loginfo("Reduce Endeffector offset")
                         
                         
-                        # Save the last target cartesian velocity command
-                        if (self.last_target_trans_cartesian_velocity != target_trans_cartesian_velocity).any() and numpy.linalg.norm(target_trans_cartesian_velocity) != 0.0:
-                            self.last_target_trans_cartesian_velocity = target_trans_cartesian_velocity
+            #             # Save the last target cartesian velocity command
+            #             if (self.last_target_trans_cartesian_velocity != target_trans_cartesian_velocity).any() and numpy.linalg.norm(target_trans_cartesian_velocity) != 0.0:
+            #                 self.last_target_trans_cartesian_velocity = target_trans_cartesian_velocity
                         
-                        # When target cartesian velocity command is not null
-                        if numpy.linalg.norm(target_trans_cartesian_velocity) != 0.0:
+            #             # When target cartesian velocity command is not null
+            #             if numpy.linalg.norm(target_trans_cartesian_velocity) != 0.0:
 
-                            singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(target_trans_cartesian_velocity) + numpy.linalg.norm(singularity_trans_offset_vector)) 
+            #                 singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(target_trans_cartesian_velocity) + numpy.linalg.norm(singularity_trans_offset_vector)) 
                             
-                            if numpy.linalg.norm(singularity_trans_offset_velocity) > (numpy.linalg.norm(target_trans_cartesian_velocity) * 1.5 ):
+            #                 if numpy.linalg.norm(singularity_trans_offset_velocity) > (numpy.linalg.norm(target_trans_cartesian_velocity) * 1.5 ):
                            
-                                singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(target_trans_cartesian_velocity) * 1.5)
+            #                     singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(target_trans_cartesian_velocity) * 1.5)
                             
-                        elif numpy.linalg.norm(self.last_target_trans_cartesian_velocity) != 0.0:
-                            singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(self.last_target_trans_cartesian_velocity) + numpy.linalg.norm(singularity_trans_offset_vector)) 
+            #             elif numpy.linalg.norm(self.last_target_trans_cartesian_velocity) != 0.0:
+            #                 singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(self.last_target_trans_cartesian_velocity) + numpy.linalg.norm(singularity_trans_offset_vector)) 
                             
-                            if numpy.linalg.norm(singularity_trans_offset_velocity) > (numpy.linalg.norm(self.last_target_trans_cartesian_velocity) * 1.5 ):
+            #                 if numpy.linalg.norm(singularity_trans_offset_velocity) > (numpy.linalg.norm(self.last_target_trans_cartesian_velocity) * 1.5 ):
                            
-                                singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(self.last_target_trans_cartesian_velocity) * 1.5)
+            #                     singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * (numpy.linalg.norm(self.last_target_trans_cartesian_velocity) * 1.5)
                                 
-                            if numpy.linalg.norm(singularity_trans_offset_velocity) < numpy.linalg.norm(self.last_target_trans_cartesian_velocity):
-                                singularity_trans_offset_velocity = singularity_trans_offset_vector
+            #                 if numpy.linalg.norm(singularity_trans_offset_velocity) < numpy.linalg.norm(self.last_target_trans_cartesian_velocity):
+            #                     singularity_trans_offset_velocity = singularity_trans_offset_vector
                                 
-                        elif numpy.linalg.norm(self.last_target_trans_cartesian_velocity) == 0.0:
+            #             elif numpy.linalg.norm(self.last_target_trans_cartesian_velocity) == 0.0:
                        
-                            singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * 0.001
-                # Translation velocity----------------------------------------------------------------------------------
-                # Rotation velocity-------------------------------------------------------------------------------------
-                if numpy.linalg.norm(singularity_rot_offset_vector) > 0.01:
+            #                 singularity_trans_offset_velocity = (singularity_trans_offset_vector/numpy.linalg.norm(singularity_trans_offset_vector)) * 0.001
+            #     # Translation velocity----------------------------------------------------------------------------------
+            #     # Rotation velocity-------------------------------------------------------------------------------------
+            #     if numpy.linalg.norm(singularity_rot_offset_vector) > 0.01:
                         
                        
-                        # Save the last target cartesian velocity command
-                        if (self.last_target_rot_cartesian_velocity != target_rot_cartesian_velocity).any() and numpy.linalg.norm(target_rot_cartesian_velocity) != 0.0:
-                            self.last_target_rot_cartesian_velocity = target_rot_cartesian_velocity
+            #             # Save the last target cartesian velocity command
+            #             if (self.last_target_rot_cartesian_velocity != target_rot_cartesian_velocity).any() and numpy.linalg.norm(target_rot_cartesian_velocity) != 0.0:
+            #                 self.last_target_rot_cartesian_velocity = target_rot_cartesian_velocity
                         
-                        # When target cartesian velocity command is not null
-                        if numpy.linalg.norm(target_rot_cartesian_velocity) != 0.0:
+            #             # When target cartesian velocity command is not null
+            #             if numpy.linalg.norm(target_rot_cartesian_velocity) != 0.0:
 
-                            singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(target_rot_cartesian_velocity) + numpy.linalg.norm(singularity_rot_offset_vector)) 
+            #                 singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(target_rot_cartesian_velocity) + numpy.linalg.norm(singularity_rot_offset_vector)) 
                             
-                            if numpy.linalg.norm(singularity_rot_offset_velocity) > (numpy.linalg.norm(target_rot_cartesian_velocity) * 1.5 ):
+            #                 if numpy.linalg.norm(singularity_rot_offset_velocity) > (numpy.linalg.norm(target_rot_cartesian_velocity) * 1.5 ):
                            
-                                singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(target_rot_cartesian_velocity) * 1.5)
+            #                     singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(target_rot_cartesian_velocity) * 1.5)
                             
-                        elif numpy.linalg.norm(self.last_target_rot_cartesian_velocity) != 0.0:
-                            singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(self.last_target_rot_cartesian_velocity) + numpy.linalg.norm(singularity_rot_offset_vector)) 
+            #             elif numpy.linalg.norm(self.last_target_rot_cartesian_velocity) != 0.0:
+            #                 singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(self.last_target_rot_cartesian_velocity) + numpy.linalg.norm(singularity_rot_offset_vector)) 
                             
-                            if numpy.linalg.norm(singularity_rot_offset_velocity) > (numpy.linalg.norm(self.last_target_rot_cartesian_velocity) * 1.5 ):
+            #                 if numpy.linalg.norm(singularity_rot_offset_velocity) > (numpy.linalg.norm(self.last_target_rot_cartesian_velocity) * 1.5 ):
                            
-                                singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(self.last_target_rot_cartesian_velocity) * 1.5)
+            #                     singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * (numpy.linalg.norm(self.last_target_rot_cartesian_velocity) * 1.5)
                                 
-                            if numpy.linalg.norm(singularity_rot_offset_velocity) < numpy.linalg.norm(self.last_rot_target_cartesian_velocity):
-                                singularity_rot_offset_velocity = singularity_rot_offset_vector
+            #                 if numpy.linalg.norm(singularity_rot_offset_velocity) < numpy.linalg.norm(self.last_rot_target_cartesian_velocity):
+            #                     singularity_rot_offset_velocity = singularity_rot_offset_vector
                                 
-                        elif numpy.linalg.norm(self.last_target_rot_cartesian_velocity) == 0.0:
+            #             elif numpy.linalg.norm(self.last_target_rot_cartesian_velocity) == 0.0:
                                 
-                                singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * 0.005 # 0.5 [°/sec]
+            #                     singularity_rot_offset_velocity = (singularity_rot_offset_vector/numpy.linalg.norm(singularity_rot_offset_vector)) * 0.005 # 0.5 [°/sec]
                                 
-                                print("singularity_rot_offset_vector")
-                                print(singularity_rot_offset_vector)
-                                print(numpy.linalg.norm(singularity_rot_offset_vector))
+            #                     print("singularity_rot_offset_vector")
+            #                     print(singularity_rot_offset_vector)
+            #                     print(numpy.linalg.norm(singularity_rot_offset_vector))
                                         
                                 
                                     
                                 
                         
-                        if numpy.linalg.norm(singularity_trans_offset_vector) < self.singularity_trans_offset_accuracy:
-                            singularity_trans_offset_velocity = copy.deepcopy(self.target_cartesian_velocity)
-                            singularity_trans_offset_velocity[-3:] = 0.0
+            #             if numpy.linalg.norm(singularity_trans_offset_vector) < self.singularity_trans_offset_accuracy:
+            #                 singularity_trans_offset_velocity = copy.deepcopy(self.target_cartesian_velocity)
+            #                 singularity_trans_offset_velocity[-3:] = 0.0
 
-                # Rotation velocity-------------------------------------------------------------------------------------
+            #     # Rotation velocity-------------------------------------------------------------------------------------
               
-                self.target_cartesian_velocity = singularity_trans_offset_velocity + singularity_rot_offset_velocity
+            #     self.target_cartesian_velocity = singularity_trans_offset_velocity + singularity_rot_offset_velocity
                 
 
-                if numpy.linalg.norm(singularity_trans_offset_vector) < self.singularity_trans_offset_accuracy and numpy.linalg.norm(singularity_rot_offset_vector) < 0.00174:
+            #     if numpy.linalg.norm(singularity_trans_offset_vector) < self.singularity_trans_offset_accuracy and numpy.linalg.norm(singularity_rot_offset_vector) < 0.00174:
                        
-                    self.bool_reduce_singularity_offset = False
-                    print("singularity_trans_offset_vector")
-                    print(numpy.linalg.norm(singularity_trans_offset_vector))
+            #         self.bool_reduce_singularity_offset = False
+            #         print("singularity_trans_offset_vector")
+            #         print(numpy.linalg.norm(singularity_trans_offset_vector))
                 
                 
-                    print("singularity_rot_offset_vector")
-                    print(numpy.linalg.norm(singularity_rot_offset_vector))
+            #         print("singularity_rot_offset_vector")
+            #         print(numpy.linalg.norm(singularity_rot_offset_vector))
 
-                    rospy.loginfo("Endeffector offset is samller then %f",self.singularity_trans_offset_accuracy)
+            #         rospy.loginfo("Endeffector offset is samller then %f",self.singularity_trans_offset_accuracy)
                     
-            # Publish the calculated singular_velocity, in 'base_link' frame
-            self.singular_velocity_msg.data = self.singular_velocity
-            self.singularity_velocity_pub.publish(self.singular_velocity_msg)
-            self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
+            # # Publish the calculated singular_velocity, in 'base_link' frame
+            # self.singular_velocity_msg.data = self.singular_velocity
+            # self.singularity_velocity_pub.publish(self.singular_velocity_msg)
+            # self.singular_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
 #-----------------------------------------------------------------------------------------------------------------------
+            #* Subract the target cartesian velocity with the singularity avoidance velocity
+            if self.singularity_stop == False:
+                self.target_cartesian_velocity = self.target_cartesian_velocity - self.singularity_avoidance_velocity
+            else:
+                self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
+                
             # * Calculate the target joint velocity with the inverse jacobian-matrix and the target cartesain velociy
             self.target_joint_velocity.data = self.inverse_jacobian.dot(self.target_cartesian_velocity)
             
