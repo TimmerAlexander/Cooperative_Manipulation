@@ -27,7 +27,7 @@
 # **************************************************************************/
 
 """
-    Description...
+    Description
 
     Impedance controller
 
@@ -43,8 +43,9 @@ import rospy
 import tf
 from geometry_msgs.msg import Twist, Vector3Stamped
 from std_msgs.msg import Float64MultiArray
+from cooperative_manipulation_controllers.msg import SingularityAvoidance, WorkspaceViolation
 
-class franka_impedance_controller():
+class franka_hardware_node():
 
     def config(self):
         # Min and max limits for the cartesian velocity (trans/rot) (unit: [m/s],[rad/s])
@@ -60,8 +61,13 @@ class franka_impedance_controller():
         # Initialize trajectory velocity for object rotation
         self.world_trajectory_velocity = numpy.array([0.0,0.0,0.0])
         # Singularity avoidance
+        self.singularity_avoidance_stop = False
         self.singularity_velocity_trans_transformed  = numpy.array([0.0,0.0,0.0])
         self.singularity_velocity_rot_transformed  = numpy.array([0.0,0.0,0.0])
+        # Franka workspace violation
+        self.workspace_violation_limit = 0.68
+        self.workspace_violation = False
+        self.workspace_violation_msg = WorkspaceViolation()
 
 
     def __init__(self):
@@ -101,7 +107,7 @@ class franka_impedance_controller():
 
         self.cartesian_msg_sub = rospy.Subscriber(
             '/cooperative_manipulation/singularity_velocity', 
-            Float64MultiArray, 
+            SingularityAvoidance, 
             self.singularity_velocity_callback,
             queue_size=1,
             tcp_nodelay=True)
@@ -113,13 +119,18 @@ class franka_impedance_controller():
                 tcp_nodelay=True,
                 queue_size=1)
 
+        # Publish singularity velocity
+        self.workspace_violation_pub = rospy.Publisher(
+            "/cooperative_manipulation/franka/workspace",
+            WorkspaceViolation,
+            queue_size=1)
+
         # * Initialize on_shutdown clean up
         rospy.on_shutdown(self._on_shutdown)
 
         rospy.loginfo("Launch Franka Hardware Node.")
         # # * Run controller thread
         self.control_thread()
-
         rospy.spin()
 
     def control_thread(self):
@@ -145,10 +156,17 @@ class franka_impedance_controller():
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = (self.desired_velocity_rot_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
 
+            #* Check for workspace violation
+            self.check_workspace_violation(self.workspace_violation_limit)
+
             #* Add singular_velocity to self.desired_velocity_trans_transformed and self.desired_velocity_rot_transformed 
-            self.desired_velocity_trans_transformed = numpy.subtract(self.desired_velocity_trans_transformed,self.singularity_velocity_trans_transformed)
-            self.desired_velocity_rot_transformed = numpy.subtract(self.desired_velocity_rot_transformed,self.singularity_velocity_rot_transformed)
-            
+            if self.singularity_avoidance_stop == False and self.workspace_violation == False:
+                self.desired_velocity_trans_transformed = numpy.subtract(self.desired_velocity_trans_transformed,self.singularity_velocity_trans_transformed)
+                self.desired_velocity_rot_transformed = numpy.subtract(self.desired_velocity_rot_transformed,self.singularity_velocity_rot_transformed)
+            else:
+                self.desired_velocity_trans_transformed = numpy.array([0.0,0.0,0.0])
+                self.desired_velocity_rot_transformed = numpy.array([0.0,0.0,0.0])
+                
             #* Publish the velocity command to franka impedance controller   
             self.command_msg.data = numpy.append(self.desired_velocity_trans_transformed,self.desired_velocity_rot_transformed) 
 
@@ -346,8 +364,9 @@ class franka_impedance_controller():
         Args:
             singularity_velocity (Float64MultiArray): Singularity avoidance velocity.
         """
+        self.singularity_avoidance_stop = singularity_velocity.singularity_stop
         singularity_velocity_transformed = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-        singularity_velocity_transformed = self.transform_vector('world','panda_link0',singularity_velocity.data)
+        singularity_velocity_transformed = self.transform_vector('world','panda_link0',singularity_velocity.singularity_velocity)
         
         self.singularity_velocity_trans_transformed = [
             singularity_velocity_transformed[0],
@@ -361,44 +380,35 @@ class franka_impedance_controller():
             singularity_velocity_transformed[5],
             ] 
         
-        # # Get current time stamp
-        # now = rospy.Time()
-    
-        # # Transform the cartesian velocity in the 'base' frame--------------------------------------
-        # world_cartesian_velocity_trans  = Vector3Stamped()
-        # world_cartesian_velocity_rot  = Vector3Stamped()
-        # # Converse cartesian_velocity translation to vector3
-        # world_cartesian_velocity_trans.header.frame_id = 'world'
-        # world_cartesian_velocity_trans.header.stamp = now
-        # world_cartesian_velocity_trans.vector.x = singularity_velocity.data[0]
-        # world_cartesian_velocity_trans.vector.y = singularity_velocity.data[1]
-        # world_cartesian_velocity_trans.vector.z = singularity_velocity.data[2]
-            
-        # # Transform cartesian_velocity translation from 'base_link' frame to 'base' frame 
-        # base_singularity_velocity_trans = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_trans)
-            
-        # # Converse cartesian_velocity rotation to vector3
-        # world_cartesian_velocity_rot.header.frame_id = 'world'
-        # world_cartesian_velocity_rot.header.stamp = now
-        # world_cartesian_velocity_rot.vector.x = singularity_velocity.data[3]
-        # world_cartesian_velocity_rot.vector.y = singularity_velocity.data[4]
-        # world_cartesian_velocity_rot.vector.z = singularity_velocity.data[5]
-        
-        # # Transform cartesian_velocity rotation from 'base_link' frame to 'base' frame
-        # base_singularity_velocity_rot = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_rot)
-        
-        # self.singularity_velocity_trans_transformed = [
-        #     base_singularity_velocity_trans.vector.x,
-        #     base_singularity_velocity_trans.vector.y,
-        #     base_singularity_velocity_trans.vector.z,
-        #     ]
-            
-        # self.singularity_velocity_rot_transformed = [
-        #     base_singularity_velocity_rot.vector.x,
-        #     base_singularity_velocity_rot.vector.y,
-        #     base_singularity_velocity_rot.vector.z,
-        #     ] 
 
+    def check_workspace_violation(self,workspace_limit: float):
+        """_summary_
+
+        Args:
+            workspace_limit (float): _description_
+        """
+        panda_tf_time_1 = self.tf_listener.getLatestCommonTime("/world", "/panda_link1")
+        panda_current_position_1, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda_link1", panda_tf_time_1)
+        
+        
+        panda_tf_time_2 = self.tf_listener.getLatestCommonTime("/world", "/panda_link6")
+        panda_current_position_2, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda_link6", panda_tf_time_2)
+
+        max_workspace = numpy.array([panda_current_position_2[0] - panda_current_position_1[0],
+                                          panda_current_position_2[1] - panda_current_position_1[1],
+                                          panda_current_position_2[2] - panda_current_position_1[2]
+                                          ])
+  
+        if numpy.linalg.norm(max_workspace) >= workspace_limit:
+            self.workspace_violation = True
+            rospy.loginfo("Workspace violation!")
+            # print("self.workspace_violation ")
+            # print(self.workspace_violation )
+            # print("workspace_vector")
+            # print(numpy.linalg.norm(max_workspace))
+            
+        self.workspace_violation_msg.workspace_violation = self.workspace_violation
+        self.workspace_violation_pub.publish(self.workspace_violation_msg)
         
     def _on_shutdown(self):
         """
@@ -412,4 +422,4 @@ class franka_impedance_controller():
 
 
 if __name__ == "__main__":
-    franka_impedance_controller()
+    franka_hardware_node()
