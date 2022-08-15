@@ -19,7 +19,9 @@ class ur16e_singularity_test():
     def config(self):
         # Set the radius and the trajectory velocity of the circular movement
         self.set_trajectory_velocity = 0.05
-        self.radius = 0.17
+        # From Start position and singularity entrance threshold = 0.05, radius = 0.156 is the smallest without singularity avoidance
+        # radius 0.166 is the biggest, when singularity min threshold = 0.01
+        self.radius = 0.163
         # ! Do not change under here------------------------------------------------------------------------------------
         self.trajectory_velocity_limit = 0.1 # [rad/s]
         self.alpha = 0.0 # [rad]
@@ -52,20 +54,6 @@ class ur16e_singularity_test():
         #* Publish velocity command 
         self.pub_cartesian_velocity_command = rospy.Publisher("/cooperative_manipulation/cartesian_velocity_command", Twist, queue_size=100)
         
-        #* Publish singularity velocity
-        self.singularity_velocity_pub = rospy.Publisher(
-            "/cooperative_manipulation/singularity_velocity",
-            Float64MultiArray,
-            queue_size=1)
-        
-        #* Subscriber to singularity avoidance velocity of the ur16e
-        self.cartesian_msg_sub = rospy.Subscriber(
-            '/cooperative_manipulation/ur16e/singularity_velocity', 
-            Float64MultiArray, 
-            self.singularity_velocity_callback,
-            queue_size=1,
-            tcp_nodelay=True)
-        
         self.pub_world_trajectory = rospy.Publisher("/cooperative_manipulation/world_trajectory", Float64MultiArray, queue_size=1)
         
         rate = rospy.Rate(self.publish_rate)
@@ -84,7 +72,7 @@ class ur16e_singularity_test():
                 self.joint_velocity_msg.angular.y = 0.0
                 self.joint_velocity_msg.angular.z = 0.0
                 
-                # * Publish the target_joint_velocity
+                #* Publish the target_joint_velocity
                 self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
                 rospy.loginfo("Stop ciruclar movement!")
                 break
@@ -97,10 +85,6 @@ class ur16e_singularity_test():
                 self.alpha = self.alpha + (self.angular_velocity_vector[2]/self.publish_rate)
                 
                 self.now_old = self.now
-            
-            # * Publish the singualrity_velocity
-            self.singular_velocity_msg.data = self.singularity_velocity
-            self.singularity_velocity_pub.publish(self.singular_velocity_msg)
             
             rate.sleep()
             
@@ -129,19 +113,8 @@ class ur16e_singularity_test():
                                         self.joint_velocity_msg.angular.y,
                                         self.joint_velocity_msg.angular.z])
         
-        # * Publish the target_joint_velocity
+        #* Publish the target_joint_velocity
         self.pub_cartesian_velocity_command.publish(self.joint_velocity_msg)
-    
-    #* Callback function for the singularity velocity
-    def singularity_velocity_callback(self,singularity_velocity):
-        """
-            Get the singularity avoidance velocity in 'world' frame.
-        Args:
-            singularity_velocity (Float64MultiArray): Singularity avoidance velocity
-        """
-        self.singularity_velocity = singularity_velocity.data
-        self.singular_velocity_msg.data = self.singularity_velocity
-        self.singularity_velocity_pub.publish(self.singular_velocity_msg)
         
         
 if __name__ == '__main__':
