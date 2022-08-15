@@ -11,7 +11,7 @@
       <arg name="load_gripper" value="$(arg load_gripper)" />
     </include>
 
-    <node pkg="tf2_ros" type="static_transform_publisher" name="panda_link0_world_broadcaster" args="1.0 0 0 3.14 0 0 world panda_link0" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="panda_link0_world_broadcaster" args="0 0 0 3.14 0 0 world panda_link0" />
 
     <!-- Launch the franka_hardware_node -->
     <node pkg="cooperative_manipulation_hardware" name="franka_hardware_node" type="franka_hardware_node.py" output="screen">
