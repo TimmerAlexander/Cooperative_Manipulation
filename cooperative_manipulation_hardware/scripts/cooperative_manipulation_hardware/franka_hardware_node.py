@@ -45,6 +45,12 @@ from geometry_msgs.msg import Twist, Vector3Stamped
 from std_msgs.msg import Float64MultiArray
 from cooperative_manipulation_controllers.msg import SingularityAvoidance, WorkspaceViolation
 
+# For measurements
+from franka_msgs.msg import FrankaState
+import moveit_commander
+import quaternion, sys, copy
+# For measurements
+
 class franka_hardware_node():
 
     def config(self):
@@ -68,6 +74,8 @@ class franka_hardware_node():
         self.workspace_violation_limit = 0.68
         self.workspace_violation = False
         self.workspace_violation_msg = WorkspaceViolation()
+        
+        self.CARTESIAN_POSE = None
 
 
     def __init__(self):
@@ -94,8 +102,8 @@ class franka_hardware_node():
         # Wait for transformations from 'world' to 'panda_gripper' and 'world' to 'ur16e_gripper'
         rospy.loginfo("Wait for transformation 'world' to '/panda_EE'.")
         self.tf_listener.waitForTransform("world","/panda_EE", rospy.Time(), rospy.Duration(10.0))
-        rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
-        self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
+        # rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
+        # self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
 
         # * Initialize subscriber:
         self.cartesian_msg_sub = rospy.Subscriber(
@@ -129,9 +137,90 @@ class franka_hardware_node():
         rospy.on_shutdown(self._on_shutdown)
 
         rospy.loginfo("Launch Franka Hardware Node.")
+        
+        # Moveit, Publisher and Subscriber for measurements-------------------------------------------------------------
+        # moveit_commander.roscpp_initialize(sys.argv)
+
+        # try:
+        #     group_name = 'panda_arm'
+        #     print("Initialize movit_commander. Group name: ",group_name)
+        #     self.group = moveit_commander.MoveGroupCommander(group_name, wait_for_servers=5.0)
+        # except Exception as e:
+        #     print(e)
+        
+        # * Initialize subscriber:
+        self.cartesian_state_sub = rospy.Subscriber(
+            '/panda/franka_state_controller/franka_states',
+            FrankaState,
+            self._get_franka_state,
+            queue_size=1,
+            tcp_nodelay=True)
+        
+        
+        self.delta_pos_msg = Float64MultiArray()
+        self.delta_ori_msg = Float64MultiArray()
+        
+        self.delta_pos_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/delta_pos',
+                Float64MultiArray,
+                tcp_nodelay=True,
+                queue_size=1)
+        
+        self.delta_ori_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/delta_ori',
+                Float64MultiArray,
+                tcp_nodelay=True,
+                queue_size=1)
+        
+        # Wait for messages to be populated before proceeding
+        rospy.loginfo("Subscribing to robot state topics...")
+        while (True):
+            if not ( self.CARTESIAN_POSE is None):
+                print(self.CARTESIAN_POSE)
+                break
+        rospy.loginfo("Recieved messages; Launch Franka Impedance Control.")
+        
+        
+        
+        
+        # * Get start position and orientation
+        start_pose = copy.deepcopy(self.CARTESIAN_POSE)
+        start_pos, start_ori = start_pose['position'],start_pose['orientation']
+
+        # * Initialize self.goal_pos and self.goal_ori
+        self.goal_pos = numpy.asarray(start_pos.reshape([1,3]))
+        self.goal_ori = start_ori
+        
+        
+        
+        # Moveit, Publisher and Subscriber for measurements-------------------------------------------------------------
+        
         # # * Run controller thread
         self.control_thread()
         rospy.spin()
+
+    # Callback for measurements-----------------------------------------------------------------------------------------
+    
+    def _get_franka_state(self,msg):
+        """
+            Callback function to get current end-point state.
+
+        Args:
+            msg (franka_core_msgs.msg.EndPointState): Current tip-state state
+        """
+        # pose message received is a vectorised column major transformation matrix
+        cart_pose_trans_mat = numpy.asarray(msg.O_T_EE).reshape(4,4,order='F')
+
+        # print("cart_pose_trans_mat")
+        # print(cart_pose_trans_mat)
+        
+        self.CARTESIAN_POSE = {
+            'position': cart_pose_trans_mat[:3,3],
+            'orientation': quaternion.from_rotation_matrix(cart_pose_trans_mat[:3,:3]) }
+        
+
+    # Callback for measurements-----------------------------------------------------------------------------------------
+
 
     def control_thread(self):
         """
@@ -139,6 +228,20 @@ class franka_hardware_node():
             and current robot states from the subscribed messages to compute
             task-space force, and then the corresponding joint torques.
         """
+        
+        # For measurements----------------------------------------------------------------------------------------------
+        # Calculate the translational and rotation movement
+        # Declare movement_trans and movement_ori
+        movement_trans = numpy.array([None])
+        movement_ori = numpy.array([None])
+        
+        time_old = rospy.Time.now()
+        time_old = time_old.to_sec() - 0.01
+
+        
+        # For measurements----------------------------------------------------------------------------------------------
+        
+        
         # Set rospy.rate
         rate = rospy.Rate(self.publish_rate)
         while not rospy.is_shutdown():
@@ -155,6 +258,48 @@ class franka_hardware_node():
             if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
                 for i in range(3):
                     self.desired_velocity_rot_transformed[i] = (self.desired_velocity_rot_transformed[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
+
+
+        # For measurements----------------------------------------------------------------------------------------------
+            time_now = rospy.Time.now()
+            time_now = time_now.to_sec()
+            time_diff = numpy.round(time_now - time_old,3)
+            time_old = time_now
+            # Get current position and orientation
+            curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
+            curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
+ 
+
+            movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
+            movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
+            
+            # Add the movement to current pose and orientation
+            self.goal_pos = (self.goal_pos + movement_trans)
+            self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
+         
+            # Calculate position and orientation difference
+            self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
+            self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
+            
+        
+            
+            print("self.delta_pos")
+            print(self.delta_pos)
+            
+            print("self.delta_ori")
+            print(self.delta_ori)
+            
+            self.delta_pos_msg.data = self.delta_pos
+            self.delta_ori_msg.data = self.delta_ori
+            
+            self.delta_pos_publisher.publish(self.delta_pos_msg)
+            self.delta_ori_publisher.publish(self.delta_ori_msg)
+       
+        # For measurements----------------------------------------------------------------------------------------------
+
+
+
+
 
             #* Check for workspace violation
             self.check_workspace_violation(self.workspace_violation_limit)
@@ -244,77 +389,77 @@ class franka_hardware_node():
         # Calculate the trajectory velocity of the manipulator for a rotation of the object-----------------------------
         # Calculate the trajectory velocity of the manipulator for a rotation of the object
         #Get self.panda_current_position, self.panda_current_quaternion of the '/panda_link8' frame in the 'world' frame
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_link8")
-        panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda_link8", panda_tf_time)
+        # panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_link8")
+        # panda_current_position, panda_current_quaternion = self.tf_listener.lookupTransform("/world", "/panda_link8", panda_tf_time)
 
 
-        # Get self.panda_current_position, self.panda_current_quaternion of the '/panda_EE' frame in the 'world' frame
-        panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_EE")
-        panda_EE_position, panda_EE_quaternion = self.tf_listener.lookupTransform("/world", "/panda_EE", panda_tf_time)
+        # # Get self.panda_current_position, self.panda_current_quaternion of the '/panda_EE' frame in the 'world' frame
+        # panda_tf_time = self.tf_listener.getLatestCommonTime("/world", "/panda_EE")
+        # panda_EE_position, panda_EE_quaternion = self.tf_listener.lookupTransform("/world", "/panda_EE", panda_tf_time)
 
-        # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame
-        ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
-        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        # # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame
+        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("/world", "/wrist_3_link")
+        # ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
 
-        # Object rotation around x axis
-        if desired_velocity.angular.x != 0.0:
-            panda_current_position_x = numpy.array([
-                0.0,
-                panda_current_position[1],
-                panda_current_position[2]
-                ])
+        # # Object rotation around x axis
+        # if desired_velocity.angular.x != 0.0:
+        #     panda_current_position_x = numpy.array([
+        #         0.0,
+        #         panda_current_position[1],
+        #         panda_current_position[2]
+        #         ])
 
-            self.robot_distance_x = numpy.array([
-                    0.0,
-                    ur16e_gripper_position[1] - panda_EE_position[1],
-                    ur16e_gripper_position[2] - panda_EE_position[2],
-                ])
+        #     self.robot_distance_x = numpy.array([
+        #             0.0,
+        #             ur16e_gripper_position[1] - panda_EE_position[1],
+        #             ur16e_gripper_position[2] - panda_EE_position[2],
+        #         ])
 
-            center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_EE_position
-            world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-            world_radius_x = panda_current_position_x - center_x
-            self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
+        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + panda_EE_position
+        #     world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
+        #     world_radius_x = panda_current_position_x - center_x
+        #     self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
 
-        # Object rotation around y axis
-        if desired_velocity.angular.y != 0.0:
-            panda_current_position_y = numpy.array([
-                panda_current_position[0],
-                0.0,
-                panda_current_position[2]
-                ])
+        # # Object rotation around y axis
+        # if desired_velocity.angular.y != 0.0:
+        #     panda_current_position_y = numpy.array([
+        #         panda_current_position[0],
+        #         0.0,
+        #         panda_current_position[2]
+        #         ])
 
-            self.robot_distance_y = numpy.array([
-                ur16e_gripper_position[0] - panda_EE_position[0],
-                0.0,
-                ur16e_gripper_position[2] - panda_EE_position[2],
-                ])
+        #     self.robot_distance_y = numpy.array([
+        #         ur16e_gripper_position[0] - panda_EE_position[0],
+        #         0.0,
+        #         ur16e_gripper_position[2] - panda_EE_position[2],
+        #         ])
 
-            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_EE_position
-            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-            world_radius_y = panda_current_position_y - center_y
-            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
+        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + panda_EE_position
+        #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+        #     world_radius_y = panda_current_position_y - center_y
+        #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y
 
-        # Object rotation around z axis
-        if desired_velocity.angular.z != 0.0:
-            panda_current_position_z = numpy.array([
-                panda_current_position[0],
-                panda_current_position[1],
-                0.0,
-                ])
+        # # Object rotation around z axis
+        # if desired_velocity.angular.z != 0.0:
+        #     panda_current_position_z = numpy.array([
+        #         panda_current_position[0],
+        #         panda_current_position[1],
+        #         0.0,
+        #         ])
 
-            self.robot_distance_z = numpy.array([
-                ur16e_gripper_position[0] - panda_EE_position[0],
-                ur16e_gripper_position[1] - panda_EE_position[1],
-                0.0,
-                ])
+        #     self.robot_distance_z = numpy.array([
+        #         ur16e_gripper_position[0] - panda_EE_position[0],
+        #         ur16e_gripper_position[1] - panda_EE_position[1],
+        #         0.0,
+        #         ])
 
-            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_EE_position
-            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-            world_radius_z = panda_current_position_z - center_z
-            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
-            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
+        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + panda_EE_position
+        #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+        #     world_radius_z = panda_current_position_z - center_z
+        #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z
 
         # Transform the velocity from 'world' frame to 'panda_link0' frame----------------------------------------------
 
@@ -410,6 +555,83 @@ class franka_hardware_node():
         self.workspace_violation_msg.workspace_violation = self.workspace_violation
         self.workspace_violation_pub.publish(self.workspace_violation_msg)
         
+    def add_quaternion(self,quat_0: numpy.quaternion,quat_1: numpy.quaternion):
+        """
+            Add two quaternions and return the sum.
+            
+        Args:
+            quat_0 (numpy.quaternion): First quaternion
+            quat_1 (numpy.quaternion): Second quaternion
+            
+        Returns:
+            numpy.quaternion: Sum of both quaternions
+        """
+        # Extract the values from Q0
+        w_0 = quat_0.w
+        x_0 = quat_0.x
+        y_0 = quat_0.y
+        z_0 = quat_0.z
+        # Extract the values from Q1
+        w_1 = quat_1.w
+        x_1 = quat_1.x
+        y_1 = quat_1.y
+        z_1 = quat_1.z
+        # Compute the product of the two quaternions, term by term
+        sum_w = w_0 * w_1 - x_0 * x_1 - y_0 * y_1 - z_0 * z_1
+        sum_x = w_0 * x_1 + x_0 * w_1 + y_0 * z_1 - z_0 * y_1
+        sum_y = w_0 * y_1 - x_0 * z_1 + y_0 * w_1 + z_0 * x_1
+        sum_z = w_0 * z_1 + x_0 * y_1 - y_0 * x_1 + z_0 * w_1
+        
+        sum_quat = numpy.quaternion(sum_w ,sum_x,sum_y,sum_z)
+        
+        return sum_quat 
+    
+    def euler_to_quaternion(self,euler_array: numpy.array):
+        """
+            Convert Euler angles to a quaternion.
+            
+            Args:
+                :param alpha: Rotation around x-axis angle in radians.
+                :param beta: Rotation around y-axis  angle in radians.
+                :param gamma: Rotation around z-axis angle in radians.
+            
+            Returns:
+                :return quaternion_from_euler: The orientation in quaternion 
+        """
+        alpha, beta, gamma = euler_array
+
+        q_x = numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) - numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+        q_y = numpy.cos(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2)
+        q_z = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.sin(gamma/2) - numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.cos(gamma/2)
+        q_w = numpy.cos(alpha/2) * numpy.cos(beta/2) * numpy.cos(gamma/2) + numpy.sin(alpha/2) * numpy.sin(beta/2) * numpy.sin(gamma/2)
+        
+        quaternion_from_euler = numpy.quaternion(q_w,q_x,q_y,q_z)
+        
+        return quaternion_from_euler
+    
+
+    def quatdiff_in_euler(self,quat_curr: numpy.quaternion, quat_des: numpy.quaternion):
+        """            
+            Compute difference between quaternions and return 
+            Euler angles as difference.
+
+        Args:
+            quat_curr (numpy.quaternion): Current orientation 
+            quat_des (numpy.quaternion): Desired orientation
+
+        Returns:
+            numpy.array: Difference between quaternions
+        """
+        curr_mat = quaternion.as_rotation_matrix(quat_curr)
+        des_mat = quaternion.as_rotation_matrix(quat_des)
+        rel_mat = des_mat.T.dot(curr_mat)
+        rel_quat = quaternion.from_rotation_matrix(rel_mat)
+        vec = quaternion.as_float_array(rel_quat)[1:]
+        if rel_quat.w < 0.0:
+            vec = -vec
+        
+        return -des_mat.dot(vec)
+
     def _on_shutdown(self):
         """
             Shutdown publisher and subscriber when rosnode dies.
