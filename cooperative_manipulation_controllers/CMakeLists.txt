@@ -37,9 +37,6 @@ if(NOT Franka_FOUND)
 endif()
 
 
-
-
-
 # generate_dynamic_reconfigure_options(
 #   cfg/compliance_param.cfg
 #   cfg/desired_mass_param.cfg
@@ -82,12 +79,14 @@ endif()
 ##   * uncomment the generate_messages entry below
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
+catkin_python_setup()
+
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  SingularityAvoidance.msg
+  WorkspaceViolation.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -104,10 +103,10 @@ endif()
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -249,7 +248,7 @@ install(FILES cooperative_manipulation_controllers_plugin.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
-catkin_python_setup()
+
 
 
 ## Mark executables for installation
