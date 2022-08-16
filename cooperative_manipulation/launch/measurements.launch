@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="measurement_number"/>
+  <arg name="bag_directory" default="/home/rosmatch/catkin_ws_timmer/src/Cooperative_Manipulation/cooperative_manipulation/bag/"/>
+  <arg name="file_name" default="measurement_"/>
+
+  <!-- Record measurement -->
+  <!-- <node name="measurement_record" pkg="rosbag" type="record"
+        args="record -o $(arg bag_directory)$(arg file_name)$(arg measurement_number) /panda/franka_state_controller/F_ext /panda/measurement/delta_pos /panda/measurement/delta_ori /ur/wrench /ur/measurement/delta_pos /ur/measurement/delta_ori /ur/measurement/sigma"/> -->
+
+  <!-- Start measurement_movement_node -->
+  <node name="measurement_movement_node" pkg="cooperative_manipulation" type="measurements_movement.py" output="screen"/>
+
+  <!-- Start elbow_singularity_node -->
+  <!-- <node name="elbow_singularity_node" pkg="cooperative_manipulation" type="elbow_singularity.py" output="screen"/> -->
+
+</launch>
+
