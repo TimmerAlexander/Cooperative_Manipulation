@@ -677,8 +677,6 @@ class ur_admittance_controller():
             self.admittance_velocity[4] = (self.wrench_diff[4] / self.A_rot_y) + pose_rot_diff[1] * self.Kp_rot_y 
             self.admittance_velocity[5] = (self.wrench_diff[5] / self.A_rot_z) + pose_rot_diff[2] * self.Kp_rot_z        
 
-
-            
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
             self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity[0]
             self.target_cartesian_velocity[1] = self.base_link_desired_velocity[1] + self.admittance_velocity[1]
@@ -722,15 +720,14 @@ class ur_admittance_controller():
                         if self.bool_singularity == False:
                             self.bool_singularity = True
                             rospy.loginfo("Activate OLMM")
-                            
-
+                        print(sigma_min)
                         if sigma_min < self.singularity_min_threshold:
-                            rospy.loginfo("Singularity stop activated!")
+                            rospy.loginfo("Singularity stop activated! Sigma %f is smaller then threshol %f",sigma_min,self.singularity_min_threshold)
                             self.singularity_stop = True
                         else:
                             self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
 
-            if  self.singularity_entry_threshold <  sigma_min < self.singularity_exit_threshold and self.bool_singularity == True:
+            if  self.singularity_entry_threshold < sigma_min < self.singularity_exit_threshold and self.bool_singularity == True:
                 self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
 
                 
@@ -767,7 +764,7 @@ class ur_admittance_controller():
                 self.target_cartesian_velocity = self.target_cartesian_velocity - self.singularity_avoidance_velocity
                 
             elif (self.bool_singularity == True and self.singularity_stop == True) or self.workspace_violation == True:
-                self.target_cartesian_velocity = self.singularity_stop_velocity
+                self.target_cartesian_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
             
             # * Calculate the inverse of the jacobian-matrix
             self.inverse_jacobian = numpy.linalg.inv(self.jacobian)
