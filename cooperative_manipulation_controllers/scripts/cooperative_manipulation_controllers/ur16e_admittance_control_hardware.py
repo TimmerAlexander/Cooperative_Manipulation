@@ -19,7 +19,7 @@
 import sys, copy, numpy, math, rospy, tf, tf2_ros, moveit_commander
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, TransformStamped, PoseStamped
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Float32
 from cooperative_manipulation_controllers.msg import SingularityAvoidance, WorkspaceViolation
 
 
@@ -196,6 +196,35 @@ class ur_admittance_controller():
         
         
         
+        # Publisher and Subscriber for measurements-------------------------------------------------------------
+        # * Initialize subscriber:
+
+        self.delta_pos_msg = Float64MultiArray()
+        self.delta_ori_msg = Float64MultiArray()
+        self.sigma_msg = Float32()
+        
+        self.delta_pos_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/delta_pos',
+                Float64MultiArray,
+                tcp_nodelay=True,
+                queue_size=1)
+        
+        self.delta_ori_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/delta_ori',
+                Float64MultiArray,
+                tcp_nodelay=True,
+                queue_size=1)
+        
+        self.sigma_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/sigma',
+                Float32,
+                tcp_nodelay=True,
+                queue_size=1)
+
+        
+        
+        
+        # Publisher and Subscriber for measurements-------------------------------------------------------------
         
         
         
@@ -659,8 +688,15 @@ class ur_admittance_controller():
                 if abs(pose_rot_diff[rot]) > 3.14: 
                     pose_rot_diff[rot] = pose_rot_diff[rot] - numpy.sign(pose_rot_diff[rot]) * 6.28
                     
-            
-            old_euler = current_EE_pose_array[-3:]
+            # For measurements------------------------------------------------------------------------------------------
+            self.delta_pos_msg.data = pose_trans_diff
+            self.delta_ori_msg.data = pose_rot_diff
+
+        
+            self.delta_pos_publisher.publish(self.delta_pos_msg)
+            self.delta_ori_publisher.publish(self.delta_ori_msg)
+            # For measurements------------------------------------------------------------------------------------------
+        
             #* Compute the wrench difference
             for wrench in range(len(self.average_wrench_ext_filtered_array )):
                 if self.average_wrench_ext_filtered_array[wrench] != 0.0:
@@ -714,13 +750,20 @@ class ur_admittance_controller():
             
             sigma_min = min(s) 
 
+            # For measurements------------------------------------------------------------------------------------------
+            self.sigma_msg.data = sigma_min 
+            self.sigma_publisher.publish(self.sigma_msg)
+
+            # For measurements------------------------------------------------------------------------------------------
+
+
             for sigma in range(len(s)):
                     # If a singularity is detected
                     if s[sigma] < self.singularity_entry_threshold:
                         if self.bool_singularity == False:
                             self.bool_singularity = True
                             rospy.loginfo("Activate OLMM")
-                        print(sigma_min)
+                            
                         if sigma_min < self.singularity_min_threshold:
                             rospy.loginfo("Singularity stop activated! Sigma %f is smaller then threshol %f",sigma_min,self.singularity_min_threshold)
                             self.singularity_stop = True
