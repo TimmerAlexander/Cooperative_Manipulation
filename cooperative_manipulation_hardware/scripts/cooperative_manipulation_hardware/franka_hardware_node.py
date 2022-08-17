@@ -41,14 +41,16 @@
 import numpy
 import rospy
 import tf
+
+from tf.transformations import euler_from_quaternion
+
 from geometry_msgs.msg import Twist, Vector3Stamped
 from std_msgs.msg import Float64MultiArray
 from cooperative_manipulation_controllers.msg import SingularityAvoidance, WorkspaceViolation
 
 # For measurements
 from franka_msgs.msg import FrankaState
-import moveit_commander
-import quaternion, sys, copy
+import quaternion, copy
 # For measurements
 
 class franka_hardware_node():
@@ -138,16 +140,7 @@ class franka_hardware_node():
 
         rospy.loginfo("Launch Franka Hardware Node.")
         
-        # Moveit, Publisher and Subscriber for measurements-------------------------------------------------------------
-        # moveit_commander.roscpp_initialize(sys.argv)
-
-        # try:
-        #     group_name = 'panda_arm'
-        #     print("Initialize movit_commander. Group name: ",group_name)
-        #     self.group = moveit_commander.MoveGroupCommander(group_name, wait_for_servers=5.0)
-        # except Exception as e:
-        #     print(e)
-        
+        # Publisher and Subscriber for measurements-------------------------------------------------------------
         # * Initialize subscriber:
         self.cartesian_state_sub = rospy.Subscriber(
             '/panda/franka_state_controller/franka_states',
@@ -180,21 +173,44 @@ class franka_hardware_node():
                 break
         rospy.loginfo("Recieved messages; Launch Franka Impedance Control.")
         
-        
-        
-        
         # * Get start position and orientation
         start_pose = copy.deepcopy(self.CARTESIAN_POSE)
         start_pos, start_ori = start_pose['position'],start_pose['orientation']
+
+
+        start_ori_array = (start_ori.x,
+                        start_ori.y,
+                        start_ori.z,
+                        start_ori.w)
+
+        # Transform quaternion to euler
+        self.desired_euler = numpy.asarray(euler_from_quaternion(start_ori_array))
 
         # * Initialize self.goal_pos and self.goal_ori
         self.goal_pos = numpy.asarray(start_pos.reshape([1,3]))
         self.goal_ori = start_ori
         
         
+        self.world_vel_trans_global  = Vector3Stamped()
+        self.world_vel_rot_global  = Vector3Stamped()
         
-        # Moveit, Publisher and Subscriber for measurements-------------------------------------------------------------
-        
+   
+        self.world_vel_trans_global.header.frame_id = 'world'
+        self.world_vel_trans_global.header.stamp = rospy.Time()
+        self.world_vel_trans_global.vector.x = 0.0
+        self.world_vel_trans_global.vector.y = 0.0
+        self.world_vel_trans_global.vector.z = 0.0
+
+
+        # Converse cartesian_velocity rotation to vector3
+        self.world_vel_rot_global.header.frame_id = 'world'
+        self.world_vel_rot_global.header.stamp = rospy.Time()
+        self.world_vel_rot_global.vector.x = 0.0
+        self.world_vel_rot_global.vector.y = 0.0
+        self.world_vel_rot_global.vector.z = 0.0
+
+
+        # Publisher and Subscriber for measurements---------------------------------------------------------------------
         # # * Run controller thread
         self.control_thread()
         rospy.spin()
@@ -230,20 +246,13 @@ class franka_hardware_node():
         """
         
         # For measurements----------------------------------------------------------------------------------------------
-        # Calculate the translational and rotation movement
-        # Declare movement_trans and movement_ori
         movement_trans = numpy.array([None])
-        movement_ori = numpy.array([None])
-        
-        time_old = rospy.Time.now()
-        time_old = time_old.to_sec() - 0.01
-
-        
         # For measurements----------------------------------------------------------------------------------------------
         
         
         # Set rospy.rate
         rate = rospy.Rate(self.publish_rate)
+        
         while not rospy.is_shutdown():
             # * Check self.target_cartesian_trans_velocity and self.target_cartesian_trot_velocity for the min/max velocity limits
             # Calculate the norm of target_cartesian_velocity (trans and rot)
@@ -261,45 +270,62 @@ class franka_hardware_node():
 
 
         # For measurements----------------------------------------------------------------------------------------------
-            time_now = rospy.Time.now()
-            time_now = time_now.to_sec()
-            time_diff = numpy.round(time_now - time_old,3)
-            time_old = time_now
             # Get current position and orientation
             curr_pose = copy.deepcopy(self.CARTESIAN_POSE)
             curr_pos, curr_ori = curr_pose['position'],curr_pose['orientation']
- 
-
+            # Position difference---------------------------------------------------------------------------------------
             movement_trans = numpy.asarray([x / self.publish_rate for x in self.desired_velocity_trans_transformed]).reshape([1,3])
-            movement_ori = self.euler_to_quaternion(numpy.asarray([x / self.publish_rate for x in self.desired_velocity_rot_transformed]))
             
-            # Add the movement to current pose and orientation
             self.goal_pos = (self.goal_pos + movement_trans)
-            self.goal_ori = self.add_quaternion(self.goal_ori,movement_ori)
-         
+            
             # Calculate position and orientation difference
             self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
-            self.delta_ori = self.quatdiff_in_euler(curr_ori, self.goal_ori).reshape([3,1])
             
-        
-            
-            print("self.delta_pos")
-            print(self.delta_pos)
-            
-            print("self.delta_ori")
-            print(self.delta_ori)
+            # print("self.delta_pos")
+            # print(self.delta_pos)
             
             self.delta_pos_msg.data = self.delta_pos
-            self.delta_ori_msg.data = self.delta_ori
-            
             self.delta_pos_publisher.publish(self.delta_pos_msg)
+            # Position difference---------------------------------------------------------------------------------------
+            
+            # Orientation difference------------------------------------------------------------------------------------
+            # Current orientation---------------------------------------------------------------------------------------
+            current_ori_array = (curr_ori.x,
+                                curr_ori.y,
+                                curr_ori.z,
+                                curr_ori.w)
+            
+            current_euler = euler_from_quaternion(current_ori_array)
+            # Current orientation---------------------------------------------------------------------------------------
+            self.desired_euler = self.desired_euler + (numpy.asarray(self.desired_velocity_rot_transformed)/self.publish_rate)
+            
+            # print("self.desired_euler[2]")
+            # print(self.desired_euler[2])
+            
+            delta_ori = numpy.array([0.0,0.0,0.0])
+            
+            delta_ori[0] = self.desired_euler[0] - current_euler[0]
+            delta_ori[1] = self.desired_euler[1] - current_euler[1]
+            delta_ori[2] = self.desired_euler[2] - current_euler[2]
+            
+            for rot in range(len(delta_ori)):
+                if abs(delta_ori[rot]) > 3.14: 
+                    delta_ori[rot] = delta_ori[rot] - numpy.sign(delta_ori[rot]) * 6.28
+            
+            print("numpy.linalg.norm(delta_ori)")
+            print(numpy.linalg.norm(delta_ori))
+            
+
+            self.delta_ori_msg.data = delta_ori
             self.delta_ori_publisher.publish(self.delta_ori_msg)
-       
+            
+            
+            # print("self.delta_ori")
+            # print(self.delta_ori)
+            
+            # Orientation difference------------------------------------------------------------------------------------
+            
         # For measurements----------------------------------------------------------------------------------------------
-
-
-
-
 
             #* Check for workspace violation
             self.check_workspace_violation(self.workspace_violation_limit)
@@ -472,6 +498,7 @@ class franka_hardware_node():
         world_cartesian_velocity_trans.vector.y = desired_velocity.linear.y + self.world_trajectory_velocity[1]
         world_cartesian_velocity_trans.vector.z = desired_velocity.linear.z + self.world_trajectory_velocity[2]
 
+        self.world_vel_trans_global = world_cartesian_velocity_trans
         #Transform cartesian_velocity translation from 'world' frame to 'panda_link0' frame 
         panda_link0_cartesian_velocity_trans = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_trans)
 
@@ -482,6 +509,7 @@ class franka_hardware_node():
         world_cartesian_velocity_rot.vector.y = desired_velocity.angular.y
         world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
 
+        self.world_vel_rot_global = world_cartesian_velocity_rot
         #Transform cartesian_velocity rotation from 'world' frame to 'panda_link0' frame 
         panda_link0_cartesian_velocity_rot = self.tf_listener.transformVector3('panda_link0',world_cartesian_velocity_rot)
 
