@@ -279,12 +279,15 @@ class franka_hardware_node():
             self.goal_pos = (self.goal_pos + movement_trans)
             
             # Calculate position and orientation difference
-            self.delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
+            delta_pos = (self.goal_pos - curr_pos).reshape([3,1])
             
-            # print("self.delta_pos")
-            # print(self.delta_pos)
+            print("delta_pos")
+            print(numpy.linalg.norm(delta_pos))
             
-            self.delta_pos_msg.data = self.delta_pos
+            # print("delta_pos")
+            # print(delta_pos)
+            
+            self.delta_pos_msg.data = delta_pos
             self.delta_pos_publisher.publish(self.delta_pos_msg)
             # Position difference---------------------------------------------------------------------------------------
             
@@ -312,8 +315,8 @@ class franka_hardware_node():
                 if abs(delta_ori[rot]) > 3.14: 
                     delta_ori[rot] = delta_ori[rot] - numpy.sign(delta_ori[rot]) * 6.28
             
-            print("numpy.linalg.norm(delta_ori)")
-            print(numpy.linalg.norm(delta_ori))
+            # print("numpy.linalg.norm(delta_ori)")
+            # print(numpy.linalg.norm(delta_ori))
             
 
             self.delta_ori_msg.data = delta_ori
