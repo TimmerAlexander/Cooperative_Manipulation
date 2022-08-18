@@ -19,7 +19,7 @@
 import sys, copy, numpy, math, rospy, tf, tf2_ros, moveit_commander
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, TransformStamped, PoseStamped
-from std_msgs.msg import Float64MultiArray, Float32
+from std_msgs.msg import Float64MultiArray, Float32, Bool
 from cooperative_manipulation_controllers.msg import SingularityAvoidance, WorkspaceViolation
 
 
@@ -202,6 +202,8 @@ class ur_admittance_controller():
         self.delta_pos_msg = Float64MultiArray()
         self.delta_ori_msg = Float64MultiArray()
         self.sigma_msg = Float32()
+        self.singularity_msg = Bool()
+        self.offset_msg = Bool()
         
         self.delta_pos_publisher = rospy.Publisher(
                 '/' + self.namespace + '/measurement/delta_pos',
@@ -218,6 +220,18 @@ class ur_admittance_controller():
         self.sigma_publisher = rospy.Publisher(
                 '/' + self.namespace + '/measurement/sigma',
                 Float32,
+                tcp_nodelay=True,
+                queue_size=1)
+        
+        self.sigularity_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/sigularity',
+                Bool,
+                tcp_nodelay=True,
+                queue_size=1)
+        
+        self.offset_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/reduce_offset',
+                Bool,
                 tcp_nodelay=True,
                 queue_size=1)
 
@@ -692,7 +706,6 @@ class ur_admittance_controller():
             self.delta_pos_msg.data = pose_trans_diff
             self.delta_ori_msg.data = pose_rot_diff
 
-        
             self.delta_pos_publisher.publish(self.delta_pos_msg)
             self.delta_ori_publisher.publish(self.delta_ori_msg)
             # For measurements------------------------------------------------------------------------------------------
@@ -721,20 +734,20 @@ class ur_admittance_controller():
             self.target_cartesian_velocity[4] = self.base_link_desired_velocity[4] + self.admittance_velocity[4]
             self.target_cartesian_velocity[5] = self.base_link_desired_velocity[5] + self.admittance_velocity[5]
 
-            # * Check self.target_cartesian_velocity for the max velocity limits
-            # Calculate the norm of target_cartesian_velocity (trans and rot)
-            target_cartesian_trans_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[0],2) + pow(self.target_cartesian_velocity[1],2) + pow(self.target_cartesian_velocity[2],2))
+            # # * Check self.target_cartesian_velocity for the max velocity limits
+            # # Calculate the norm of target_cartesian_velocity (trans and rot)
+            # target_cartesian_trans_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[0],2) + pow(self.target_cartesian_velocity[1],2) + pow(self.target_cartesian_velocity[2],2))
             
-            target_cartesian_rot_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[3],2) + pow(self.target_cartesian_velocity[4],2) + pow(self.target_cartesian_velocity[5],2))
+            # target_cartesian_rot_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[3],2) + pow(self.target_cartesian_velocity[4],2) + pow(self.target_cartesian_velocity[5],2))
             
-            #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
-            if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
-                for i in range(3):
-                    self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
+            # #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
+            # if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
+            #     for i in range(3):
+            #         self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
                     
-            if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
-                for i in range(3,6):
-                    self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
+            # if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
+            #     for i in range(3,6):
+            #         self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
                     
             # * Get the current joint states 
             self.current_joint_states_array = self.group.get_current_joint_values() 
@@ -770,12 +783,12 @@ class ur_admittance_controller():
                         else:
                             self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
 
-            if  self.singularity_entry_threshold < sigma_min < self.singularity_exit_threshold and self.bool_singularity == True:
-                self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+            # if  self.singularity_entry_threshold < sigma_min < self.singularity_exit_threshold and self.bool_singularity == True:
+            #     self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
 
                 
             # If a singularity was detected but the singularity_counter is null, 
-            if sigma_min > self.singularity_exit_threshold and self.bool_singularity == True:
+            if sigma_min > self.singularity_entry_threshold and self.bool_singularity == True:
 
                 #* Reset the bool_singularity and acitivate the bool_reduce_singularity_offset
                 self.bool_singularity = False
@@ -801,6 +814,18 @@ class ur_admittance_controller():
                     rospy.loginfo("Endeffector trans difference %f [m] is samller then threshold %f [m]",numpy.linalg.norm(pose_trans_diff),self.singularity_trans_offset_accuracy)
                     rospy.loginfo("Endeffector rot difference %f [rad] is samller then threshold %f [rad]",numpy.linalg.norm(pose_rot_diff),self.singularity_rot_offset_accuracy)
 
+
+
+            # For measurements------------------------------------------------------------------------------------------
+            self.singularity_msg.data = self.bool_singularity 
+            self.sigularity_publisher.publish(self.singularity_msg)
+            
+            
+            
+            self.offset_msg.data = self.bool_reduce_singularity_offset
+            self.offset_publisher.publish(self.offset_msg)
+
+            # For measurements------------------------------------------------------------------------------------------
 # * Singulartiy avoidance: OLMM-----------------------------------------------------------------------------------------
             #* Subract the target cartesian velocity with the singularity avoidance velocity
             if self.bool_singularity == True and self.singularity_stop == False:
