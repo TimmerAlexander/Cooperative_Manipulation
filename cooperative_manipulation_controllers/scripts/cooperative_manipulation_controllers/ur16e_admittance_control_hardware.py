@@ -16,6 +16,7 @@
     Output: 
     * Target joint velocity: self.target_joint_velocity (In 'base_link' frame)
 """
+from cmath import pi
 import sys, copy, numpy, math, rospy, tf, tf2_ros, moveit_commander
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from geometry_msgs.msg import WrenchStamped, Vector3Stamped, Twist, TransformStamped, PoseStamped
@@ -96,11 +97,13 @@ class ur_admittance_controller():
         
         self.singularity_stop = False
         self.singularity_stop_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
-         
-         
+        
+        self.singularity_exit_threshold = 0.06 
+        
         self.singularity_entry_threshold = 0.05
-        self.singularity_exit_threshold = 0.06
-        self.singularity_min_threshold = 0.01
+        
+        self.singularity_min_threshold = 0.015
+        self.singularity_stop_threshold = 0.01
         
         self.adjusting_scalar = 0.0
         
@@ -341,7 +344,7 @@ class ur_admittance_controller():
                                     target_frame_euler[2]])  
         return target_pose
     
-    def scalar_adjusting_function(self,current_sigma,):
+    def scalar_adjusting_function(self,current_sigma):
         """Compute the adjusting scalar for the OLMM. 3 varaitions to calculate the adjusting scalar are presented.
 
             Source: QIU, Changwu; CAO, Qixin; MIAO, Shouhong. An on-line task modification method for singularity avoidance of robot manipulators. Robotica, 2009, 27. Jg., Nr. 4, S. 539-546.
@@ -362,8 +365,10 @@ class ur_admittance_controller():
         # adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(1/2))
         # 3.
         adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(3/2))
+        # 4.
+        adjusting_scalar = 0.5 * (1 + math.cos(pi*((current_sigma-self.singularity_min_threshold)/(self.singularity_entry_threshold - self.singularity_min_threshold))))
         
-        return adjusting_scalar
+        return adjusting_scalar 
     
     def transform_vector(self,source_frame: str,target_frame: str,input_vector: numpy.array):
         """ 
@@ -719,12 +724,12 @@ class ur_admittance_controller():
                     self.wrench_diff[wrench] = 0.0
             
             # * Calculate velocity from wrench difference and admittance in 'wrist_3_link' frame
-            self.admittance_velocity[0] = (self.wrench_diff[0] / self.A_trans_x) + pose_trans_diff[0] * self.Kp_trans_x 
-            self.admittance_velocity[1] = (self.wrench_diff[1] / self.A_trans_y) + pose_trans_diff[1] * self.Kp_trans_y 
-            self.admittance_velocity[2] = (self.wrench_diff[2] / self.A_trans_z) + pose_trans_diff[2] * self.Kp_trans_z
-            self.admittance_velocity[3] = (self.wrench_diff[3] / self.A_rot_x) + pose_rot_diff[0] * self.Kp_rot_x 
-            self.admittance_velocity[4] = (self.wrench_diff[4] / self.A_rot_y) + pose_rot_diff[1] * self.Kp_rot_y 
-            self.admittance_velocity[5] = (self.wrench_diff[5] / self.A_rot_z) + pose_rot_diff[2] * self.Kp_rot_z        
+            self.admittance_velocity[0] = (self.wrench_diff[0]  + (pose_trans_diff[0] * self.Kp_trans_x * self.A_trans_x))/ self.A_trans_x
+            self.admittance_velocity[1] = (self.wrench_diff[1] + (pose_trans_diff[1] * self.Kp_trans_y * self.A_trans_y)) / self.A_trans_y 
+            self.admittance_velocity[2] = (self.wrench_diff[2] + (pose_trans_diff[2] * self.Kp_trans_z * self.A_trans_z)) / self.A_trans_z 
+            self.admittance_velocity[3] = (self.wrench_diff[3] + (pose_rot_diff[0] * self.Kp_rot_x * self.A_rot_x )) / self.A_rot_x 
+            self.admittance_velocity[4] = (self.wrench_diff[4] + (pose_rot_diff[1] * self.Kp_rot_y * self.A_rot_y)) / self.A_rot_y
+            self.admittance_velocity[5] = (self.wrench_diff[5] + (pose_rot_diff[2] * self.Kp_rot_z * self.A_rot_z )) / self.A_rot_z    
 
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
             self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity[0]
@@ -769,20 +774,26 @@ class ur_admittance_controller():
 
             # For measurements------------------------------------------------------------------------------------------
 
-
+            
             for sigma in range(len(s)):
+                
                     # If a singularity is detected
                     if s[sigma] < self.singularity_entry_threshold:
                         if self.bool_singularity == False:
                             self.bool_singularity = True
                             rospy.loginfo("Activate OLMM")
                             
-                        if sigma_min < self.singularity_min_threshold:
+                        print(sigma_min)
+                        if s[sigma] < self.singularity_stop_threshold:
                             rospy.loginfo("Singularity stop activated! Sigma %f is smaller then threshol %f",sigma_min,self.singularity_min_threshold)
                             self.singularity_stop = True
                         else:
-                            self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                            
+                            if s[sigma] > self.singularity_min_threshold:
+                                self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
 
+                            else:
+                                self.singularity_avoidance_velocity = numpy.dot(1,numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
             # if  self.singularity_entry_threshold < sigma_min < self.singularity_exit_threshold and self.bool_singularity == True:
             #     self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
 
