@@ -43,12 +43,12 @@ class ur_admittance_controller():
         self.A_rot_y = 100
         self.A_rot_z = 100
         # Kp gains
-        self.Kp_trans_x = 1.0
-        self.Kp_trans_y = 1.0
-        self.Kp_trans_z = 1.0
-        self.Kp_rot_x = 0.01
-        self.Kp_rot_y = 0.01
-        self.Kp_rot_z = 0.01
+        self.Kp_trans_x = 1.25
+        self.Kp_trans_y = 1.25
+        self.Kp_trans_z = 1.25
+        self.Kp_rot_x = 0.0125
+        self.Kp_rot_y = 0.0125
+        self.Kp_rot_z = 0.0125
         #* Min and max limits for the cartesian velocity (trans/rot) [m/s]
         self.cartesian_velocity_trans_max_limit = 0.1
         self.cartesian_velocity_rot_max_limit = 0.1
@@ -58,9 +58,9 @@ class ur_admittance_controller():
         self.wrench_filter_force_y = 1.2
         self.wrench_filter_force_z = 1.2
         # Torque treshold 
-        self.wrench_filter_torque_x = 1.0
-        self.wrench_filter_torque_y = 1.0
-        self.wrench_filter_torque_z = 1.0
+        self.wrench_filter_torque_x = 0.8
+        self.wrench_filter_torque_y = 0.8
+        self.wrench_filter_torque_z = 0.8
         #* Average filter
         # Lists to store the wrench values
         self.average_filter_list_force_x = []
@@ -94,6 +94,8 @@ class ur_admittance_controller():
         self.workspace_violation = False
         #* Singulariy avoidance: OLMM
         self.singularity_velocity_world = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
+        
+        self.reconstruct_trajektory = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         
         self.singularity_stop = False
         self.singularity_stop_velocity = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -147,8 +149,8 @@ class ur_admittance_controller():
         # Wait for transformations from 'world' to 'ur16e_gripper' and 'world' to 'panda_EE'
         rospy.loginfo("Wait for transformation 'world' to 'ur16e_gripper'.")
         self.tf_listener.waitForTransform("world","ur16e_gripper", rospy.Time(), rospy.Duration(10.0))
-        # rospy.loginfo("Wait for transformation 'world' to 'panda_EE'.")
-        # self.tf_listener.waitForTransform("world","panda_EE", rospy.Time(), rospy.Duration(60.0))
+        rospy.loginfo("Wait for transformation 'world' to 'panda_EE'.")
+        self.tf_listener.waitForTransform("world","panda_EE", rospy.Time(), rospy.Duration(60.0))
 
         # * Get namespace for topics from launch file
         self.namespace = rospy.get_param("~ur_ns")
@@ -448,77 +450,77 @@ class ur_admittance_controller():
 
         # Calculate the trajectory velocity of the manipulator for a rotation of the object-----------------------------
         # Get ur16e_current_position, ur16e_current_quaternion of the 'wrist_3_link' in frame in the 'world' frame 
-        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "wrist_3_link")
-        # ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "wrist_3_link")
+        ur16e_current_position, ur16e_current_quaternion = self.tf_listener.lookupTransform("/world", "/wrist_3_link", ur16e_tf_time)
 
-        # # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'world' frame 
-        # ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "ur16e_gripper")
-        # ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
+        # Get ur16e_current_position, ur16e_current_quaternion of the 'ur16e_gripper' in frame in the 'world' frame 
+        ur16e_tf_time = self.tf_listener.getLatestCommonTime("world", "ur16e_gripper")
+        ur16e_gripper_position, ur16e_gripper_quaternion = self.tf_listener.lookupTransform("/world", "/ur16e_gripper", ur16e_tf_time)
 
-        # # # Get self.panda_current_position, self.panda_current_quaternion of the 'panda_EE' frame in the 'world' frame 
-        # panda_tf_time = self.tf_listener.getLatestCommonTime("world", "panda_EE")
-        # panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("world", "panda_EE", panda_tf_time)
+        # # Get self.panda_current_position, self.panda_current_quaternion of the 'panda_EE' frame in the 'world' frame 
+        panda_tf_time = self.tf_listener.getLatestCommonTime("world", "panda_EE")
+        panda_gripper_position, panda_gripper_quaternion = self.tf_listener.lookupTransform("world", "panda_EE", panda_tf_time)
 
-        # # Object rotation around x axis 
-        # if desired_velocity.angular.x != 0.0:
-        #     ur16e_current_position_x = numpy.array([
-        #         0.0,
-        #         ur16e_current_position[1],
-        #         ur16e_current_position[2]])
+        # Object rotation around x axis 
+        if desired_velocity.angular.x != 0.0:
+            ur16e_current_position_x = numpy.array([
+                0.0,
+                ur16e_current_position[1],
+                ur16e_current_position[2]])
             
-        #     self.robot_distance_x = numpy.array([0.0,
-        #         panda_gripper_position[1] - ur16e_gripper_position[1],
-        #         panda_gripper_position[2] - ur16e_gripper_position[2],
-        #     ])
-            
-            
-        #     center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_gripper_position
-        #     world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
-        #     world_radius_x = ur16e_current_position_x - center_x
-        #     self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
-        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
+            self.robot_distance_x = numpy.array([0.0,
+                panda_gripper_position[1] - ur16e_gripper_position[1],
+                panda_gripper_position[2] - ur16e_gripper_position[2],
+            ])
             
             
-        # # Object rotation around y axis 
-        # if desired_velocity.angular.y != 0.0: 
-        #     ur16e_current_position_y = numpy.array([
-        #         ur16e_current_position[0],
-        #         0.0,
-        #         ur16e_current_position[2]
-        #         ]) 
+            center_x = (numpy.linalg.norm(self.robot_distance_x)/2) * (1/numpy.linalg.norm(self.robot_distance_x)) * self.robot_distance_x + ur16e_gripper_position
+            world_desired_rotation_x = numpy.array([desired_velocity.angular.x,0.0,0.0])
+            world_radius_x = ur16e_current_position_x - center_x
+            self.world_trajectory_velocity_x = numpy.cross(world_desired_rotation_x,world_radius_x)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_x
             
-        #     self.robot_distance_y = numpy.array([
-        #         panda_gripper_position[0] - ur16e_gripper_position[0],
-        #         0.0,
-        #         panda_gripper_position[2] - ur16e_gripper_position[2],
-        #         ])
             
-        #     center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
-        #     world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
-        #     world_radius_y = ur16e_current_position_y - center_y
-        #     self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
-        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
+        # Object rotation around y axis 
+        if desired_velocity.angular.y != 0.0: 
+            ur16e_current_position_y = numpy.array([
+                ur16e_current_position[0],
+                0.0,
+                ur16e_current_position[2]
+                ]) 
+            
+            self.robot_distance_y = numpy.array([
+                panda_gripper_position[0] - ur16e_gripper_position[0],
+                0.0,
+                panda_gripper_position[2] - ur16e_gripper_position[2],
+                ])
+            
+            center_y = (numpy.linalg.norm(self.robot_distance_y)/2) * (1/numpy.linalg.norm(self.robot_distance_y)) * self.robot_distance_y + ur16e_gripper_position
+            world_desired_rotation_y = numpy.array([0.0,desired_velocity.angular.y,0.0])
+            world_radius_y = ur16e_current_position_y - center_y
+            self.world_trajectory_velocity_y = numpy.cross(world_desired_rotation_y,world_radius_y)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_y 
 
-        # # Object rotation around z axis 
-        # if desired_velocity.angular.z != 0.0:
-        #     ur16e_current_position_z = numpy.array([
-        #         ur16e_current_position[0],
-        #         ur16e_current_position[1],
-        #         0.0,
-        #         ]) 
+        # Object rotation around z axis 
+        if desired_velocity.angular.z != 0.0:
+            ur16e_current_position_z = numpy.array([
+                ur16e_current_position[0],
+                ur16e_current_position[1],
+                0.0,
+                ]) 
                             
-        #     self.robot_distance_z = numpy.array([
-        #         panda_gripper_position[0] - ur16e_gripper_position[0],
-        #         panda_gripper_position[1] - ur16e_gripper_position[1],
-        #         0.0,
-        #         ])
+            self.robot_distance_z = numpy.array([
+                panda_gripper_position[0] - ur16e_gripper_position[0],
+                panda_gripper_position[1] - ur16e_gripper_position[1],
+                0.0,
+                ])
             
             
-        #     center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
-        #     world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
-        #     world_radius_z = ur16e_current_position_z - center_z
-        #     self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
-        #     self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z     
+            center_z = (numpy.linalg.norm(self.robot_distance_z)/2) * (1/numpy.linalg.norm(self.robot_distance_z)) * self.robot_distance_z + ur16e_gripper_position
+            world_desired_rotation_z = numpy.array([0.0,0.0,desired_velocity.angular.z])
+            world_radius_z = ur16e_current_position_z - center_z
+            self.world_trajectory_velocity_z = numpy.cross(world_desired_rotation_z,world_radius_z)
+            self.world_trajectory_velocity = self.world_trajectory_velocity + self.world_trajectory_velocity_z     
             
 
 
@@ -702,11 +704,17 @@ class ur_admittance_controller():
             pose_trans_diff = pose_diff[0:3]
             pose_rot_diff = pose_diff[-3:]
             
+            
             # Calcuate the correct orientation
             for rot in range(len(pose_rot_diff)):
                 if abs(pose_rot_diff[rot]) > 3.14: 
                     pose_rot_diff[rot] = pose_rot_diff[rot] - numpy.sign(pose_rot_diff[rot]) * 6.28
                     
+            # print("pose_trans_diff ")
+            # print(pose_trans_diff )
+            # print("pose_rot_diff")
+            # print(pose_rot_diff)
+            
             # For measurements------------------------------------------------------------------------------------------
             self.delta_pos_msg.data = pose_trans_diff
             self.delta_ori_msg.data = pose_rot_diff
@@ -783,7 +791,7 @@ class ur_admittance_controller():
                             self.bool_singularity = True
                             rospy.loginfo("Activate OLMM")
                             
-                        print(sigma_min)
+                        #print(sigma_min)
                         if s[sigma] < self.singularity_stop_threshold:
                             rospy.loginfo("Singularity stop activated! Sigma %f is smaller then threshol %f",sigma_min,self.singularity_min_threshold)
                             self.singularity_stop = True
@@ -814,19 +822,41 @@ class ur_admittance_controller():
             self.singularity_velocity_msg.singularity_stop = self.singularity_stop
             self.singularity_velocity_msg.singularity_velocity = self.singularity_velocity_world
             self.singularity_velocity_pub.publish(self.singularity_velocity_msg)  
-            
+                
             #* Check for trajectory differences:
             if self.bool_reduce_singularity_offset == True:
-                self.singularity_velocity_world = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0]) 
+                print("numpy.linalg.norm(pose_trans_diff)")
+                print(numpy.linalg.norm(pose_trans_diff))
+                print("numpy.linalg.norm(pose_rot_diff)")
+                print(numpy.linalg.norm(pose_rot_diff))
+                
+                self.reconstruct_trajektory[0] = -(pose_trans_diff[0] * 1.5 * self.Kp_trans_x * self.A_trans_x)/ self.A_trans_x
+                self.reconstruct_trajektory[1] = -(pose_trans_diff[1] * 1.5 * self.Kp_trans_y * self.A_trans_y)/ self.A_trans_y
+                self.reconstruct_trajektory[2] = -(pose_trans_diff[2] * 1.5 * self.Kp_trans_z * self.A_trans_z)/ self.A_trans_z
+                
+                
+                self.reconstruct_trajektory[3] = -(pose_rot_diff[0] * 1.5 * self.Kp_rot_x * self.A_rot_x ) / self.A_rot_x 
+                self.reconstruct_trajektory[4] = -(pose_rot_diff[1] * 1.5 * self.Kp_rot_y * self.A_rot_y ) / self.A_rot_y 
+                self.reconstruct_trajektory[5] = -(pose_rot_diff[2] * 1.5 * self.Kp_rot_z * self.A_rot_z ) / self.A_rot_z 
+                
+                #* Transform the singularity avoidance velocity into 'world' frame
+                self.singularity_velocity_world = self.transform_vector('base_link','world',self.reconstruct_trajektory)
+                #* Publish the singularity avoidance velocity to rosmaster
+                self.singularity_velocity_msg.singularity_stop = self.singularity_stop
+                self.singularity_velocity_msg.singularity_velocity = self.singularity_velocity_world
+                self.singularity_velocity_pub.publish(self.singularity_velocity_msg)  
+                
                 if numpy.linalg.norm(pose_trans_diff) < self.singularity_trans_offset_accuracy and numpy.linalg.norm(pose_rot_diff) < self.singularity_rot_offset_accuracy:
                     
                     self.bool_reduce_singularity_offset = False
                     
+                    self.singularity_velocity_world = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0]) 
+                    
                     rospy.loginfo("Endeffector trans difference %f [m] is samller then threshold %f [m]",numpy.linalg.norm(pose_trans_diff),self.singularity_trans_offset_accuracy)
-                    rospy.loginfo("Endeffector rot difference %f [rad] is samller then threshold %f [rad]",numpy.linalg.norm(pose_rot_diff),self.singularity_rot_offset_accuracy)
-
-
-
+                    rospy.loginfo("Endeffector rot difference %f [rad] is samller then threshold %f [rad]",numpy.linalg.norm(pose_rot_diff),self.singularity_rot_offset_accuracy) 
+                
+                
+            
             # For measurements------------------------------------------------------------------------------------------
             self.singularity_msg.data = self.bool_singularity 
             self.sigularity_publisher.publish(self.singularity_msg)
