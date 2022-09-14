@@ -31,7 +31,7 @@ class ur_admittance_controller():
         self.publish_rate = 100
         #* Admittance controler values
         # Array with the contact forces/torques
-        self.wrench_contact = numpy.array([1.0,1.0,1.0,0.5,0.5,0.5])
+        self.wrench_contact = numpy.array([1.0,1.0,1.0,0.1,0.1,0.1])
         #self.wrench_contact = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
         # Array to store the wrench difference
         self.wrench_diff = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0])
@@ -46,21 +46,21 @@ class ur_admittance_controller():
         self.Kp_trans_x = 1.25
         self.Kp_trans_y = 1.25
         self.Kp_trans_z = 1.25
-        self.Kp_rot_x = 0.0125
-        self.Kp_rot_y = 0.0125
-        self.Kp_rot_z = 0.0125
+        self.Kp_rot_x = 0.125
+        self.Kp_rot_y = 0.125
+        self.Kp_rot_z = 0.125
         #* Min and max limits for the cartesian velocity (trans/rot) [m/s]
         self.cartesian_velocity_trans_max_limit = 0.1
         self.cartesian_velocity_rot_max_limit = 0.1
         #* Bandpass filter
         # Force threshold 
-        self.wrench_filter_force_x = 1.2
-        self.wrench_filter_force_y = 1.2
-        self.wrench_filter_force_z = 1.2
+        self.wrench_filter_force_x = 0.7
+        self.wrench_filter_force_y = 0.7
+        self.wrench_filter_force_z = 0.7
         # Torque treshold 
-        self.wrench_filter_torque_x = 0.8
-        self.wrench_filter_torque_y = 0.8
-        self.wrench_filter_torque_z = 0.8
+        self.wrench_filter_torque_x = 0.1
+        self.wrench_filter_torque_y = 0.1
+        self.wrench_filter_torque_z = 0.1
         #* Average filter
         # Lists to store the wrench values
         self.average_filter_list_force_x = []
@@ -544,16 +544,16 @@ class ur_admittance_controller():
         self.world_cartesian_velocity_rot.vector.z = desired_velocity.angular.z
         
         # Transform cartesian_velocity rotation from 'world' frame to 'base_link' frame
-        self.base_link_cartesian_desired_velocity_rot = self.tf_listener.transformVector3('base_link',self.    world_cartesian_velocity_rot)
+        self.base_link_cartesian_desired_velocity_rot = self.tf_listener.transformVector3('base_link',self.world_cartesian_velocity_rot)
         
         # Converse cartesian_velocity from vector3 to numpy.array
         self.base_link_desired_velocity = numpy.array([
             self.base_link_cartesian_desired_velocity_trans.vector.x,
             self.base_link_cartesian_desired_velocity_trans.vector.y,
             self.base_link_cartesian_desired_velocity_trans.vector.z,
-            self.base_link_cartesian_desired_velocity_rot.vector.x,
-            self.base_link_cartesian_desired_velocity_rot.vector.y,
-            self.base_link_cartesian_desired_velocity_rot.vector.z
+            self.base_link_cartesian_desired_velocity_rot.vector.x ,
+            self.base_link_cartesian_desired_velocity_rot.vector.y ,
+            self.base_link_cartesian_desired_velocity_rot.vector.z 
             ])
         
         # Set the trajectory velocity for an object rotation to zero
@@ -619,38 +619,47 @@ class ur_admittance_controller():
         
 
         #* Band-passfilter
-        if numpy.abs(self.average_wrench_array_transformed[0]) < self.wrench_filter_force_x:
-            self.average_wrench_ext_filtered_array[0] = 0.0
-        else: 
-            self.average_wrench_ext_filtered_array[0] = self.average_wrench_array_transformed[0] - numpy.sign(self.average_wrench_array_transformed[0]) * self.wrench_filter_force_x
-            
-        if numpy.abs(self.average_wrench_array_transformed[1]) < self.wrench_filter_force_y:
-                self.average_wrench_ext_filtered_array[1] = 0.0
-        else: 
-            self.average_wrench_ext_filtered_array[1] = self.average_wrench_array_transformed[1] - numpy.sign(self.average_wrench_array_transformed[1]) * self.wrench_filter_force_y
+        if numpy.linalg.norm(self.base_link_desired_velocity) == 0.0:
+            #print("bandsperre")
+            if numpy.abs(self.average_wrench_array_transformed[0]) < self.wrench_filter_force_x:
+                self.average_wrench_ext_filtered_array[0] = 0.0
+            else: 
+                self.average_wrench_ext_filtered_array[0] = self.average_wrench_array_transformed[0] - numpy.sign(self.average_wrench_array_transformed[0]) * self.wrench_filter_force_x
+                
+            if numpy.abs(self.average_wrench_array_transformed[1]) < self.wrench_filter_force_y:
+                    self.average_wrench_ext_filtered_array[1] = 0.0
+            else: 
+                self.average_wrench_ext_filtered_array[1] = self.average_wrench_array_transformed[1] - numpy.sign(self.average_wrench_array_transformed[1]) * self.wrench_filter_force_y
 
-        if numpy.abs(self.average_wrench_array_transformed[2]) < self.wrench_filter_force_z:
-            self.average_wrench_ext_filtered_array[2] = 0.0
-        else: 
-           self.average_wrench_ext_filtered_array[2] = self.average_wrench_array_transformed[2] - numpy.sign(self.average_wrench_array_transformed[2]) *  self.wrench_filter_force_z
-           
-        if numpy.abs(self.average_wrench_array_transformed[3]) < self.wrench_filter_torque_x:
-            self.average_wrench_ext_filtered_array[3] = 0.0
-        else: 
-            self.average_wrench_ext_filtered_array[3] = self.average_wrench_array_transformed[3]- numpy.sign(self.average_wrench_array_transformed[3]) * self.wrench_filter_torque_x
+            if numpy.abs(self.average_wrench_array_transformed[2]) < self.wrench_filter_force_z:
+                self.average_wrench_ext_filtered_array[2] = 0.0
+            else: 
+                self.average_wrench_ext_filtered_array[2] = self.average_wrench_array_transformed[2] - numpy.sign(self.average_wrench_array_transformed[2]) *  self.wrench_filter_force_z
             
-        if numpy.abs(self.average_wrench_array_transformed[4]) < self.wrench_filter_torque_y:
-            self.average_wrench_ext_filtered_array[4] = 0.0
-        else: 
-            self.average_wrench_ext_filtered_array[4] = self.average_wrench_array_transformed[4] - numpy.sign(self.average_wrench_array_transformed[4]) * self.wrench_filter_torque_y
-            
-        if numpy.abs(self.average_wrench_array_transformed[5]) < self.wrench_filter_torque_z:
-            self.average_wrench_ext_filtered_array[5] = 0.0
-        else: 
-            self.average_wrench_ext_filtered_array[5] = self.average_wrench_array_transformed[5] - numpy.sign(self.average_wrench_array_transformed[5]) * self.wrench_filter_torque_z
-            
+            if numpy.abs(self.average_wrench_array_transformed[3]) < self.wrench_filter_torque_x:
+                self.average_wrench_ext_filtered_array[3] = 0.0
+            else: 
+                self.average_wrench_ext_filtered_array[3] = self.average_wrench_array_transformed[3]- numpy.sign(self.average_wrench_array_transformed[3]) * self.wrench_filter_torque_x
+                
+            if numpy.abs(self.average_wrench_array_transformed[4]) < self.wrench_filter_torque_y:
+                self.average_wrench_ext_filtered_array[4] = 0.0
+            else: 
+                self.average_wrench_ext_filtered_array[4] = self.average_wrench_array_transformed[4] - numpy.sign(self.average_wrench_array_transformed[4]) * self.wrench_filter_torque_y
+                
+            if numpy.abs(self.average_wrench_array_transformed[5]) < self.wrench_filter_torque_z:
+                self.average_wrench_ext_filtered_array[5] = 0.0
+            else: 
+                self.average_wrench_ext_filtered_array[5] = self.average_wrench_array_transformed[5] - numpy.sign(self.average_wrench_array_transformed[5]) * self.wrench_filter_torque_z
+        else:
+            #print("no bandsperre")
+            self.average_wrench_ext_filtered_array[0] = self.average_wrench_array_transformed[0]
+            self.average_wrench_ext_filtered_array[1] = self.average_wrench_array_transformed[1]
+            self.average_wrench_ext_filtered_array[2] = self.average_wrench_array_transformed[2]
+            self.average_wrench_ext_filtered_array[3] = self.average_wrench_array_transformed[3]
+            self.average_wrench_ext_filtered_array[4] = self.average_wrench_array_transformed[4]
+            self.average_wrench_ext_filtered_array[5] = self.average_wrench_array_transformed[5]
     
-    
+        #print(self.average_wrench_ext_filtered_array)
     def control_thread(self):
         """ 
             This thread calculates and publishes the target joint velocity using and admittance controller.
@@ -687,12 +696,15 @@ class ur_admittance_controller():
             # Transform cartesian_velocity rotation from 'world' frame to 'tool0' frame
             self.tool0_velocity_rot = self.tf_listener.transformVector3('tool0',self.world_cartesian_velocity_rot)
             
+            print("self.tool0_velocity_rot")
+            print(self.tool0_velocity_rot)
+            
             tool0_velocity_rot_array = numpy.array([self.tool0_velocity_rot.vector.x,
                                                     self.tool0_velocity_rot.vector.y,
                                                     self.tool0_velocity_rot.vector.z])
             
             self.trajectory_EE_pose_array[3] = numpy.array(self.trajectory_EE_pose_array[3] + (tool0_velocity_rot_array[0]/self.publish_rate))
-            self.trajectory_EE_pose_array[4] = numpy.array(self.trajectory_EE_pose_array[4] - (tool0_velocity_rot_array[1]/self.publish_rate))
+            self.trajectory_EE_pose_array[4] = numpy.array(self.trajectory_EE_pose_array[4] + (tool0_velocity_rot_array[1]/self.publish_rate))
             self.trajectory_EE_pose_array[5] = numpy.array(self.trajectory_EE_pose_array[5] - (tool0_velocity_rot_array[2]/self.publish_rate))
             
             
@@ -712,8 +724,8 @@ class ur_admittance_controller():
                     
             # print("pose_trans_diff ")
             # print(pose_trans_diff )
-            # print("pose_rot_diff")
-            # print(pose_rot_diff)
+            print("pose_rot_diff")
+            print(pose_rot_diff)
             
             # For measurements------------------------------------------------------------------------------------------
             self.delta_pos_msg.data = pose_trans_diff
@@ -735,9 +747,14 @@ class ur_admittance_controller():
             self.admittance_velocity[0] = (self.wrench_diff[0]  + (pose_trans_diff[0] * self.Kp_trans_x * self.A_trans_x))/ self.A_trans_x
             self.admittance_velocity[1] = (self.wrench_diff[1] + (pose_trans_diff[1] * self.Kp_trans_y * self.A_trans_y)) / self.A_trans_y 
             self.admittance_velocity[2] = (self.wrench_diff[2] + (pose_trans_diff[2] * self.Kp_trans_z * self.A_trans_z)) / self.A_trans_z 
+            
+            # self.admittance_velocity[3] = ((pose_rot_diff[0] * self.Kp_rot_x * self.A_rot_x )) / self.A_rot_x 
+            # self.admittance_velocity[4] = ((pose_rot_diff[1] * self.Kp_rot_y * self.A_rot_y)) / self.A_rot_y
+            # self.admittance_velocity[5] = ((pose_rot_diff[2] * self.Kp_rot_z * self.A_rot_z )) / self.A_rot_z    
+            
             self.admittance_velocity[3] = (self.wrench_diff[3] + (pose_rot_diff[0] * self.Kp_rot_x * self.A_rot_x )) / self.A_rot_x 
             self.admittance_velocity[4] = (self.wrench_diff[4] + (pose_rot_diff[1] * self.Kp_rot_y * self.A_rot_y)) / self.A_rot_y
-            self.admittance_velocity[5] = (self.wrench_diff[5] + (pose_rot_diff[2] * self.Kp_rot_z * self.A_rot_z )) / self.A_rot_z    
+            self.admittance_velocity[5] = (self.wrench_diff[5] +  (pose_rot_diff[2] * self.Kp_rot_z * self.A_rot_z )) / self.A_rot_z
 
             # * Add the desired_velocity in 'base_link' frame and admittance velocity in 'base_link' frame
             self.target_cartesian_velocity[0] = self.base_link_desired_velocity[0] + self.admittance_velocity[0]
@@ -825,19 +842,20 @@ class ur_admittance_controller():
                 
             #* Check for trajectory differences:
             if self.bool_reduce_singularity_offset == True:
+                
                 print("numpy.linalg.norm(pose_trans_diff)")
                 print(numpy.linalg.norm(pose_trans_diff))
                 print("numpy.linalg.norm(pose_rot_diff)")
                 print(numpy.linalg.norm(pose_rot_diff))
                 
-                self.reconstruct_trajektory[0] = -(pose_trans_diff[0] * 1.5 * self.Kp_trans_x * self.A_trans_x)/ self.A_trans_x
-                self.reconstruct_trajektory[1] = -(pose_trans_diff[1] * 1.5 * self.Kp_trans_y * self.A_trans_y)/ self.A_trans_y
-                self.reconstruct_trajektory[2] = -(pose_trans_diff[2] * 1.5 * self.Kp_trans_z * self.A_trans_z)/ self.A_trans_z
+                # self.reconstruct_trajektory[0] = -(pose_trans_diff[0]  * self.Kp_trans_x * self.A_trans_x)/ self.A_trans_x
+                # self.reconstruct_trajektory[1] = -(pose_trans_diff[1]  * self.Kp_trans_y * self.A_trans_y)/ self.A_trans_y
+                # self.reconstruct_trajektory[2] = -(pose_trans_diff[2]  * self.Kp_trans_z * self.A_trans_z)/ self.A_trans_z
                 
                 
-                self.reconstruct_trajektory[3] = -(pose_rot_diff[0] * 1.5 * self.Kp_rot_x * self.A_rot_x ) / self.A_rot_x 
-                self.reconstruct_trajektory[4] = -(pose_rot_diff[1] * 1.5 * self.Kp_rot_y * self.A_rot_y ) / self.A_rot_y 
-                self.reconstruct_trajektory[5] = -(pose_rot_diff[2] * 1.5 * self.Kp_rot_z * self.A_rot_z ) / self.A_rot_z 
+                # self.reconstruct_trajektory[3] = -(pose_rot_diff[0]  * self.Kp_rot_x * self.A_rot_x ) / self.A_rot_x 
+                # self.reconstruct_trajektory[4] = -(pose_rot_diff[1]  * self.Kp_rot_y * self.A_rot_y ) / self.A_rot_y 
+                # self.reconstruct_trajektory[5] = -(pose_rot_diff[2]  * self.Kp_rot_z * self.A_rot_z ) / self.A_rot_z 
                 
                 #* Transform the singularity avoidance velocity into 'world' frame
                 self.singularity_velocity_world = self.transform_vector('base_link','world',self.reconstruct_trajektory)
