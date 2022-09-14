@@ -23,6 +23,7 @@ class cooperative_movement():
         self.acc_vel = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.current_vel = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.acceleration_duration = 25 #[Hz] = 0.02 [s]
+        self.vel_cmd_msg = Float64MultiArray()
 
         
     def __init__(self):
@@ -38,24 +39,63 @@ class cooperative_movement():
         
         self.pub_world_trajectory = rospy.Publisher("/cooperative_manipulation/world_trajectory", Float64MultiArray, queue_size=1)
         
+        
+        self.cmd_vel_publihser = rospy.Publisher('/measurement/cmd_vel',Float64MultiArray,tcp_nodelay=True,queue_size=1)
+        
         rate = rospy.Rate(self.publish_rate)
         
         rospy.loginfo("Cooperative movement starts now!")
         
+        rospy.loginfo("Wait until program starts!")
+        rospy.sleep(0.5)
         
         self.stage_init(rate,1.0)
         
-        self.velocity_command(1,rate,8.0,0.0,0.05,0.0,0.0,0.0,0.0)
-        self.velocity_command(2,rate,8.0,0.0,-0.05,0.0,0.0,0.03,0.0)
-        self.velocity_command(3,rate,8.0,0.0,0.0,0.0,0.0,-0.03,0.0)
-        self.velocity_command(4,rate,5.0,0.04,0.0,0.0,0.0,0.0,0.0)
-        self.velocity_command(5,rate,5.0,0.0,-0.03,-0.04,0.0,0.0,0.0)
-        self.velocity_command(6,rate,5.0,-0.04,0.03,0.0,0.0,0.0,0.0)
-        self.velocity_command(7,rate,10.0,0.0,0.0,0.02,0.0,0.0,0.0)
-        self.velocity_command(8,rate,12.0,0.0,0.0,0.0,0.0,0.0,0.04)
-        self.velocity_command(9,rate,12.0,0.0,0.0,0.0,0.0,0.0,-0.04)
+        self.velocity_command(1,rate,5.0,0.0,0.0,0.0,0.0,0.05,0.0)
+        self.velocity_command(2,rate,5.0,0.0,0.0,0.0,0.0,-0.05,0.0)
+        # rotation around y
+        self.velocity_command(3,rate,5.0,0.0,0.0,0.0,0.0,0.0,0.06)
+        self.velocity_command(4,rate,5.0,0.0,0.0,0.0,0.0,0.0,-0.06)
+        # rotation around y + trans y
+        self.velocity_command(5,rate,6.0,0.0,0.06,0.0,0.0,0.04,0.0)
+        self.velocity_command(6,rate,8.0,0.0,-0.045,0.0,0.0,-0.03,0.0)
+        # rotation around z + trans y
+        self.velocity_command(7,rate,4.0,0.0,-0.04,0.0,0.0,0.0,+0.06)
+        self.velocity_command(8,rate,8.0,0.0,+0.02,0.0,0.0,0.0,-0.03)
+    
+        self.velocity_command(9,rate,3.0,0.0,0.0,0.0,0.0,0.06,0.06)
 
-         
+        self.velocity_command(11,rate,6.0,0.0,0.0,0.0,0.0,-0.03,-0.03)
+
+
+        # #trans in y and x
+        self.velocity_command(13,rate,5.0,0.05,-0.03,-0.02,0.0,0.0,0.0)
+        
+        self.velocity_command(14,rate,2.5,-0.1,-0.06,-0.04,0.0,0.0,0.0)
+        
+        self.velocity_command(15,rate,5.0,0.0,0.06,-0.04,0.0,0.0,0.0)
+        self.velocity_command(16,rate,5.0,0.0,0.0,0.08,0.0,0.0,0.0)
+        
+        self.velocity_command(17,rate,2.5,-0.05,0.0,0.0,0.0,0.0,0.0)
+        self.velocity_command(18,rate,5.0,0.0,0.08,0.0,0.0,0.0,0.0)
+        
+        self.velocity_command(19,rate,2.0,0.1,0.0,0.0,0.0,0.0,0.0)
+        self.velocity_command(20,rate,4.0,0.0,-0.1,0.0,0.0,0.0,0.0)
+        
+        self.velocity_command(21,rate,2.0,-0.0625,0.0,0.0,0.0,0.0,0.0)
+        
+        #-------------------------------------------------------------------------
+        # self.velocity_command(9,rate,3.0,0.0,0.0,0.0,0.0,0.06,0.06)
+        # self.velocity_command(10,rate,3.0,0.0,0.0,0.0,0.0,-0.06,0.06)
+        # self.velocity_command(11,rate,6.0,0.0,0.0,0.0,0.0,-0.03,-0.03)
+        # self.velocity_command(12,rate,6.0,0.0,0.0,0.0,0.0,0.03,-0.03)
+        
+
+        
+        
+        
+
+
 
 # ! Do not changes this!------------------------------------------------------------------------------------------------
 # This stage moves the robot back to the initposition.
@@ -69,7 +109,7 @@ class cooperative_movement():
         """ Set a velocity command for a specific duration.
 
         Args:
-            stage (int): Number of velocity command.
+            stage (int): Number of stage.
             rate (float): Publish time.
             duration (float): Publish duration. 
             x_lin (float): Linear velocity in x[m/s].
@@ -79,7 +119,7 @@ class cooperative_movement():
             y_rot (float): Angular velocity around y[rad/s].
             z_rot (float): Angular velocity around z[rad/s].
         """
-        rospy.loginfo("Velocity command: %f",stage)
+        rospy.loginfo("Stage command: %f",stage)
         rospy.loginfo("x_lin %f[m/s],y_lin %f[m/s],z_lin %f[m/s],x_rot %f[rad/s],y_rot %f[rad/s],z_rot %f[rad/s]",x_lin,y_lin,z_lin,x_rot,y_rot,z_rot)
         rospy.loginfo("Duration: %f [s]",duration)
         
@@ -90,12 +130,17 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.y = y_rot
         self.joint_velocity_msg.angular.z = z_rot
         
+        
+        
         joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
                                         self.joint_velocity_msg.linear.y,
                                         self.joint_velocity_msg.linear.z,
                                         self.joint_velocity_msg.angular.x,
                                         self.joint_velocity_msg.angular.y,
                                         self.joint_velocity_msg.angular.z])
+        
+        self.vel_cmd_msg.data = joint_velocity_array
+        self.cmd_vel_publihser.publish(self.vel_cmd_msg)
         
         self.compute_path(self.joint_velocity_msg,duration)
         
@@ -162,8 +207,8 @@ class cooperative_movement():
             rate (Rate): Publish rate
             duration (float): Publishing time
         """
-        rospy.loginfo("Stage 0")
-        rospy.loginfo("Robots stop. Wait until program starts! Duration: %f [s]",duration)
+        rospy.loginfo("Stage init")
+        rospy.loginfo("Init movement! Duration: %f [s]",duration)
         
         self.joint_velocity_msg.linear.x = 0.0
         self.joint_velocity_msg.linear.y = 0.0
@@ -171,6 +216,16 @@ class cooperative_movement():
         self.joint_velocity_msg.angular.x = 0.0
         self.joint_velocity_msg.angular.y = 0.0
         self.joint_velocity_msg.angular.z = 0.0
+        
+        joint_velocity_array = np.array([self.joint_velocity_msg.linear.x,
+                                        self.joint_velocity_msg.linear.y,
+                                        self.joint_velocity_msg.linear.z,
+                                        self.joint_velocity_msg.angular.x,
+                                        self.joint_velocity_msg.angular.y,
+                                        self.joint_velocity_msg.angular.z])
+        
+        self.vel_cmd_msg.data = joint_velocity_array
+        self.cmd_vel_publihser.publish(self.vel_cmd_msg)
         
         self.compute_path(self.joint_velocity_msg,duration)
         
@@ -253,6 +308,8 @@ class cooperative_movement():
                                         self.joint_velocity_msg.angular.y,
                                         self.joint_velocity_msg.angular.z])
         
+        self.vel_cmd_msg.data = joint_velocity_array
+        self.cmd_vel_publihser.publish(self.vel_cmd_msg)
         
         self.compute_path(self.joint_velocity_msg,duration)
         
