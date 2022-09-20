@@ -209,6 +209,7 @@ class ur_admittance_controller():
         self.sigma_msg = Float32()
         self.singularity_msg = Bool()
         self.offset_msg = Bool()
+        self.wrench_base_msg = Float64MultiArray()
         
         self.delta_pos_publisher = rospy.Publisher(
                 '/' + self.namespace + '/measurement/delta_pos',
@@ -241,7 +242,11 @@ class ur_admittance_controller():
                 queue_size=1)
 
         
-        
+        self.wrench_base_publisher = rospy.Publisher(
+                '/' + self.namespace + '/measurement/wrench_base',
+                Float64MultiArray,
+                tcp_nodelay=True,
+                queue_size=1)
         
         # Publisher and Subscriber for measurements-------------------------------------------------------------
         
@@ -366,7 +371,7 @@ class ur_admittance_controller():
         # 2.
         # adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(1/2))
         # 3.
-        adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(3/2))
+        #adjusting_scalar = (1-(current_sigma/self.singularity_entry_threshold)**(3/2))
         # 4.
         adjusting_scalar = 0.5 * (1 + math.cos(pi*((current_sigma-self.singularity_min_threshold)/(self.singularity_entry_threshold - self.singularity_min_threshold))))
         
@@ -564,6 +569,18 @@ class ur_admittance_controller():
             Get external wrench in 'tool0_controller' frame.
             
         """
+        
+        #------------------------------------------------------------------------
+        wrench_ext_array = numpy.array([wrench_ext.wrench.force.x,
+                                        wrench_ext.wrench.force.y,
+                                        wrench_ext.wrench.force.z,
+                                        wrench_ext.wrench.torque.x,
+                                        wrench_ext.wrench.torque.y,
+                                        wrench_ext.wrench.torque.z])
+        
+        self.wrench_base_msg.data = self.transform_vector('tool0_controller','base_link',wrench_ext_array)
+        self.wrench_base_publisher.publish(self.wrench_base_msg)
+        #------------------------------------------------------------------------
         # * Average filter
         # Fill the empty lists with wrench values
         if len(self.average_filter_list_force_x) < self.average_filter_list_length:
@@ -696,8 +713,8 @@ class ur_admittance_controller():
             # Transform cartesian_velocity rotation from 'world' frame to 'tool0' frame
             self.tool0_velocity_rot = self.tf_listener.transformVector3('tool0',self.world_cartesian_velocity_rot)
             
-            print("self.tool0_velocity_rot")
-            print(self.tool0_velocity_rot)
+            #print("self.tool0_velocity_rot")
+            #print(self.tool0_velocity_rot)
             
             tool0_velocity_rot_array = numpy.array([self.tool0_velocity_rot.vector.x,
                                                     self.tool0_velocity_rot.vector.y,
@@ -724,8 +741,8 @@ class ur_admittance_controller():
                     
             # print("pose_trans_diff ")
             # print(pose_trans_diff )
-            print("pose_rot_diff")
-            print(pose_rot_diff)
+            #print("pose_rot_diff")
+            #print(pose_rot_diff)
             
             # For measurements------------------------------------------------------------------------------------------
             self.delta_pos_msg.data = pose_trans_diff
@@ -748,9 +765,7 @@ class ur_admittance_controller():
             self.admittance_velocity[1] = (self.wrench_diff[1] + (pose_trans_diff[1] * self.Kp_trans_y * self.A_trans_y)) / self.A_trans_y 
             self.admittance_velocity[2] = (self.wrench_diff[2] + (pose_trans_diff[2] * self.Kp_trans_z * self.A_trans_z)) / self.A_trans_z 
             
-            # self.admittance_velocity[3] = ((pose_rot_diff[0] * self.Kp_rot_x * self.A_rot_x )) / self.A_rot_x 
-            # self.admittance_velocity[4] = ((pose_rot_diff[1] * self.Kp_rot_y * self.A_rot_y)) / self.A_rot_y
-            # self.admittance_velocity[5] = ((pose_rot_diff[2] * self.Kp_rot_z * self.A_rot_z )) / self.A_rot_z    
+  
             
             self.admittance_velocity[3] = (self.wrench_diff[3] + (pose_rot_diff[0] * self.Kp_rot_x * self.A_rot_x )) / self.A_rot_x 
             self.admittance_velocity[4] = (self.wrench_diff[4] + (pose_rot_diff[1] * self.Kp_rot_y * self.A_rot_y)) / self.A_rot_y
@@ -764,20 +779,6 @@ class ur_admittance_controller():
             self.target_cartesian_velocity[4] = self.base_link_desired_velocity[4] + self.admittance_velocity[4]
             self.target_cartesian_velocity[5] = self.base_link_desired_velocity[5] + self.admittance_velocity[5]
 
-            # # * Check self.target_cartesian_velocity for the max velocity limits
-            # # Calculate the norm of target_cartesian_velocity (trans and rot)
-            # target_cartesian_trans_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[0],2) + pow(self.target_cartesian_velocity[1],2) + pow(self.target_cartesian_velocity[2],2))
-            
-            # target_cartesian_rot_velocity_norm = math.sqrt(pow(self.target_cartesian_velocity[3],2) + pow(self.target_cartesian_velocity[4],2) + pow(self.target_cartesian_velocity[5],2))
-            
-            # #  Check for cartesian velocity max limit and set to max limit, if max limit is exceeded
-            # if target_cartesian_trans_velocity_norm > self.cartesian_velocity_trans_max_limit:
-            #     for i in range(3):
-            #         self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_trans_velocity_norm) * self.cartesian_velocity_trans_max_limit
-                    
-            # if target_cartesian_rot_velocity_norm > self.cartesian_velocity_rot_max_limit:
-            #     for i in range(3,6):
-            #         self.target_cartesian_velocity[i] = (self.target_cartesian_velocity[i]/target_cartesian_rot_velocity_norm) * self.cartesian_velocity_rot_max_limit
                     
             # * Get the current joint states 
             self.current_joint_states_array = self.group.get_current_joint_values() 
@@ -799,6 +800,8 @@ class ur_admittance_controller():
 
             # For measurements------------------------------------------------------------------------------------------
 
+            #* Reset the singularity velocity world to zero
+            self.singularity_avoidance_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
             
             for sigma in range(len(s)):
                 
@@ -815,12 +818,11 @@ class ur_admittance_controller():
                         else:
                             
                             if s[sigma] > self.singularity_min_threshold:
-                                self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                                self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma])) + self.singularity_avoidance_velocity
 
                             else:
-                                self.singularity_avoidance_velocity = numpy.dot(1,numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
-            # if  self.singularity_entry_threshold < sigma_min < self.singularity_exit_threshold and self.bool_singularity == True:
-            #     self.singularity_avoidance_velocity = numpy.dot(self.scalar_adjusting_function(s[sigma]),numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma]))
+                                self.singularity_avoidance_velocity = numpy.dot(1,numpy.dot(numpy.dot(u[:,sigma],self.target_cartesian_velocity),u[:,sigma])) + self.singularity_avoidance_velocity
+
 
                 
             # If a singularity was detected but the singularity_counter is null, 
@@ -830,8 +832,8 @@ class ur_admittance_controller():
                 self.bool_singularity = False
                 self.bool_reduce_singularity_offset = True
                 rospy.loginfo("Deactivate OLMM")
-                #* Reset the singularity velocity world to zero
-                self.singularity_avoidance_velocity = [0.0,0.0,0.0,0.0,0.0,0.0]
+                
+                
                 
             #* Transform the singularity avoidance velocity into 'world' frame
             self.singularity_velocity_world = self.transform_vector('base_link','world',self.singularity_avoidance_velocity)
@@ -840,38 +842,6 @@ class ur_admittance_controller():
             self.singularity_velocity_msg.singularity_velocity = self.singularity_velocity_world
             self.singularity_velocity_pub.publish(self.singularity_velocity_msg)  
                 
-            #* Check for trajectory differences:
-            if self.bool_reduce_singularity_offset == True:
-                
-                print("numpy.linalg.norm(pose_trans_diff)")
-                print(numpy.linalg.norm(pose_trans_diff))
-                print("numpy.linalg.norm(pose_rot_diff)")
-                print(numpy.linalg.norm(pose_rot_diff))
-                
-                # self.reconstruct_trajektory[0] = -(pose_trans_diff[0]  * self.Kp_trans_x * self.A_trans_x)/ self.A_trans_x
-                # self.reconstruct_trajektory[1] = -(pose_trans_diff[1]  * self.Kp_trans_y * self.A_trans_y)/ self.A_trans_y
-                # self.reconstruct_trajektory[2] = -(pose_trans_diff[2]  * self.Kp_trans_z * self.A_trans_z)/ self.A_trans_z
-                
-                
-                # self.reconstruct_trajektory[3] = -(pose_rot_diff[0]  * self.Kp_rot_x * self.A_rot_x ) / self.A_rot_x 
-                # self.reconstruct_trajektory[4] = -(pose_rot_diff[1]  * self.Kp_rot_y * self.A_rot_y ) / self.A_rot_y 
-                # self.reconstruct_trajektory[5] = -(pose_rot_diff[2]  * self.Kp_rot_z * self.A_rot_z ) / self.A_rot_z 
-                
-                #* Transform the singularity avoidance velocity into 'world' frame
-                self.singularity_velocity_world = self.transform_vector('base_link','world',self.reconstruct_trajektory)
-                #* Publish the singularity avoidance velocity to rosmaster
-                self.singularity_velocity_msg.singularity_stop = self.singularity_stop
-                self.singularity_velocity_msg.singularity_velocity = self.singularity_velocity_world
-                self.singularity_velocity_pub.publish(self.singularity_velocity_msg)  
-                
-                if numpy.linalg.norm(pose_trans_diff) < self.singularity_trans_offset_accuracy and numpy.linalg.norm(pose_rot_diff) < self.singularity_rot_offset_accuracy:
-                    
-                    self.bool_reduce_singularity_offset = False
-                    
-                    self.singularity_velocity_world = numpy.array([0.0,0.0,0.0,0.0,0.0,0.0]) 
-                    
-                    rospy.loginfo("Endeffector trans difference %f [m] is samller then threshold %f [m]",numpy.linalg.norm(pose_trans_diff),self.singularity_trans_offset_accuracy)
-                    rospy.loginfo("Endeffector rot difference %f [rad] is samller then threshold %f [rad]",numpy.linalg.norm(pose_rot_diff),self.singularity_rot_offset_accuracy) 
                 
                 
             
