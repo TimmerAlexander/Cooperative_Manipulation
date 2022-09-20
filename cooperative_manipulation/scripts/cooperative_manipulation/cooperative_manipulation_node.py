@@ -26,7 +26,7 @@ class singularity_avoidance_node():
         self.singularity_avoidance_stop = False
         self.workspace_violation = False
         
-        self.gripper_distance = 1.073
+        self.gripper_distance = 1.20 #[m]
         
     def __init__(self):
         

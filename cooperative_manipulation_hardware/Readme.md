@@ -85,10 +85,10 @@
 
 - Navigate to your rosbag folder
 
-        cd ~/catkin_ws_timmer/src/Cooperative_Manipulation/cooperative_manipulation/rosbag
+        cd ~/catkin_ws_timmer/src/Cooperative_Manipulation/cooperative_manipulation/bag
 - Record measurements:
 
-        rosbag record /panda/franka_state_controller/F_ext /panda/measurement/delta_pos /panda/measurement/delta_ori /ur/wrench /ur/measurement/delta_pos /ur/measurement/delta_ori /ur/measurement/sigma
+        rosbag record /measurement/cmd_vel /cooperative_manipulation/singularity_velocity /cooperative_manipulation/workspace /panda/franka_state_controller/F_ext /panda/measurement/delta_pos /panda/measurement/delta_ori /ur/wrench /ur/measurement/delta_pos /ur/measurement/delta_ori /ur/measurement/sigma /ur/measurement/sigularity /ur/measurement/reduce_offset
 - Play rosbag file 
 
         rosbag play <rosbag file name>

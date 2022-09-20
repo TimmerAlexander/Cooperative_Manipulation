@@ -18,16 +18,15 @@ class ur16e_singularity_test():
     
     def config(self):
         # Set the radius and the trajectory velocity of the circular movement
-        self.set_trajectory_velocity = 0.05
+        self.set_trajectory_velocity = 0.1
         # From Start position and singularity entrance threshold = 0.05, radius = 0.156 is the smallest without singularity avoidance
-        # radius 0.166 is the biggest, when singularity min threshold = 0.01
-        self.radius = 0.163
+        # radius 0.165 is the biggest without singularity stop
+        self.radius = 0.17
         # ! Do not change under here------------------------------------------------------------------------------------
-        self.trajectory_velocity_limit = 0.1 # [rad/s]
+        self.trajectory_velocity_limit = 0.11 # [rad/s]
         self.alpha = 0.0 # [rad]
         self.publish_rate = 100 # [HZ] 
         self.angular_velocity_vector = np.array([0.0,0.0,0.0])
-        # ! Do not change under here------------------------------------------------------------------------------------
         self.trajectory_msg = Float64MultiArray()
         self.pub_trajectory = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
         self.singularity_velocity = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
