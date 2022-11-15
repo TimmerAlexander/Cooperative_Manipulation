@@ -10,12 +10,41 @@ add_compile_options(-std=c++17)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
-  hardware_interface
   pluginlib
   roscpp
   rospy
   std_msgs
+  dynamic_reconfigure
+  eigen_conversions
+  franka_hw
+  franka_gripper
+  geometry_msgs
+  hardware_interface
+  joint_limits_interface
+  tf
+  tf_conversions
+  message_generation
+  realtime_tools
+  urdf
+  visualization_msgs
+  franka_example_controllers
 )
+
+find_package(Eigen3 REQUIRED)
+find_package(Franka 0.9.0 QUIET)
+if(NOT Franka_FOUND)
+  find_package(Franka 0.8.0 REQUIRED)
+endif()
+
+
+# generate_dynamic_reconfigure_options(
+#   cfg/compliance_param.cfg
+#   cfg/desired_mass_param.cfg
+#   cfg/dual_arm_compliance_param.cfg
+#   cfg/teleop_param.cfg
+#   cfg/teleop_gripper_param.cfg
+# )
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -50,13 +79,14 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * uncomment the generate_messages entry below
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+catkin_python_setup()
 
+## Generate messages in the 'msg' folder
+add_message_files(
+  FILES
+  SingularityAvoidance.msg
+  WorkspaceViolation.msg
+)
 ## Generate services in the 'srv' folder
 # add_service_files(
 #   FILES
@@ -72,10 +102,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -107,11 +137,32 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
+  INCLUDE_DIRS include
   LIBRARIES cooperative_manipulation_controllers
-  CATKIN_DEPENDS roscpp rospy std_msgs
-  pluginlib
-  CATKIN_DEPENDS
-  rospy)
+  CATKIN_DEPENDS 
+    roscpp
+    rospy
+    std_msgs
+    controller_interface
+    dynamic_reconfigure
+    eigen_conversions
+    franka_hw
+    franka_gripper
+    geometry_msgs
+    hardware_interface
+    joint_limits_interface
+    tf
+    tf_conversions
+    message_runtime
+    pluginlib
+    realtime_tools
+    urdf
+    visualization_msgs
+    franka_example_controllers
+  DEPENDS Franka
+  )
+
+
 
 ###########
 ## Build ##
@@ -119,26 +170,36 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(
-# include
+include_directories( 
+  include 
   ${catkin_INCLUDE_DIRS}
-  ${GAZEBO_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  #${GAZEBO_INCLUDE_DIRS}
+)
+
+add_library(cooperative_manipulation_controllers
+  src/franka_joint_impedance_control_hardware.cpp
+  src/franka_cartesian_impedance_control_hardware.cpp
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME} 
-# )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(cooperative_manipulation_controllers 
+#       ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+#       ${catkin_EXPORTED_TARGETS})
+add_dependencies(cooperative_manipulation_controllers
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+)
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 # ## The recommended prefix ensures that target names across packages don't collide
-#  add_executable(gazebo_ros_interface src/gazebo_ros_interface.cpp)
-#  target_link_libraries(gazebo_ros_interface ${GAZEBO_LIBRARIES}  ${catkin_LIBRARIES} pthread)
+# add_executable(cooperative_manipulation_controllers src/franka_joint_torque_controller.cpp)
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -150,9 +211,20 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(cooperative_manipulation_controllers PUBLIC
+  ${Franka_LIBRARIES}
+  ${catkin_LIBRARIES}
+)
+
+target_include_directories(cooperative_manipulation_controllers SYSTEM PUBLIC
+  ${Franka_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
+)
+
+target_include_directories(cooperative_manipulation_controllers PUBLIC
+  include
+)
 
 # link_directories(${GAZEBO_LIBRARY_DIRS})
 # list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS}")
@@ -169,8 +241,15 @@ include_directories(
 #   scripts/my_python_script
 #   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 # )
+## Installation
 
-catkin_python_setup()
+install(FILES cooperative_manipulation_controllers_plugin.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+
+
+
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
 #catkin_install_python(PROGRAMS scripts/cooperative_manipulation_controllers/franka_impedance_control_sim.py
@@ -200,6 +279,8 @@ catkin_python_setup()
 #   # myfile2
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
+
+
 
 #############
 ## Testing ##

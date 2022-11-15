@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="robot_ip" value="192.168.13.90" />
+  <arg name="load_gripper" default="true" />
+  <arg name="panda_name" default="panda"/>
+ 
+  <group ns="$(arg panda_name)"> 
+
+    <include file="$(find cooperative_manipulation_hardware)/hardware_launch/utils/robots/franka.launch" >
+      <arg name="robot_ip" value="$(arg robot_ip)" />
+      <arg name="load_gripper" value="$(arg load_gripper)" />
+    </include>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="panda_link0_world_broadcaster" args="0 0 0 3.14 0 0 world panda_link0" />
+
+    <!-- Launch the franka_hardware_node -->
+    <node pkg="cooperative_manipulation_hardware" name="franka_hardware_node" type="franka_hardware_node.py" output="screen">
+            <param name="panda_ns" value="$(arg panda_name)"/>
+    </node>
+
+  </group>
+
+</launch>
