@@ -1014,7 +1014,7 @@ class ur_admittance_controller():
             self.singularity_velocity_world = self.transform_vector('base_link','world',self.singularity_avoidance_velocity)
             #
             self.singularity_velocity_msg.singularity_stop = self.singularity_stop
-            self.singularity_velocity_msg.singularity_avoidance_velocity = self.singularity_velocity_world
+            self.singularity_velocity_msg.singularity_velocity = self.singularity_velocity_world
             # Publish the singularity avoidance velocity to rosmaster
             self.singularity_velocity_pub.publish(self.singularity_velocity_msg)  
                 

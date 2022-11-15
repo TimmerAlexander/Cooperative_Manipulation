@@ -57,7 +57,7 @@ class singularity_avoidance_node():
                 
             # Publish
             self.singularity_msg.singularity_stop = self.singularity_stop
-            self.singularity_msg.singularity_avoidance_velocity = self.singularity_avoidance_velocity
+            self.singularity_msg.singularity_velocity = self.singularity_avoidance_velocity
             
             
             self.singularity_velocity_pub.publish(self.singularity_msg)
@@ -70,7 +70,7 @@ class singularity_avoidance_node():
 
         """
         self.singularity_stop = singularity_velocity.singularity_stop
-        self.singularity_avoidance_velocity = singularity_velocity.singularity_avoidance_velocity
+        self.singularity_avoidance_velocity = singularity_velocity.singularity_velocity
             
    
 if __name__ == '__main__':

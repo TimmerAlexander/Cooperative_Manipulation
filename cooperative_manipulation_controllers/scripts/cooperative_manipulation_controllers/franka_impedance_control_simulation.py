@@ -156,7 +156,7 @@ class franka_impedance_controller():
         #     queue_size=1,
         #     tcp_nodelay=True)
         
-        self.cartesian_msg_sub = rospy.Subscriber(
+        self.singularity_msg_sub = rospy.Subscriber(
             '/cooperative_manipulation/singularity_velocity', 
             SingularityAvoidance, 
             self.singularity_velocity_callback,
@@ -373,9 +373,9 @@ class franka_impedance_controller():
         # Converse cartesian_velocity translation to vector3
         world_cartesian_velocity_trans.header.frame_id = 'world'
         world_cartesian_velocity_trans.header.stamp = now
-        world_cartesian_velocity_trans.vector.x = singularity_velocity.singularity_avoidance_velocity[0]
-        world_cartesian_velocity_trans.vector.y = singularity_velocity.singularity_avoidance_velocity[1]
-        world_cartesian_velocity_trans.vector.z = singularity_velocity.singularity_avoidance_velocity[2]
+        world_cartesian_velocity_trans.vector.x = singularity_velocity.singularity_velocity[0]
+        world_cartesian_velocity_trans.vector.y = singularity_velocity.singularity_velocity[1]
+        world_cartesian_velocity_trans.vector.z = singularity_velocity.singularity_velocity[2]
             
         # Transform cartesian_velocity translation from 'ur/base_link' frame to 'panda/base' frame 
         base_singularity_velocity_trans = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_trans)
@@ -383,9 +383,9 @@ class franka_impedance_controller():
         # Converse cartesian_velocity rotation to vector3
         world_cartesian_velocity_rot.header.frame_id = 'world'
         world_cartesian_velocity_rot.header.stamp = now
-        world_cartesian_velocity_rot.vector.x = singularity_velocity.singularity_avoidance_velocity[3]
-        world_cartesian_velocity_rot.vector.y = singularity_velocity.singularity_avoidance_velocity[4]
-        world_cartesian_velocity_rot.vector.z = singularity_velocity.singularity_avoidance_velocity[5]
+        world_cartesian_velocity_rot.vector.x = singularity_velocity.singularity_velocity[3]
+        world_cartesian_velocity_rot.vector.y = singularity_velocity.singularity_velocity[4]
+        world_cartesian_velocity_rot.vector.z = singularity_velocity.singularity_velocity[5]
         
         # Transform cartesian_velocity rotation from 'ur/base_link' frame to 'panda/base' frame
         base_singularity_velocity_rot = self.tf_listener.transformVector3('panda/base',world_cartesian_velocity_rot)
