@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="cooperative_movment" default="true"/>
+
+  <!-- Start cooperative_movement_node -->
+  <group if="$(arg cooperative_movment)">
+    <node name="cooperative_movement_node" pkg="cooperative_manipulation" type="cooperative_movement.py" output="screen"/>
+  </group>
+
+  <!-- Start elbow_singularity_node -->
+  <group unless="$(arg cooperative_movment)">
+    <node name="elbow_singularity_node" pkg="cooperative_manipulation" type="elbow_singularity.py" output="screen"/> 
+  </group>
+
+</launch>
+

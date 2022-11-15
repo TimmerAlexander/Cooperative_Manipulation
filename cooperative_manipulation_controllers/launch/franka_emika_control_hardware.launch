@@ -4,10 +4,16 @@
  
   <group ns="$(arg panda_name)"> 
 
-    <!-- Launch the franka_impedance_controller parameters -->
-    <rosparam command="load" file="$(find cooperative_manipulation_controllers)/config/franka_impedance_control_hardware.yaml" />
+    <!-- Launch the franka_cartesian_impedance_controller parameters -->
+    <rosparam command="load" file="$(find cooperative_manipulation_controllers)/config/franka_cartesian_impedance_control_hardware.yaml" />
     <!-- Launch the franka_impedance_controller -->
-    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_impedance_controller"/>
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_cartesian_impedance_controller"/>
+
+
+    <!-- Launch the franka_joint_impedance_controller parameters -->
+    <!-- <rosparam command="load" file="$(find cooperative_manipulation_controllers)/config/franka_joint_impedance_control_hardware.yaml" /> -->
+    <!-- Launch the franka_impedance_controller -->
+    <!-- <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="franka_joint_impedance_controller"/> -->
 
   </group>
 

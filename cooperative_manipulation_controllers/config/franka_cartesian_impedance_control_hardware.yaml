@@ -1,0 +1,27 @@
+franka_cartesian_impedance_controller:
+    type: cooperative_manipulation_controllers/FrankaCartesianImpedanceController
+    arm_id: panda
+    joint_names:
+        - panda_joint1
+        - panda_joint2
+        - panda_joint3
+        - panda_joint4
+        - panda_joint5
+        - panda_joint6
+        - panda_joint7
+    k_gains:
+        - 300.0
+        - 300.0
+        - 300.0
+        - 50.0
+        - 50.0
+        - 50.0
+    d_gains:
+        - 150.0
+        - 150.0
+        - 150.0
+        - 20.0
+        - 20.0
+        - 20.0
+    publish_rate: 10.0
+    coriolis_factor: 1.0
