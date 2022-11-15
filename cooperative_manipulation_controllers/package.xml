@@ -83,6 +83,13 @@
   <exec_depend>moveit_commander</exec_depend>
 
 
+  <depend>message_generation</depend>
+
+
+  <depend>message_runtime</depend>
+
+
+
 
 
   <!-- The export tag contains other, unspecified, tags -->
