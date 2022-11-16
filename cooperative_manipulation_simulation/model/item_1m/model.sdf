@@ -23,7 +23,7 @@
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <mesh>
-            <uri>/home/rosmatch/catkin_ws_timmer/src/Cooperative_Manipulation/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
+            <uri>/Path/to/your/workspace/src/Cooperative_Manipulation/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
             <scale>1 1 1</scale>
           </mesh>
         </geometry>
