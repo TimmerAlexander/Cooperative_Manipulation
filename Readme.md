@@ -217,9 +217,7 @@ In a new Terminal:
 
 **Solution:**
 
-In a new Terminal:
-
-        press and release emergency stop
+        Press and release emergency stop
 
 ### **UR16e:**
 Zero F/T-Sensor:
