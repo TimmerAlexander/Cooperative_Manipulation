@@ -1,4 +1,4 @@
-
+# **This package contains code for cooperative mainpulation of an object with a Franka Emika Panda (impedance controller) and a UR16e (admittance controller + singularity avoidance).**
 # 1. Installation
 Start by changing directory to your catkin workspace!
 
@@ -109,7 +109,7 @@ to
     <mu1>1000000.0</mu1>
     <mu2>1000000.0</mu2>
 
-## 5. Install libfranka: 
+## 5. Install libfranka
 Libfranka can be installed as described in the following link: https://frankaemika.github.io/docs/installation_linux.html#installing-from-the-ros-repositories
 
 ## 6. Build packages
@@ -123,27 +123,27 @@ Clean build with libfranka:
 
 # 2. Usage
 ## **Launch cooperative manipulation with hardware.**
-
+> Attention:  It is important that the grippers of the robots face each other on a line.
 ## 1. Start rosmaster
 In a new Terminal: 
 
         roscore
 
 ## 2. Launch the UR16e
+In a new Terminal: 
+
+        roslaunch cooperative_manipulation_hardware ur16e_hardware.launch
+
 Move the UR16e to the start position if nessecary. You can change the start pose of the UR16e by changing the joint angles in "ur16e_move_to_start.launch".
 
 In a new Terminal: 
 
         roslaunch cooperative_manipulation_hardware ur16e_move_to_start.launch
 
-In a new Terminal: 
-
-        roslaunch cooperative_manipulation_hardware ur16e_hardware.launch
 
 
 
-
-## 3. Launch the panda
+## 3. Launch the Franka Emika Panda
 On Franka Desk click on "Activate FCI" in the menu!
 
 In a new Terminal:
@@ -155,17 +155,17 @@ Launch the UR16e admittance controller.
 
 In a new Terminal:
 
-        roslaunch cooperative_manipulation_controllers franka_control_hardware.launch
+        roslaunch cooperative_manipulation_controllers ur16e_control_hardware.launch 
 
-Launch the Franka impedance controller.
+Launch the Franka Emika Panda impedance controller.
 
 In a new Terminal:
 
-        roslaunch cooperative_manipulation_controllers ur16e_control_hardware.launch
+        roslaunch cooperative_manipulation_controllers franka_control_hardware.launch
 
 
 ## 5. Launch the cooperative manipulation node
-This script enables communication between the robots.
+This script enables communication between the robots. Measure the distance between the grippers and pass it as parameter "self.gripper_distance" in the "cooperative_manipulation_node.py" script (Important for the rotation movement).
 
 In a new Terminal: 
 
@@ -179,11 +179,11 @@ In a new Terminal:
 
 ## 7. Launch the cooperative manipulation movements
 ### **A movement consisting of translatory and rotatory movement**
-Plan a trajectory of translational and rotational mmovements in "measurements_movement.py" and launch the movement as follow:
+Plan a trajectory of translational and rotational movements in "measurements_movement.py" and launch the movement as follow:
 
 In a new Terminal: 
 
-        rosrun cooperative_manipulation measurements_movement.py
+        roslaunch cooperative_manipulation measurements.launch cooperative_movment:=true
 
 ### **A movement consisting of a circular motion**
 A movement that triggers an elbow singularity at UR16e (from the given start pose).
@@ -191,7 +191,7 @@ You can set the radius and speed in "elbow_singularity.py" and start the movemen
 
 In a new Terminal: 
 
-        rosrun cooperative_manipulation elbow_singularity.py
+        roslaunch cooperative_manipulation measurements.launch cooperative_movment:=false
 
 ### **Set a velocity commands**
 Set a velocity command from the terminal under the topic:
@@ -247,14 +247,16 @@ In a new Terminal:
 In a new Terminal: 
 
         roslaunch cooperative_manipulation_simulation cooperative_manipulation_franka.launch
+
+Change the directory in "cooperative_manipulation_simulation/model/item_1m/model.sdf" if you haven't already done so:
+
+    <uri>/<Path to your workspace>/src/Cooperative_Manipulation/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
+
 In a new Terminal: 
 
         roslaunch cooperative_manipulation_simulation cooperative_manipulation_object.launch
 
 ## 2. Grasp the object
-Change the directory in "cooperative_manipulation_simulation/model/item_1m/model.sdf" if you haven't already done so:
-
-    <uri>/<Path to your workspace>/src/Cooperative_Manipulation/cooperative_manipulation_simulation/model/visual/ItemProfile_1m.dae</uri>
 In a new Terminal: 
 
         roslaunch cooperative_manipulation_simulation cooperative_manipulation_gripper_grasp.launch
